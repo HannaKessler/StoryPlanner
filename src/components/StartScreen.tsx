@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Logo } from "./Logo";
 import { Field, Modal } from "./Modal";
 import { useProjectStore } from "../store/projectStore";
 
@@ -27,7 +26,6 @@ export function StartScreen() {
   return (
     <div className="sp-start">
       <section className="sp-start-hero">
-        <Logo size={42} />
         <h1>StoryPlanner</h1>
         <div className="sp-start-actions">
           <button type="button" className="sp-btn is-primary" disabled={busy} onClick={() => setCreating(true)}>

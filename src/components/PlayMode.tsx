@@ -18,21 +18,19 @@ export function PlayMode() {
   const enter = actions.find((action) => action.kind === "enter");
   const back = actions.find((action) => action.kind === "return");
   const open = transitions.filter((action) => action.enabled).length;
-  const depth = play.frames.map((frame) => graphs[frame.graphId]?.name || "Untitled").join(" / ");
 
   return (
     <div className="sp-play">
       <div className="sp-play-stage">
         <div className="sp-play-bar">
-          <span className="sp-faint">{depth}</span>
+          <p className="sp-play-log" title="Beats entered so far">
+            {play.log.join(" → ")}
+          </p>
           <span className="sp-grow" />
           <button type="button" className="sp-chip-btn" onClick={restartPlay}>
             Restart
           </button>
         </div>
-        <p className="sp-play-log" title="Beats entered so far">
-          {play.log.join(" → ")}
-        </p>
         {!location && <p className="sp-empty">Beat missing.</p>}
         {location && (
           <article className="sp-script">

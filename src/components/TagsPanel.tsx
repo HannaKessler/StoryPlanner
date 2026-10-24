@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { TAG_COLORS } from "../domain/factories";
 import type { TagCategory } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { IconButton, Section } from "./Panel";
@@ -66,17 +65,6 @@ function CategoryBlock({ category }: { category: TagCategory }) {
           <div className="sp-chips">
             {category.tags.map((tag) => (
               <span key={tag.id} className="sp-tag-chip">
-                <button
-                  type="button"
-                  className="sp-swatch"
-                  style={{ background: tag.color }}
-                  title="Change colour"
-                  aria-label={`Change colour of ${tag.name}`}
-                  onClick={() => {
-                    const index = TAG_COLORS.indexOf(tag.color);
-                    updateTag(category.id, tag.id, { color: TAG_COLORS[(index + 1) % TAG_COLORS.length] });
-                  }}
-                />
                 <input
                   className="sp-chip-input"
                   aria-label="Tag name"

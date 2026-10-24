@@ -3,7 +3,6 @@ import {
   Background,
   Controls,
   MarkerType,
-  MiniMap,
   ReactFlow,
   ReactFlowProvider,
   applyEdgeChanges,
@@ -23,14 +22,6 @@ import { TransitionEdge, type TransitionFlowEdge } from "./TransitionEdge";
 
 const nodeTypes = { story: StoryNodeCard };
 const edgeTypes = { transition: TransitionEdge };
-
-const NODE_COLORS: Record<string, string> = {
-  start: "#9cba92",
-  event: "#e3a15a",
-  scene: "#8eb4c8",
-  dialogue: "#b7a4d6",
-  end: "#d4897a",
-};
 
 export function GraphCanvas() {
   const graph = useProjectStore((state) => (state.currentGraphId ? state.graphs[state.currentGraphId] : null));
@@ -132,13 +123,6 @@ function CanvasBody({ graph, project }: { graph: GraphDocument; project: Project
       >
         <Background color="#3a342c" gap={20} size={1.1} />
         <Controls showInteractive={false} />
-        <MiniMap
-          pannable
-          zoomable
-          style={{ width: 150, height: 96 }}
-          nodeColor={(node) => NODE_COLORS[(node.data as { story?: { type?: string } }).story?.type ?? ""] ?? "#5c5348"}
-          maskColor="rgba(18, 17, 15, 0.7)"
-        />
       </ReactFlow>
     </div>
   );
@@ -155,7 +139,7 @@ function toNodes(graph: GraphDocument): StoryFlowNode[] {
 
 function toEdges(graph: GraphDocument, project: ProjectDocument): TransitionFlowEdge[] {
   return graph.edges.map((edge) => {
-    const color = edge.condition ? "#e3a15a" : "#8a7d6c";
+    const color = "#8a7d6c";
     return {
       id: edge.id,
       type: "transition",

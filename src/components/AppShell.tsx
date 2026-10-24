@@ -8,7 +8,6 @@ import { ExportDialog } from "./ExportDialog";
 import { GraphCanvas } from "./GraphCanvas";
 import { Inspector } from "./Inspector";
 import { LeftPanel } from "./LeftPanel";
-import { Logo } from "./Logo";
 import { Modal } from "./Modal";
 import { PlayMode } from "./PlayMode";
 
@@ -44,7 +43,6 @@ export function AppShell() {
     <div className="sp-app">
       <header className="sp-topbar">
         <div className="sp-brand">
-          <Logo size={20} />
           <div className="sp-menu">
             <button type="button" className="sp-btn sp-btn-quiet" onClick={() => setMenu((open) => !open)}>
               File
@@ -125,12 +123,12 @@ export function AppShell() {
               </nav>
               <div className="sp-toolbar">
                 {!hasStart && (
-                  <button type="button" className="sp-chip-btn sp-type-start" onClick={() => addNode("start")}>
+                  <button type="button" className="sp-chip-btn" onClick={() => addNode("start")}>
                     + Start
                   </button>
                 )}
                 {ADDABLE.map((type) => (
-                  <button key={type} type="button" className={`sp-chip-btn sp-type-${type}`} onClick={() => addNode(type)}>
+                  <button key={type} type="button" className="sp-chip-btn" onClick={() => addNode(type)}>
                     + {NODE_LABEL[type]}
                   </button>
                 ))}

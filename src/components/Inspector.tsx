@@ -55,12 +55,11 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
   const child = node.subgraphId ? graphs[node.subgraphId] : undefined;
   const content = node.type === "event" || node.type === "scene" || node.type === "dialogue";
   const outgoing = graph.edges.filter((edge) => edge.source === node.id);
-  const incoming = graph.edges.filter((edge) => edge.target === node.id);
 
   return (
     <>
       <div className="sp-insp-head">
-        <span className={`sp-kicker sp-type-${node.type}`}>{NODE_LABEL[node.type]}</span>
+        <span className="sp-kicker">{NODE_LABEL[node.type]}</span>
         <input className="sp-head-input" aria-label="Title" value={node.title} onChange={(event) => updateNode(node.id, { title: event.target.value })} />
         {content && !child && (
           <button type="button" className="sp-chip-btn" title="Create an inner graph for this beat" onClick={() => openSubgraph(node.id)}>
@@ -151,11 +150,6 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
         </Section>
       )}
 
-      {node.type !== "start" && (
-        <Section id="insp:in" title="Transitions in" count={incoming.length} defaultOpen={false}>
-          <TransitionList graph={graph} edges={incoming} project={project} side="source" />
-        </Section>
-      )}
     </>
   );
 }
@@ -186,7 +180,6 @@ function TransitionList({
           <li key={edge.id}>
             <button type="button" className="sp-trans" onClick={() => select({ kind: "edge", id: edge.id })}>
               <span className="sp-trans-top">
-                {edge.condition && <i className="sp-cond-dot" title="Has conditions" />}
                 <strong>{edge.label || (side === "target" ? `→ ${otherTitle}` : `${otherTitle} →`)}</strong>
                 {edge.label && <span className="sp-faint">{side === "target" ? `→ ${otherTitle}` : `from ${otherTitle}`}</span>}
               </span>
@@ -220,16 +213,11 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
   const project = useProjectStore((state) => state.project);
   const updateEdge = useProjectStore((state) => state.updateEdge);
   const deleteEdges = useProjectStore((state) => state.deleteEdges);
-  const moveEdge = useProjectStore((state) => state.moveEdge);
-  const select = useProjectStore((state) => state.select);
   const addEdgeEffect = useProjectStore((state) => state.addEdgeEffect);
   const updateEdgeEffect = useProjectStore((state) => state.updateEdgeEffect);
   const deleteEdgeEffect = useProjectStore((state) => state.deleteEdgeEffect);
   const edge = graph.edges.find((item) => item.id === edgeId);
   if (!edge || !project) return null;
-  const siblings = graph.edges.filter((item) => item.source === edge.source);
-  const order = siblings.indexOf(edge);
-  const source = graph.nodes.find((item) => item.id === edge.source);
 
   return (
     <>
@@ -262,9 +250,6 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
                 </option>
               ))}
           </select>
-          <IconButton label="Select source beat" onClick={() => select({ kind: "node", id: edge.source })}>
-            ↗
-          </IconButton>
         </span>
       </Row>
       <Row label="To">
@@ -283,22 +268,6 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
                 </option>
               ))}
           </select>
-          <IconButton label="Select target beat" onClick={() => select({ kind: "node", id: edge.target })}>
-            ↗
-          </IconButton>
-        </span>
-      </Row>
-      <Row label="Order">
-        <span className="sp-row-pair">
-          <span className="sp-faint" title={`Priority among transitions from ${source?.title || "Untitled"}`}>
-            {order + 1}/{siblings.length}
-          </span>
-          <IconButton label="Move up" disabled={order <= 0} onClick={() => moveEdge(edge.id, -1)}>
-            ↑
-          </IconButton>
-          <IconButton label="Move down" disabled={order >= siblings.length - 1} onClick={() => moveEdge(edge.id, 1)}>
-            ↓
-          </IconButton>
         </span>
       </Row>
       <Section id="insp:conditions" title="Conditions" summary={describeCondition(edge.condition, project)}>
