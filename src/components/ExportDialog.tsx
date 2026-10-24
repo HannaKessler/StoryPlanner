@@ -40,22 +40,18 @@ export function ExportDialog() {
   }, [kind, project, graphs]);
 
   if (!project) return null;
-  const option = OPTIONS.find((item) => item.id === kind) ?? OPTIONS[0];
-
   return (
     <Modal title="Export" wide onClose={() => setExportOpen(false)}>
       <div className="sp-export">
         <div className="sp-export-options">
           {OPTIONS.map((item) => (
-            <button key={item.id} type="button" className={item.id === kind ? "is-active" : ""} onClick={() => setKind(item.id)}>
+            <button key={item.id} type="button" className={item.id === kind ? "is-active" : ""} title={item.detail} onClick={() => setKind(item.id)}>
               <strong>{item.title}</strong>
-              <span>{item.detail}</span>
             </button>
           ))}
         </div>
         <div className="sp-export-preview">
-          <p className="sp-muted">
-            {option.detail} This uses the project as it is now, including unsaved edits. Suggested file:{" "}
+          <p className="sp-muted" title="Includes unsaved edits">
             <code>
               {kind === "bundle"
                 ? `${slugify(project.name)}.json`

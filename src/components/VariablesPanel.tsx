@@ -22,7 +22,6 @@ export function VariablesPanel() {
         </button>
       ))}
     >
-      {project.variables.length === 0 && <p className="sp-hint">Global flags, numbers, and tags. Add one above.</p>}
       <ul className="sp-var-list">
         {project.variables.map((variable) => (
           <VariableRow key={variable.id} variable={variable} project={project} />
@@ -45,7 +44,7 @@ function VariableRow({ variable, project }: { variable: VariableDef; project: Pr
         <button
           type="button"
           className={`sp-kind sp-kind-${known ? variable.kind : "other"}`}
-          title={`${kindLabel(variable.kind)} — click for description${variable.kind === "tag" ? " and category" : ""}`}
+          title={known ? `${kindLabel(variable.kind)}: description${variable.kind === "tag" ? ", category" : ""}` : `${variable.kind}: from a newer editor, kept as-is`}
           onClick={() => setExpanded((open) => !open)}
         >
           {KIND_SHORT[variable.kind] ?? variable.kind}
@@ -119,7 +118,6 @@ function VariableRow({ variable, project }: { variable: VariableDef; project: Pr
               ))}
             </select>
           )}
-          {!known && <p className="sp-hint">Stored by a newer editor. Kept as-is.</p>}
         </div>
       )}
     </li>

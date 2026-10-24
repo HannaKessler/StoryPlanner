@@ -21,11 +21,11 @@ describe("play-through", () => {
   it("disables the token transition until hasToken is set, and spends gold on a bribe", () => {
     let state = createPlayState(project, graphs);
     state = take(state, "Approach the gate");
-    expect(labels(state)).toContain("Step into Approach the gate");
+    expect(labels(state)).toContain("Step in");
     expect(labels(state, true)).toContain("Leave");
     expect(labels(state, true)).not.toContain("Enter the walls");
 
-    state = take(state, "Step into Approach the gate");
+    state = take(state, "Step in");
     state = take(state, "At the gate");
     const atGate = labels(state);
     expect(atGate).toContain("off:Show the lantern token");
@@ -54,7 +54,7 @@ describe("play-through", () => {
   it("does not follow a transition whose condition fails", () => {
     let state = createPlayState(project, graphs);
     state = take(state, "Approach the gate");
-    state = take(state, "Step into Approach the gate");
+    state = take(state, "Step in");
     state = take(state, "At the gate");
     const blocked = availableActions(state, project, graphs).find((action) => action.label === "Show the lantern token");
     expect(blocked?.enabled).toBe(false);
@@ -68,7 +68,7 @@ describe("transition actions", () => {
   it("describes the target, the condition, and the effects of each outgoing transition", () => {
     let state = createPlayState(project, graphs);
     state = take(state, "Approach the gate");
-    state = take(state, "Step into Approach the gate");
+    state = take(state, "Step in");
     state = take(state, "At the gate");
     const coin = availableActions(state, project, graphs).find((action) => action.label === "Offer a coin");
     expect(coin?.kind).toBe("transition");

@@ -17,8 +17,7 @@ export function EffectsEditor({
 }) {
   const project = useProjectStore((state) => state.project);
   if (!project) return null;
-  if (project.variables.length === 0) return <p className="sp-hint">Add a variable in the left panel first.</p>;
-  if (effects.length === 0) return <p className="sp-hint">No variable changes.</p>;
+  if (effects.length === 0) return null;
   return (
     <div className="sp-effects">
       {effects.map((effect) => {

@@ -292,7 +292,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         selection: null,
         play: null,
         recents: remember(folder, saved.name, get().recents),
-        banner: { tone: "info", text: "Project created." },
+        banner: null,
       });
     } catch (error) {
       set({ banner: { tone: "error", text: errorMessage(error) } });
@@ -344,10 +344,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ busy: true, banner: null });
     try {
       const folder = await sampleProjectDir();
-      const opened = await get().openAt(folder);
-      if (opened) {
-        set({ banner: { tone: "info", text: "Sample project opened. Save writes back into sample-project." } });
-      }
+      await get().openAt(folder);
     } catch (error) {
       set({ banner: { tone: "error", text: errorMessage(error) } });
     } finally {
@@ -365,7 +362,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         project: saved,
         dirty: false,
         recents: remember(state.projectPath, saved.name, get().recents),
-        banner: { tone: "info", text: "Saved." },
+        banner: null,
       });
       return true;
     } catch (error) {

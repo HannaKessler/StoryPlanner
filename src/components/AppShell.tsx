@@ -148,14 +148,13 @@ export function AppShell() {
       <footer className="sp-status">
         <span className="sp-status-path">{path}</span>
         <span>
-          {graph ? `${graph.nodes.length} beats · ${graph.edges.length} transitions` : ""} · {project.variables.length} variables · schema v{SCHEMA_VERSION}
-          {dirty ? " · unsaved" : " · saved"}
+          {graph ? `${graph.nodes.length} beats · ${graph.edges.length} transitions (${graph.edges.filter((edge) => edge.condition).length} conditional) · ` : ""}
+          {project.variables.length} variables · schema v{SCHEMA_VERSION}
         </span>
       </footer>
       {exportOpen && <ExportDialog />}
       {pendingClose && (
         <Modal title="Unsaved changes" onClose={() => useProjectStore.getState().cancelClose()}>
-          <p>Save this project before closing it?</p>
           <div className="sp-modal-actions">
             <button type="button" className="sp-btn" onClick={() => useProjectStore.getState().cancelClose()}>
               Cancel

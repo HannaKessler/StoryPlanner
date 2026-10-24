@@ -19,7 +19,11 @@ export function TagSelect({
   const category = project?.tagCategories.find((item) => item.id === categoryId);
 
   if (!category) {
-    return <span className="sp-hint">No tag category on this variable.</span>;
+    return (
+      <select className="sp-cell" disabled title="This variable has no tag category">
+        <option>no category</option>
+      </select>
+    );
   }
 
   if (adding) {

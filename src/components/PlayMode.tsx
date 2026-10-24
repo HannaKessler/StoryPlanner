@@ -33,10 +33,9 @@ export function PlayMode() {
         <p className="sp-play-log" title="Beats entered so far">
           {play.log.join(" → ")}
         </p>
-        {!location && <p className="sp-empty">This beat is gone. Restart the play-through.</p>}
+        {!location && <p className="sp-empty">Beat missing.</p>}
         {location && (
           <article className="sp-script">
-            <p className="sp-kicker">{location.graph.name}</p>
             <h2>{location.node.title || "Untitled"}</h2>
             {location.node.summary.trim() && <p className="sp-script-summary">{location.node.summary}</p>}
             {location.node.sceneNotes.trim() && <p className="sp-script-note">{location.node.sceneNotes}</p>}
@@ -55,27 +54,29 @@ export function PlayMode() {
             )}
 
             {enter && <ActionButton action={enter} onPick={performPlay} />}
-            <div className="sp-play-group">
-              <h3>
-                Transitions <span className="sp-faint">{open} of {transitions.length} open</span>
-              </h3>
-              {transitions.length === 0 && (
-                <p className="sp-hint">{location.node.type === "end" ? "End of this branch." : "No transitions leave this beat."}</p>
-              )}
-              {transitions.map((action) => (
-                <ActionButton key={action.id} action={action} onPick={performPlay} />
-              ))}
-            </div>
+            {transitions.length > 0 ? (
+              <div className="sp-play-group">
+                <h3>
+                  Transitions <span className="sp-faint">{open}/{transitions.length}</span>
+                </h3>
+                {transitions.map((action) => (
+                  <ActionButton key={action.id} action={action} onPick={performPlay} />
+                ))}
+              </div>
+            ) : (
+              !back && <h3 className="sp-play-end">End</h3>
+            )}
             {back && <ActionButton action={back} onPick={performPlay} />}
           </article>
         )}
       </div>
       <aside className="sp-play-vars sp-panel">
         <header className="sp-sec-head">
-          <span className="sp-sec-title">Live variables</span>
+          <span className="sp-sec-title" title="Changed values are highlighted. Edit one to try another branch.">
+            Live variables
+          </span>
           <span className="sp-sec-count">{project.variables.length}</span>
         </header>
-        <p className="sp-hint">Changed values are highlighted. Edit one to open another branch.</p>
         <ul className="sp-var-list">
           {project.variables.map((variable) => {
             const value = play.values[variable.id];
@@ -135,8 +136,7 @@ function ActionButton({ action, onPick }: { action: PlayAction; onPick: (action:
     <button type="button" className={className} disabled={!action.enabled} onClick={() => onPick(action)}>
       <span className="sp-play-action-top">
         <strong>{action.label}</strong>
-        {action.kind === "transition" && action.label !== action.target && <span className="sp-faint">→ {action.target}</span>}
-        {action.kind !== "transition" && <span className="sp-faint">{action.kind === "enter" ? `into ${action.target}` : `to ${action.target}`}</span>}
+        {action.label !== action.target && <span className="sp-faint">→ {action.target}</span>}
         {!action.enabled && <span className="sp-blocked">blocked</span>}
       </span>
       {action.condition && <small>if {action.condition}</small>}

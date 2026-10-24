@@ -9,7 +9,7 @@ export function DialogueEditor({ nodeId, lines }: { nodeId: string; lines: Dialo
   const deleteLine = useProjectStore((state) => state.deleteLine);
   const moveLine = useProjectStore((state) => state.moveLine);
 
-  if (lines.length === 0) return <p className="sp-hint">No lines yet.</p>;
+  if (lines.length === 0) return null;
   return (
     <ol className="sp-lines">
       {lines.map((line, index) => (

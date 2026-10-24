@@ -1,4 +1,4 @@
-import { describeCondition, defaultCompare, opLabel, opsForKind } from "../domain/conditions";
+import { defaultCompare, opLabel, opsForKind } from "../domain/conditions";
 import type { CompareOp, Condition, Scalar } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { IconButton } from "./Panel";
@@ -16,7 +16,6 @@ export function ConditionBuilder({
   const firstVariable = project.variables[0]?.id ?? "";
   return (
     <div className="sp-cond">
-      <p className="sp-cond-summary">{value ? `If ${describeCondition(value, project)}` : "Always available"}</p>
       {value ? (
         <ConditionNode value={value} onChange={onChange} />
       ) : (
@@ -73,7 +72,10 @@ function ConditionNode({
       onChange({ ...value, children });
     };
     return (
-      <div className={`sp-cond-group is-${value.op}`}>
+      <div
+        className={`sp-cond-group is-${value.op}`}
+        title={value.children.length === 0 ? (value.op === "and" ? "Empty: always passes" : "Empty: never passes") : undefined}
+      >
         <div className="sp-cond-head">
           <select
             className="sp-cell sp-cond-op-select"
@@ -112,9 +114,6 @@ function ConditionNode({
             ×
           </IconButton>
         </div>
-        {value.children.length === 0 && (
-          <p className="sp-hint">{value.op === "and" ? "Empty: always passes." : "Empty: never passes."}</p>
-        )}
         {value.children.map((child, index) => (
           <ConditionNode key={index} value={child} onChange={(next) => replaceChild(index, next)} />
         ))}

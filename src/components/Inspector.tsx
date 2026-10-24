@@ -23,28 +23,20 @@ export function Inspector() {
 
 function GraphInspector({ graph }: { graph: GraphDocument }) {
   const updateGraphMeta = useProjectStore((state) => state.updateGraphMeta);
-  const conditional = graph.edges.filter((edge) => edge.condition).length;
   return (
     <>
       <div className="sp-insp-head">
         <span className="sp-kicker">Graph</span>
         <input className="sp-head-input" aria-label="Graph name" value={graph.name} onChange={(event) => updateGraphMeta({ name: event.target.value })} />
       </div>
-      <p className="sp-stats">
-        {graph.nodes.length} beats · {graph.edges.length} transitions · {conditional} conditional
-      </p>
       <Section id="insp:graph-notes" title="Scene notes" summary={graph.sceneNotes}>
         <textarea
           className="sp-cell sp-area"
           rows={3}
-          placeholder="Notes that cover this whole graph."
           value={graph.sceneNotes}
           onChange={(event) => updateGraphMeta({ sceneNotes: event.target.value })}
         />
       </Section>
-      <p className="sp-hint">
-        Select a beat or a transition. Drag from a beat’s right handle to another beat to add a transition. Branching lives on transitions: each has its own conditions and variable changes.
-      </p>
     </>
   );
 }
@@ -70,6 +62,11 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
       <div className="sp-insp-head">
         <span className={`sp-kicker sp-type-${node.type}`}>{NODE_LABEL[node.type]}</span>
         <input className="sp-head-input" aria-label="Title" value={node.title} onChange={(event) => updateNode(node.id, { title: event.target.value })} />
+        {content && !child && (
+          <button type="button" className="sp-chip-btn" title="Create an inner graph for this beat" onClick={() => openSubgraph(node.id)}>
+            + inner
+          </button>
+        )}
         {node.type !== "start" && (
           <IconButton label="Delete beat" danger onClick={() => deleteNodes([node.id])}>
             ×
@@ -77,36 +74,37 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
         )}
       </div>
 
-      {content && (
-        <div className="sp-inner-row">
-          <span className="sp-faint">Inner graph</span>
-          <span className="sp-inner-name">{child ? child.name || "Untitled" : "none"}</span>
+      {content && child && (
+        <div className="sp-inner-row" title="Inner graph">
+          <span className="sp-inner-name">↳ {child.name || "Untitled"}</span>
           <button type="button" className="sp-chip-btn" onClick={() => openSubgraph(node.id)}>
-            {child ? "Open" : "Create"}
+            Open
           </button>
-          {child && (
-            <IconButton label="Remove inner graph" danger onClick={() => deleteSubgraph(node.id)}>
-              ×
-            </IconButton>
-          )}
+          <IconButton label="Remove inner graph" danger onClick={() => deleteSubgraph(node.id)}>
+            ×
+          </IconButton>
         </div>
       )}
 
       {node.type !== "start" && (
         <Section id="insp:notes" title="Notes" summary={node.summary || node.sceneNotes}>
-          <Row label="Summary">
-            <textarea className="sp-cell sp-area" rows={2} value={node.summary} onChange={(event) => updateNode(node.id, { summary: event.target.value })} />
-          </Row>
+          <textarea
+            className="sp-cell sp-area"
+            rows={2}
+            aria-label="Summary"
+            placeholder="Summary"
+            value={node.summary}
+            onChange={(event) => updateNode(node.id, { summary: event.target.value })}
+          />
           {content && (
-            <Row label="Scene">
-              <textarea
-                className="sp-cell sp-area"
-                rows={2}
-                placeholder="Setting, action, direction"
-                value={node.sceneNotes}
-                onChange={(event) => updateNode(node.id, { sceneNotes: event.target.value })}
-              />
-            </Row>
+            <textarea
+              className="sp-cell sp-area"
+              rows={2}
+              aria-label="Scene notes"
+              placeholder="Scene notes"
+              value={node.sceneNotes}
+              onChange={(event) => updateNode(node.id, { sceneNotes: event.target.value })}
+            />
           )}
         </Section>
       )}
@@ -177,7 +175,7 @@ function TransitionList({
 }) {
   const select = useProjectStore((state) => state.select);
   const moveEdge = useProjectStore((state) => state.moveEdge);
-  if (edges.length === 0) return <p className="sp-hint">None.</p>;
+  if (edges.length === 0) return null;
   return (
     <ul className="sp-trans-list">
       {edges.map((edge, index) => {
@@ -240,7 +238,7 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
         <input
           className="sp-head-input"
           aria-label="Transition label"
-          placeholder="Label (optional)"
+          placeholder="Label"
           value={edge.label}
           onChange={(event) => updateEdge(edge.id, { label: event.target.value })}
         />
@@ -292,8 +290,8 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
       </Row>
       <Row label="Order">
         <span className="sp-row-pair">
-          <span className="sp-faint">
-            {order + 1} of {siblings.length} from {source?.title || "Untitled"}
+          <span className="sp-faint" title={`Priority among transitions from ${source?.title || "Untitled"}`}>
+            {order + 1}/{siblings.length}
           </span>
           <IconButton label="Move up" disabled={order <= 0} onClick={() => moveEdge(edge.id, -1)}>
             ↑
@@ -312,7 +310,13 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
         count={edge.effects.length}
         summary={edge.effects.map((effect) => describeEffect(effect, project)).join(", ")}
         actions={
-          <button type="button" className="sp-chip-btn" disabled={project.variables.length === 0} onClick={() => addEdgeEffect(edge.id)}>
+          <button
+            type="button"
+            className="sp-chip-btn"
+            disabled={project.variables.length === 0}
+            title={project.variables.length === 0 ? "Add a variable first" : undefined}
+            onClick={() => addEdgeEffect(edge.id)}
+          >
             + effect
           </button>
         }

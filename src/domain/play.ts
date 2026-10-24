@@ -70,7 +70,7 @@ export function availableActions(
     actions.push({
       id: `enter:${node.id}`,
       kind: "enter",
-      label: `Step into ${node.title || "this beat"}`,
+      label: "Step in",
       target: child.name || "Inner graph",
       condition: "",
       effects: "",

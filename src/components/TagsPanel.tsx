@@ -19,7 +19,6 @@ export function TagsPanel() {
         </button>
       }
     >
-      {project.tagCategories.length === 0 && <p className="sp-hint">Categories like Characters, Locations, Items.</p>}
       {project.tagCategories.map((category) => (
         <CategoryBlock key={category.id} category={category} />
       ))}
@@ -51,7 +50,7 @@ function CategoryBlock({ category }: { category: TagCategory }) {
         <button
           type="button"
           className={category.isCharacters ? "sp-flag is-on" : "sp-flag"}
-          title="Speakers: tags in this category can be picked as dialogue speakers"
+          title="Tags here can be dialogue speakers"
           aria-pressed={category.isCharacters}
           onClick={() => updateCategory(category.id, { isCharacters: !category.isCharacters })}
         >
