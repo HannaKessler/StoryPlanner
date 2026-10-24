@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "id": "graph_inside",
+  "name": "Within the walls",
+  "parentGraphId": "graph_root",
+  "parentNodeId": "node_root_inside",
+  "sceneNotes": "Beyond the gate.",
+  "nodes": [
+    {
+      "id": "node_in_start",
+      "type": "start",
+      "position": {
+        "x": 40,
+        "y": 180
+      },
+      "title": "Start",
+      "summary": "",
+      "sceneNotes": "",
+      "subgraphId": null,
+      "lines": [],
+      "choices": [],
+      "effects": []
+    },
+    {
+      "id": "node_in_court",
+      "type": "dialogue",
+      "position": {
+        "x": 320,
+        "y": 150
+      },
+      "title": "The courtyard",
+      "summary": "",
+      "sceneNotes": "Rain sounds farther off. The gate closes.",
+      "subgraphId": null,
+      "lines": [
+        {
+          "id": "line_court_1",
+          "speakerTagId": "tag_traveler",
+          "text": "The rain sounds different in here.",
+          "direction": ""
+        }
+      ],
+      "choices": [],
+      "effects": []
+    },
+    {
+      "id": "node_in_end",
+      "type": "end",
+      "position": {
+        "x": 680,
+        "y": 170
+      },
+      "title": "Settled",
+      "summary": "The night changes its sound.",
+      "sceneNotes": "",
+      "subgraphId": null,
+      "lines": [],
+      "choices": [],
+      "effects": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_in_start",
+      "source": "node_in_start",
+      "target": "node_in_court",
+      "choiceId": null,
+      "label": "",
+      "condition": null
+    },
+    {
+      "id": "edge_in_end",
+      "source": "node_in_court",
+      "target": "node_in_end",
+      "choiceId": null,
+      "label": "",
+      "condition": null
+    }
+  ]
+}

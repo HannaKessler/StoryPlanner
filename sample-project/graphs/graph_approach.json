@@ -1,0 +1,373 @@
+{
+  "schemaVersion": 1,
+  "id": "graph_approach",
+  "name": "At the gate",
+  "parentGraphId": "graph_root",
+  "parentNodeId": "node_root_approach",
+  "sceneNotes": "The conversation at the shut gate.",
+  "nodes": [
+    {
+      "id": "node_ap_start",
+      "type": "start",
+      "position": {
+        "x": 40,
+        "y": 280
+      },
+      "title": "Start",
+      "summary": "",
+      "sceneNotes": "",
+      "subgraphId": null,
+      "lines": [],
+      "choices": [],
+      "effects": []
+    },
+    {
+      "id": "node_ap_gate",
+      "type": "dialogue",
+      "position": {
+        "x": 300,
+        "y": 220
+      },
+      "title": "At the gate",
+      "summary": "",
+      "sceneNotes": "The gatekeeper does not open the shutter at first.",
+      "subgraphId": null,
+      "lines": [
+        {
+          "id": "line_gate_1",
+          "speakerTagId": "tag_gatekeeper",
+          "text": "The gate is shut. What business have you past nightfall?",
+          "direction": "He does not lift the lantern."
+        },
+        {
+          "id": "line_gate_2",
+          "speakerTagId": "tag_traveler",
+          "text": "I have walked since the east village.",
+          "direction": ""
+        }
+      ],
+      "choices": [
+        {
+          "id": "choice_token",
+          "label": "Show the lantern token",
+          "condition": {
+            "type": "compare",
+            "variableId": "var_has_token",
+            "op": "eq",
+            "value": true
+          },
+          "effects": [
+            {
+              "id": "fx_token_convinced",
+              "variableId": "var_convinced",
+              "op": "set",
+              "value": true
+            },
+            {
+              "id": "fx_token_location",
+              "variableId": "var_location",
+              "op": "set",
+              "value": "tag_loc_inside"
+            }
+          ]
+        },
+        {
+          "id": "choice_road",
+          "label": "Ask about the old road",
+          "condition": null,
+          "effects": [
+            {
+              "id": "fx_road_asked",
+              "variableId": "var_asked_road",
+              "op": "set",
+              "value": true
+            },
+            {
+              "id": "fx_road_location",
+              "variableId": "var_location",
+              "op": "set",
+              "value": "tag_loc_road"
+            }
+          ]
+        },
+        {
+          "id": "choice_coin",
+          "label": "Offer a coin",
+          "condition": {
+            "type": "group",
+            "op": "and",
+            "children": [
+              {
+                "type": "compare",
+                "variableId": "var_gold",
+                "op": "gte",
+                "value": 1
+              },
+              {
+                "type": "not",
+                "child": {
+                  "type": "compare",
+                  "variableId": "var_convinced",
+                  "op": "eq",
+                  "value": true
+                }
+              }
+            ]
+          },
+          "effects": [
+            {
+              "id": "fx_coin_gold",
+              "variableId": "var_gold",
+              "op": "add",
+              "value": -1
+            },
+            {
+              "id": "fx_coin_location",
+              "variableId": "var_location",
+              "op": "set",
+              "value": "tag_loc_inside"
+            }
+          ]
+        },
+        {
+          "id": "choice_back",
+          "label": "Turn back",
+          "condition": null,
+          "effects": []
+        }
+      ],
+      "effects": []
+    },
+    {
+      "id": "node_ap_token",
+      "type": "dialogue",
+      "position": {
+        "x": 700,
+        "y": 0
+      },
+      "title": "The token",
+      "summary": "",
+      "sceneNotes": "A small iron token, warm from the traveler's hand.",
+      "subgraphId": null,
+      "lines": [
+        {
+          "id": "line_token_1",
+          "speakerTagId": "tag_gatekeeper",
+          "text": "That token is older than the lock. Come through.",
+          "direction": ""
+        },
+        {
+          "id": "line_token_2",
+          "speakerTagId": "tag_traveler",
+          "text": "Then I will not waste the night.",
+          "direction": ""
+        }
+      ],
+      "choices": [],
+      "effects": []
+    },
+    {
+      "id": "node_ap_bribe",
+      "type": "dialogue",
+      "position": {
+        "x": 700,
+        "y": 220
+      },
+      "title": "The bribe",
+      "summary": "",
+      "sceneNotes": "The coin rings once on the stone sill.",
+      "subgraphId": null,
+      "lines": [
+        {
+          "id": "line_bribe_1",
+          "speakerTagId": "tag_gatekeeper",
+          "text": "A coin spends faster than a reason. Go.",
+          "direction": ""
+        },
+        {
+          "id": "line_bribe_2",
+          "speakerTagId": "tag_traveler",
+          "text": "Spend it on a dry watch, then.",
+          "direction": ""
+        }
+      ],
+      "choices": [],
+      "effects": []
+    },
+    {
+      "id": "node_ap_downhill",
+      "type": "dialogue",
+      "position": {
+        "x": 700,
+        "y": 440
+      },
+      "title": "Downhill",
+      "summary": "",
+      "sceneNotes": "The gatekeeper points past the lantern light.",
+      "subgraphId": null,
+      "lines": [
+        {
+          "id": "line_down_1",
+          "speakerTagId": "tag_gatekeeper",
+          "text": "Follow the lanterns downhill. Do not leave the stones.",
+          "direction": ""
+        },
+        {
+          "id": "line_down_2",
+          "speakerTagId": "tag_traveler",
+          "text": "And if the lanterns go out?",
+          "direction": ""
+        },
+        {
+          "id": "line_down_3",
+          "speakerTagId": "tag_gatekeeper",
+          "text": "Then you are no longer on the road.",
+          "direction": "Quietly."
+        }
+      ],
+      "choices": [],
+      "effects": []
+    },
+    {
+      "id": "node_ap_cross",
+      "type": "dialogue",
+      "position": {
+        "x": 1080,
+        "y": 110
+      },
+      "title": "Crossing",
+      "summary": "",
+      "sceneNotes": "The gate begins to open onto wet stone.",
+      "subgraphId": null,
+      "lines": [
+        {
+          "id": "line_cross_1",
+          "speakerTagId": "tag_gatekeeper",
+          "text": "Mind the step. The stones are slick.",
+          "direction": ""
+        }
+      ],
+      "choices": [],
+      "effects": []
+    },
+    {
+      "id": "node_ap_end_granted",
+      "type": "end",
+      "position": {
+        "x": 1420,
+        "y": 90
+      },
+      "title": "Granted",
+      "summary": "The traveler is let through.",
+      "sceneNotes": "",
+      "subgraphId": null,
+      "lines": [],
+      "choices": [],
+      "effects": []
+    },
+    {
+      "id": "node_ap_end_road",
+      "type": "end",
+      "position": {
+        "x": 1080,
+        "y": 460
+      },
+      "title": "The road taken",
+      "summary": "The traveler leaves the gate behind.",
+      "sceneNotes": "",
+      "subgraphId": null,
+      "lines": [],
+      "choices": [],
+      "effects": []
+    },
+    {
+      "id": "node_ap_end_back",
+      "type": "end",
+      "position": {
+        "x": 700,
+        "y": 680
+      },
+      "title": "Back into the rain",
+      "summary": "The lanterns stay where they are.",
+      "sceneNotes": "The lanterns stay where they are.",
+      "subgraphId": null,
+      "lines": [],
+      "choices": [],
+      "effects": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_ap_start",
+      "source": "node_ap_start",
+      "target": "node_ap_gate",
+      "choiceId": null,
+      "label": "",
+      "condition": null
+    },
+    {
+      "id": "edge_ap_token",
+      "source": "node_ap_gate",
+      "target": "node_ap_token",
+      "choiceId": "choice_token",
+      "label": "",
+      "condition": null
+    },
+    {
+      "id": "edge_ap_road",
+      "source": "node_ap_gate",
+      "target": "node_ap_downhill",
+      "choiceId": "choice_road",
+      "label": "",
+      "condition": null
+    },
+    {
+      "id": "edge_ap_coin",
+      "source": "node_ap_gate",
+      "target": "node_ap_bribe",
+      "choiceId": "choice_coin",
+      "label": "",
+      "condition": null
+    },
+    {
+      "id": "edge_ap_back",
+      "source": "node_ap_gate",
+      "target": "node_ap_end_back",
+      "choiceId": "choice_back",
+      "label": "",
+      "condition": null
+    },
+    {
+      "id": "edge_ap_token_cross",
+      "source": "node_ap_token",
+      "target": "node_ap_cross",
+      "choiceId": null,
+      "label": "",
+      "condition": null
+    },
+    {
+      "id": "edge_ap_bribe_cross",
+      "source": "node_ap_bribe",
+      "target": "node_ap_cross",
+      "choiceId": null,
+      "label": "",
+      "condition": null
+    },
+    {
+      "id": "edge_ap_cross_end",
+      "source": "node_ap_cross",
+      "target": "node_ap_end_granted",
+      "choiceId": null,
+      "label": "",
+      "condition": null
+    },
+    {
+      "id": "edge_ap_down_end",
+      "source": "node_ap_downhill",
+      "target": "node_ap_end_road",
+      "choiceId": null,
+      "label": "",
+      "condition": null
+    }
+  ]
+}
