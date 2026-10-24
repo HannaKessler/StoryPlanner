@@ -1,6 +1,8 @@
 # StoryPlanner project schema
 
-Version **1**. Every project file, graph file, and bundled export carries `schemaVersion`. This app reads version 1 only. A higher number means the file was written by a newer StoryPlanner; do not guess at fields you do not know.
+Version **2**. Every project file, graph file, and bundled export carries `schemaVersion`. This app writes version 2 and still reads version 1 (see [Version 1 files](#version-1-files)). A higher number means the file was written by a newer StoryPlanner; do not guess at fields you do not know.
+
+The story model works like a state machine (think of Unity’s Animator). **Nodes are states**: events, scenes, and dialogue that hold content. **Edges are transitions**: all branching lives on them. Each transition has its own condition on global variables and its own variable effects. Any node can own an inner graph, which works like a sub-state machine. Nodes never contain choices.
 
 Engine add-ons should treat this document as the contract. Files are UTF-8 JSON. Unknown object keys are dropped when StoryPlanner saves, so do not store private data beside the documented fields. Unknown **variable kinds** are the exception: the `kind` string is open-ended and is preserved.
 
@@ -24,7 +26,7 @@ There is no depth limit. A node points at an inner graph with `subgraphId`. That
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "proj_lantern_gate",
   "name": "The Lantern Gate",
   "createdAt": "2026-01-15T18:00:00.000Z",
@@ -37,7 +39,7 @@ There is no depth limit. A node points at an inner graph with `subgraphId`. That
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| schemaVersion | number | `1` |
+| schemaVersion | number | `2` |
 | id | string | Stable project id |
 | name | string | Display name |
 | createdAt, updatedAt | string | ISO-8601 timestamps |
@@ -94,7 +96,7 @@ There are no enums and no nested types.
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "graph_approach",
   "name": "At the gate",
   "parentGraphId": "graph_root",
@@ -118,9 +120,7 @@ The root graph uses `null` for both parent fields. `sceneNotes` on a graph cover
   "summary": "",
   "sceneNotes": "The gatekeeper does not open the shutter at first.",
   "subgraphId": null,
-  "lines": [],
-  "choices": [],
-  "effects": []
+  "lines": []
 }
 ```
 
@@ -131,14 +131,14 @@ The root graph uses `null` for both parent fields. `sceneNotes` on a graph cover
 | start | Entry of this graph. Play begins here. One per graph is the normal case |
 | event | A high-level beat. Often owns a subgraph |
 | scene | A place and time, with scene notes. May own a subgraph |
-| dialogue | Ordered spoken lines and player choices |
+| dialogue | Ordered spoken lines |
 | end | Stops this branch |
 
 `position` is the editor canvas point in pixels. Add-ons can ignore it.
 
 `subgraphId` is another graph id, or `null`. Opening that graph is how a writer drills in. Any node may own one. Nesting is unlimited.
 
-`effects` run when play enters the node.
+A node has no logic of its own. What happens next, and which variables change, is decided by the transitions that leave it.
 
 ### Dialogue line
 
@@ -153,37 +153,46 @@ The root graph uses `null` for both parent fields. `sceneNotes` on a graph cover
 
 `speakerTagId` is a tag id, or `null` for narration. The tag should belong to a category with `isCharacters: true`. `direction` is a short parenthetical for that line. Longer setting and action live in `sceneNotes`.
 
-### Choice
+### Edge (transition)
 
 ```json
 {
-  "id": "choice_coin",
+  "id": "edge_ap_coin",
+  "source": "node_ap_gate",
+  "target": "node_ap_bribe",
   "label": "Offer a coin",
-  "condition": { "type": "compare", "variableId": "var_gold", "op": "gte", "value": 1 },
+  "condition": {
+    "type": "group",
+    "op": "and",
+    "children": [
+      { "type": "compare", "variableId": "var_gold", "op": "gte", "value": 1 },
+      { "type": "not", "child": { "type": "compare", "variableId": "var_convinced", "op": "eq", "value": true } }
+    ]
+  },
   "effects": [
     { "id": "fx_coin_gold", "variableId": "var_gold", "op": "add", "value": -1 }
   ]
 }
 ```
 
-A choice is available when its condition passes (and, if the connection has one, that condition passes too). `effects` run when the player takes the choice, before the story moves on.
+| Field | Type | Notes |
+| --- | --- | --- |
+| id | string | Stable edge id |
+| source, target | string | Node ids in the same graph. Edges are directed |
+| label | string | What the transition is called. A player-facing option, an exit name, or empty |
+| condition | Condition or null | The transition is available when this passes. `null` means always |
+| effects | Effect[] | Run in order when the transition is followed, before the target is entered |
 
-The connection for a choice is an edge with `choiceId` set to this id and `source` set to the dialogue node. A choice with no such edge still stores its label, condition, and effects.
+The outgoing transitions of a node keep their order in `edges`. The editor and the exports list them in that order. An engine can use it as priority, or offer every open transition to the player. Several transitions may connect the same two nodes.
 
-### Edge
+A player choice is a labelled transition. The label is the text of the option, the condition decides whether it is open, and the effects record what taking it changes.
 
-```json
-{
-  "id": "edge_root_inside",
-  "source": "node_root_approach",
-  "target": "node_root_inside",
-  "choiceId": null,
-  "label": "Enter the walls",
-  "condition": null
-}
-```
+### Moving through a graph
 
-`choiceId` is `null` for an ordinary connection. Edges are directed. Conditions on an edge gate that connection.
+- Play starts at the root graph’s entry node. That is the `start` node, or else the first node with no incoming edge.
+- From the current node, every outgoing edge whose condition passes can be followed. Following it runs its `effects`, then enters `target`.
+- If the current node has a `subgraphId`, play can enter that graph at its entry node. From inside, play can return to the parent node and continue with the parent’s outgoing transitions. Returning runs no effects.
+- An `end` node, or a node with no open transition, ends that branch.
 
 ## Conditions
 
@@ -231,7 +240,7 @@ Export → Bundled JSON writes one document:
 
 ```json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "kind": "storyplanner.bundle",
   "exportedAt": "2026-04-01T00:00:00.000Z",
   "project": {},
@@ -247,11 +256,21 @@ Play-through state (current beat, live variable values, the path taken) is runti
 
 Derived exports in this version are Markdown:
 
-- **Screenplay** walks from each graph’s start, writes scene notes as block quotes, and spells conditions and effects in words. The first visit to a beat is written in full. Later visits say `→ Continues at **Title**.`
-- **Voice sheets** list, per character category (`isCharacters`), only that character’s lines. Each line is preceded by the italic line or lines it directly answers. The previous line in the same node is the single answer. The first line of a node answers the last spoken line of each way in, and a line inside a nested graph can answer the last line before that graph was entered. Scene notes are included above the line.
+- **Screenplay** walks from each graph’s start, writes scene notes as block quotes, and spells each transition’s condition and effects in words. The first visit to a beat is written in full. Later visits say `→ Continues at **Title**.`
+- **Voice sheets** list, per character category (`isCharacters`), only that character’s lines. Each line is preceded by the italic line or lines it directly answers. The previous line in the same node is the single answer. The first line of a node answers the last spoken line of each way in, and a line inside a nested graph can answer the last line before that graph was entered. When the transition into the node has a label, the sheet names it after the cue. Scene notes are included above the line.
 
 ## Adding a variable kind later
 
 1. Keep storing `kind` as a string and `defaultValue` as a scalar.
 2. Teach the editor and the evaluator the new kind.
-3. Leave `schemaVersion` at 1 if no existing field changes meaning. Bump it when a consumer would misread old files.
+3. Leave `schemaVersion` as it is if no existing field changes meaning. Bump it when a consumer would misread old files.
+
+## Version 1 files
+
+Version 1 kept player choices (`choices`) and on-enter `effects` on nodes, and edges had a `choiceId`. Version 2 moved all of that onto edges. StoryPlanner migrates a version 1 graph when it loads it, and writes version 2 on the next save:
+
+- An edge whose `choiceId` names a choice on its source node takes the choice’s label (unless the edge had its own), the choice’s condition joined with the edge’s condition by `and`, and the choice’s effects.
+- A node’s on-enter effects are appended to every incoming edge in the same graph. Their ids are prefixed with the edge id so they stay unique.
+- A choice with no edge, and on-enter effects of a node with no incoming edge, have nowhere to go and are dropped.
+
+Add-ons only need to read version 2. Re-save older projects in StoryPlanner first.

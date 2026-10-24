@@ -1,6 +1,7 @@
 import { describeCondition, defaultCompare, opLabel, opsForKind } from "../domain/conditions";
 import type { CompareOp, Condition, Scalar } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
+import { IconButton } from "./Panel";
 import { TagSelect } from "./TagSelect";
 
 export function ConditionBuilder({
@@ -12,21 +13,22 @@ export function ConditionBuilder({
 }) {
   const project = useProjectStore((state) => state.project);
   if (!project) return null;
+  const firstVariable = project.variables[0]?.id ?? "";
   return (
     <div className="sp-cond">
-      <p className="sp-cond-summary">{describeCondition(value, project)}</p>
+      <p className="sp-cond-summary">{value ? `If ${describeCondition(value, project)}` : "Always available"}</p>
       {value ? (
         <ConditionNode value={value} onChange={onChange} />
       ) : (
-        <div className="sp-inline">
-          <button type="button" className="sp-btn sp-btn-small" onClick={() => onChange(defaultCompare(project.variables[0]?.id ?? ""))}>
-            Add rule
+        <div className="sp-cond-tools">
+          <button type="button" className="sp-chip-btn" disabled={!firstVariable} onClick={() => onChange(defaultCompare(firstVariable))}>
+            + rule
           </button>
-          <button type="button" className="sp-btn sp-btn-small" onClick={() => onChange({ type: "group", op: "and", children: [] })}>
-            All of
+          <button type="button" className="sp-chip-btn" onClick={() => onChange({ type: "group", op: "and", children: [] })}>
+            + all of
           </button>
-          <button type="button" className="sp-btn sp-btn-small" onClick={() => onChange({ type: "group", op: "or", children: [] })}>
-            Any of
+          <button type="button" className="sp-chip-btn" onClick={() => onChange({ type: "group", op: "or", children: [] })}>
+            + any of
           </button>
         </div>
       )}
@@ -43,18 +45,20 @@ function ConditionNode({
 }) {
   const project = useProjectStore((state) => state.project);
   if (!project) return null;
+  const firstVariable = project.variables[0]?.id ?? "";
 
   if (value.type === "not") {
     return (
-      <div className="sp-cond-card">
+      <div className="sp-cond-group is-not">
         <div className="sp-cond-head">
-          <strong>Not</strong>
-          <button type="button" className="sp-btn sp-btn-small" onClick={() => onChange(value.child)}>
-            Unwrap
+          <span className="sp-cond-op">NOT</span>
+          <span className="sp-grow" />
+          <button type="button" className="sp-chip-btn" onClick={() => onChange(value.child)} title="Remove the NOT and keep what is inside">
+            unwrap
           </button>
-          <button type="button" className="sp-btn sp-btn-small" onClick={() => onChange(null)}>
-            Remove
-          </button>
+          <IconButton label="Remove" danger onClick={() => onChange(null)}>
+            ×
+          </IconButton>
         </div>
         <ConditionNode value={value.child} onChange={(child) => onChange(child ? { type: "not", child } : null)} />
       </div>
@@ -69,39 +73,29 @@ function ConditionNode({
       onChange({ ...value, children });
     };
     return (
-      <div className="sp-cond-card">
+      <div className={`sp-cond-group is-${value.op}`}>
         <div className="sp-cond-head">
           <select
-            className="sp-select"
+            className="sp-cell sp-cond-op-select"
+            aria-label="Group type"
             value={value.op}
             onChange={(event) => onChange({ ...value, op: event.target.value as "and" | "or" })}
           >
-            <option value="and">All of</option>
-            <option value="or">Any of</option>
+            <option value="and">ALL of</option>
+            <option value="or">ANY of</option>
           </select>
-          <button type="button" className="sp-btn sp-btn-small" onClick={() => onChange({ type: "not", child: value })}>
-            Wrap in Not
-          </button>
-          <button type="button" className="sp-btn sp-btn-small" onClick={() => onChange(null)}>
-            Remove
-          </button>
-        </div>
-        <div className="sp-cond-children">
-          {value.children.map((child, index) => (
-            <ConditionNode key={index} value={child} onChange={(next) => replaceChild(index, next)} />
-          ))}
-        </div>
-        <div className="sp-inline">
+          <span className="sp-grow" />
           <button
             type="button"
-            className="sp-btn sp-btn-small"
-            onClick={() => onChange({ ...value, children: [...value.children, defaultCompare(project.variables[0]?.id ?? "")] })}
+            className="sp-chip-btn"
+            disabled={!firstVariable}
+            onClick={() => onChange({ ...value, children: [...value.children, defaultCompare(firstVariable)] })}
           >
-            + Rule
+            + rule
           </button>
           <button
             type="button"
-            className="sp-btn sp-btn-small"
+            className="sp-chip-btn"
             onClick={() =>
               onChange({
                 ...value,
@@ -109,9 +103,21 @@ function ConditionNode({
               })
             }
           >
-            + Group
+            + group
           </button>
+          <button type="button" className="sp-chip-btn" title="Wrap in NOT" onClick={() => onChange({ type: "not", child: value })}>
+            not
+          </button>
+          <IconButton label="Remove group" danger onClick={() => onChange(null)}>
+            ×
+          </IconButton>
         </div>
+        {value.children.length === 0 && (
+          <p className="sp-hint">{value.op === "and" ? "Empty: always passes." : "Empty: never passes."}</p>
+        )}
+        {value.children.map((child, index) => (
+          <ConditionNode key={index} value={child} onChange={(next) => replaceChild(index, next)} />
+        ))}
       </div>
     );
   }
@@ -121,7 +127,8 @@ function ConditionNode({
   return (
     <div className="sp-cond-rule">
       <select
-        className="sp-select"
+        className="sp-cell"
+        aria-label="Variable"
         value={value.variableId}
         onChange={(event) => {
           const nextVariable = project.variables.find((item) => item.id === event.target.value);
@@ -134,18 +141,14 @@ function ConditionNode({
           });
         }}
       >
-        <option value="">Variable…</option>
+        <option value="">variable…</option>
         {project.variables.map((item) => (
           <option key={item.id} value={item.id}>
             {item.name}
           </option>
         ))}
       </select>
-      <select
-        className="sp-select"
-        value={value.op}
-        onChange={(event) => onChange({ ...value, op: event.target.value as CompareOp })}
-      >
+      <select className="sp-cell" aria-label="Comparison" value={value.op} onChange={(event) => onChange({ ...value, op: event.target.value as CompareOp })}>
         {ops.map((op) => (
           <option key={op} value={op}>
             {opLabel(op)}
@@ -158,9 +161,12 @@ function ConditionNode({
         value={value.value}
         onChange={(next) => onChange({ ...value, value: next })}
       />
-      <button type="button" className="sp-icon-btn" onClick={() => onChange(null)} aria-label="Remove rule">
+      <IconButton label="Wrap in NOT" onClick={() => onChange({ type: "not", child: value })}>
+        ¬
+      </IconButton>
+      <IconButton label="Remove rule" danger onClick={() => onChange(null)}>
         ×
-      </button>
+      </IconButton>
     </div>
   );
 }
@@ -178,7 +184,7 @@ function ValueInput({
 }) {
   if (kind === "boolean") {
     return (
-      <select className="sp-select" value={value === true ? "true" : "false"} onChange={(event) => onChange(event.target.value === "true")}>
+      <select className="sp-cell" aria-label="Value" value={value === true ? "true" : "false"} onChange={(event) => onChange(event.target.value === "true")}>
         <option value="true">true</option>
         <option value="false">false</option>
       </select>
@@ -187,8 +193,9 @@ function ValueInput({
   if (kind === "value") {
     return (
       <input
-        className="sp-input"
+        className="sp-cell"
         type="number"
+        aria-label="Value"
         value={typeof value === "number" ? value : 0}
         onChange={(event) => onChange(Number(event.target.value))}
       />
@@ -198,11 +205,7 @@ function ValueInput({
     return <TagSelect categoryId={categoryId} value={typeof value === "string" ? value : null} onChange={onChange} allowEmpty />;
   }
   return (
-    <input
-      className="sp-input"
-      value={value === null || value === undefined ? "" : String(value)}
-      onChange={(event) => onChange(event.target.value)}
-    />
+    <input className="sp-cell" aria-label="Value" value={value === null || value === undefined ? "" : String(value)} onChange={(event) => onChange(event.target.value)} />
   );
 }
 

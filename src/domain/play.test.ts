@@ -18,7 +18,7 @@ function labels(state: PlayState, enabledOnly = false): string[] {
 }
 
 describe("play-through", () => {
-  it("hides the token choice until hasToken is set, and spends gold on a bribe", () => {
+  it("disables the token transition until hasToken is set, and spends gold on a bribe", () => {
     let state = createPlayState(project, graphs);
     state = take(state, "Approach the gate");
     expect(labels(state)).toContain("Step into Approach the gate");
@@ -31,6 +31,7 @@ describe("play-through", () => {
     expect(atGate).toContain("off:Show the lantern token");
     expect(atGate).toContain("Offer a coin");
     expect(atGate).toContain("Ask about the old road");
+    expect(atGate).toContain("Turn back");
 
     state = setPlayValue(state, "var_has_token", true);
     expect(labels(state, true)).toContain("Show the lantern token");
@@ -40,13 +41,17 @@ describe("play-through", () => {
     expect(state.values.var_location).toBe("tag_loc_inside");
     expect(state.log.at(-1)).toBe("The bribe");
 
+    expect(labels(state)).toEqual(["Crossing", "Return"]);
+    state = take(state, "Crossing");
+    expect(state.values.var_gold).toBe(4);
+
     state = take(state, "Return");
     const back = labels(state, true);
     expect(back).toContain("Enter the walls");
     expect(back).not.toContain("Leave");
   });
 
-  it("does not take a choice whose condition fails", () => {
+  it("does not follow a transition whose condition fails", () => {
     let state = createPlayState(project, graphs);
     state = take(state, "Approach the gate");
     state = take(state, "Step into Approach the gate");
@@ -56,5 +61,19 @@ describe("play-through", () => {
     const stayed = performAction(state, blocked as PlayAction, project, graphs);
     expect(stayed.values.var_convinced).toBe(false);
     expect(stayed.log.at(-1)).toBe("At the gate");
+  });
+});
+
+describe("transition actions", () => {
+  it("describes the target, the condition, and the effects of each outgoing transition", () => {
+    let state = createPlayState(project, graphs);
+    state = take(state, "Approach the gate");
+    state = take(state, "Step into Approach the gate");
+    state = take(state, "At the gate");
+    const coin = availableActions(state, project, graphs).find((action) => action.label === "Offer a coin");
+    expect(coin?.kind).toBe("transition");
+    expect(coin?.target).toBe("The bribe");
+    expect(coin?.condition).toContain("gold ≥ 1");
+    expect(coin?.effects).toContain("subtract 1 from gold");
   });
 });

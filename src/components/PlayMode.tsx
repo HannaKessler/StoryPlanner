@@ -1,7 +1,8 @@
-import { speakerName } from "../domain/format";
-import { kindLabel } from "../domain/labels";
+import { formatValue, speakerName } from "../domain/format";
 import { availableActions, playLocation, type PlayAction } from "../domain/play";
 import { useProjectStore } from "../store/projectStore";
+
+const KIND_SHORT: Record<string, string> = { boolean: "bool", value: "value", tag: "tag" };
 
 export function PlayMode() {
   const project = useProjectStore((state) => state.project);
@@ -13,109 +14,112 @@ export function PlayMode() {
   if (!project || !play) return null;
   const location = playLocation(play, graphs);
   const actions = availableActions(play, project, graphs);
-  const groups: Array<{ title: string; kind: PlayAction["kind"] }> = [
-    { title: "Detail", kind: "enter" },
-    { title: "Choices", kind: "choice" },
-    { title: "Exits", kind: "edge" },
-    { title: "Leave", kind: "return" },
-  ];
+  const transitions = actions.filter((action) => action.kind === "transition");
+  const enter = actions.find((action) => action.kind === "enter");
+  const back = actions.find((action) => action.kind === "return");
+  const open = transitions.filter((action) => action.enabled).length;
+  const depth = play.frames.map((frame) => graphs[frame.graphId]?.name || "Untitled").join(" / ");
 
   return (
     <div className="sp-play">
       <div className="sp-play-stage">
-        <p className="sp-play-log">{play.log.join(" → ")}</p>
+        <div className="sp-play-bar">
+          <span className="sp-faint">{depth}</span>
+          <span className="sp-grow" />
+          <button type="button" className="sp-chip-btn" onClick={restartPlay}>
+            Restart
+          </button>
+        </div>
+        <p className="sp-play-log" title="Beats entered so far">
+          {play.log.join(" → ")}
+        </p>
         {!location && <p className="sp-empty">This beat is gone. Restart the play-through.</p>}
         {location && (
           <article className="sp-script">
-            {location.graph.sceneNotes.trim() && <p className="sp-script-note">{location.graph.sceneNotes}</p>}
             <p className="sp-kicker">{location.graph.name}</p>
             <h2>{location.node.title || "Untitled"}</h2>
             {location.node.summary.trim() && <p className="sp-script-summary">{location.node.summary}</p>}
             {location.node.sceneNotes.trim() && <p className="sp-script-note">{location.node.sceneNotes}</p>}
-            <div className="sp-script-lines">
-              {location.node.lines.map((line) => (
-                <div key={line.id}>
-                  <p className="sp-script-speaker">{speakerName(project, line.speakerTagId)}</p>
-                  {line.direction.trim() && <p className="sp-script-direction">({line.direction})</p>}
-                  <p className="sp-script-text">{line.text || "…"}</p>
-                </div>
+            {location.node.lines.length > 0 && (
+              <div className="sp-script-lines">
+                {location.node.lines.map((line) => (
+                  <div key={line.id} className="sp-script-line">
+                    <p className="sp-script-speaker">{speakerName(project, line.speakerTagId)}</p>
+                    <div>
+                      {line.direction.trim() && <p className="sp-script-direction">({line.direction})</p>}
+                      <p className="sp-script-text">{line.text || "…"}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {enter && <ActionButton action={enter} onPick={performPlay} />}
+            <div className="sp-play-group">
+              <h3>
+                Transitions <span className="sp-faint">{open} of {transitions.length} open</span>
+              </h3>
+              {transitions.length === 0 && (
+                <p className="sp-hint">{location.node.type === "end" ? "End of this branch." : "No transitions leave this beat."}</p>
+              )}
+              {transitions.map((action) => (
+                <ActionButton key={action.id} action={action} onPick={performPlay} />
               ))}
             </div>
-            {location.node.type === "end" && <p className="sp-muted">End of this branch.</p>}
-            {groups.map((group) => {
-              const items = actions.filter((action) => action.kind === group.kind);
-              if (items.length === 0) return null;
-              return (
-                <div key={group.kind} className="sp-play-group">
-                  <h3>{group.title}</h3>
-                  {items.map((action) => (
-                    <button
-                      key={action.id}
-                      type="button"
-                      className={action.enabled ? "sp-play-action" : "sp-play-action is-off"}
-                      disabled={!action.enabled}
-                      onClick={() => performPlay(action)}
-                    >
-                      <strong>{action.label}</strong>
-                      {action.enabled && action.detail && action.detail !== "Always" && <small>{action.detail}</small>}
-                      {!action.enabled && action.reason && <small>{action.reason}</small>}
-                    </button>
-                  ))}
-                </div>
-              );
-            })}
+            {back && <ActionButton action={back} onPick={performPlay} />}
           </article>
         )}
       </div>
-      <aside className="sp-play-vars">
-        <header>
-          <h2>Variables</h2>
-          <button type="button" className="sp-btn sp-btn-small" onClick={restartPlay}>
-            Restart
-          </button>
+      <aside className="sp-play-vars sp-panel">
+        <header className="sp-sec-head">
+          <span className="sp-sec-title">Live variables</span>
+          <span className="sp-sec-count">{project.variables.length}</span>
         </header>
-        <p className="sp-muted">Live values for this play-through. Change one to try another branch.</p>
-        <ul>
+        <p className="sp-hint">Changed values are highlighted. Edit one to open another branch.</p>
+        <ul className="sp-var-list">
           {project.variables.map((variable) => {
             const value = play.values[variable.id];
             const changed = value !== variable.defaultValue;
+            const category = project.tagCategories.find((item) => item.id === variable.tagCategoryId);
             return (
-              <li key={variable.id} className={changed ? "is-changed" : ""}>
-                <div>
-                  <strong>{variable.name}</strong>
-                  <small>
-                    {kindLabel(variable.kind)} · default {formatDefault(variable.defaultValue, variable.kind, project.tagCategories)}
-                  </small>
-                </div>
-                {variable.kind === "boolean" ? (
-                  <button type="button" className="sp-btn sp-btn-small" onClick={() => updatePlayValue(variable.id, value !== true)}>
-                    {value === true ? "true" : "false"}
-                  </button>
-                ) : variable.kind === "value" ? (
-                  <input
-                    className="sp-input"
-                    type="number"
-                    value={typeof value === "number" ? value : 0}
-                    onChange={(event) => updatePlayValue(variable.id, Number(event.target.value))}
-                  />
-                ) : variable.kind === "tag" ? (
-                  <select
-                    className="sp-select"
-                    value={typeof value === "string" ? value : ""}
-                    onChange={(event) => updatePlayValue(variable.id, event.target.value || null)}
-                  >
-                    <option value="">unset</option>
-                    {project.tagCategories
-                      .find((category) => category.id === variable.tagCategoryId)
-                      ?.tags.map((tag) => (
+              <li key={variable.id} className={changed ? "sp-var is-changed" : "sp-var"}>
+                <div className="sp-var-main">
+                  <span className={`sp-kind sp-kind-${variable.kind}`}>{KIND_SHORT[variable.kind] ?? variable.kind}</span>
+                  <span className="sp-var-name" title={`default ${formatValue(project, variable, variable.defaultValue)}`}>
+                    {variable.name}
+                  </span>
+                  {variable.kind === "boolean" ? (
+                    <select className="sp-cell sp-cell-value" aria-label={variable.name} value={value === true ? "true" : "false"} onChange={(event) => updatePlayValue(variable.id, event.target.value === "true")}>
+                      <option value="true">true</option>
+                      <option value="false">false</option>
+                    </select>
+                  ) : variable.kind === "value" ? (
+                    <input
+                      className="sp-cell sp-cell-value"
+                      type="number"
+                      aria-label={variable.name}
+                      value={typeof value === "number" ? value : 0}
+                      onChange={(event) => updatePlayValue(variable.id, Number(event.target.value))}
+                    />
+                  ) : variable.kind === "tag" ? (
+                    <select
+                      className="sp-cell sp-cell-value"
+                      aria-label={variable.name}
+                      value={typeof value === "string" ? value : ""}
+                      onChange={(event) => updatePlayValue(variable.id, event.target.value || null)}
+                    >
+                      <option value="">unset</option>
+                      {category?.tags.map((tag) => (
                         <option key={tag.id} value={tag.id}>
                           {tag.name}
                         </option>
                       ))}
-                  </select>
-                ) : (
-                  <span>{value == null ? "unset" : String(value)}</span>
-                )}
+                    </select>
+                  ) : (
+                    <span className="sp-cell sp-cell-value">{value == null ? "unset" : String(value)}</span>
+                  )}
+                </div>
+                {changed && <p className="sp-var-default">was {formatValue(project, variable, variable.defaultValue)}</p>}
               </li>
             );
           })}
@@ -125,20 +129,18 @@ export function PlayMode() {
   );
 }
 
-function formatDefault(
-  value: boolean | number | string | null,
-  kind: string,
-  categories: { tags: { id: string; name: string }[] }[],
-): string {
-  if (kind === "tag") {
-    if (typeof value !== "string") return "unset";
-    for (const category of categories) {
-      const tag = category.tags.find((item) => item.id === value);
-      if (tag) return tag.name;
-    }
-    return "missing tag";
-  }
-  if (typeof value === "boolean") return value ? "true" : "false";
-  if (value == null) return "unset";
-  return String(value);
+function ActionButton({ action, onPick }: { action: PlayAction; onPick: (action: PlayAction) => void }) {
+  const className = `sp-play-action is-${action.kind}${action.enabled ? "" : " is-off"}`;
+  return (
+    <button type="button" className={className} disabled={!action.enabled} onClick={() => onPick(action)}>
+      <span className="sp-play-action-top">
+        <strong>{action.label}</strong>
+        {action.kind === "transition" && action.label !== action.target && <span className="sp-faint">→ {action.target}</span>}
+        {action.kind !== "transition" && <span className="sp-faint">{action.kind === "enter" ? `into ${action.target}` : `to ${action.target}`}</span>}
+        {!action.enabled && <span className="sp-blocked">blocked</span>}
+      </span>
+      {action.condition && <small>if {action.condition}</small>}
+      {action.effects && <small className="sp-play-fx">then {action.effects}</small>}
+    </button>
+  );
 }

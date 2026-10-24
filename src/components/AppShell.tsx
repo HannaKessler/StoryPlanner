@@ -7,11 +7,10 @@ import { useProjectStore } from "../store/projectStore";
 import { ExportDialog } from "./ExportDialog";
 import { GraphCanvas } from "./GraphCanvas";
 import { Inspector } from "./Inspector";
+import { LeftPanel } from "./LeftPanel";
 import { Logo } from "./Logo";
 import { Modal } from "./Modal";
 import { PlayMode } from "./PlayMode";
-import { TagsManager } from "./TagsManager";
-import { VariablesManager } from "./VariablesManager";
 
 const ADDABLE: StoryNodeType[] = ["event", "scene", "dialogue", "end"];
 
@@ -45,7 +44,7 @@ export function AppShell() {
     <div className="sp-app">
       <header className="sp-topbar">
         <div className="sp-brand">
-          <Logo size={26} />
+          <Logo size={20} />
           <div className="sp-menu">
             <button type="button" className="sp-btn sp-btn-quiet" onClick={() => setMenu((open) => !open)}>
               File
@@ -86,8 +85,6 @@ export function AppShell() {
             [
               ["graph", "Graph"],
               ["play", "Play"],
-              ["variables", "Variables"],
-              ["tags", "Tags"],
             ] as const
           ).map(([id, label]) => (
             <button
@@ -128,56 +125,30 @@ export function AppShell() {
               </nav>
               <div className="sp-toolbar">
                 {!hasStart && (
-                  <button type="button" className="sp-btn sp-btn-small" onClick={() => addNode("start")}>
+                  <button type="button" className="sp-chip-btn sp-type-start" onClick={() => addNode("start")}>
                     + Start
                   </button>
                 )}
                 {ADDABLE.map((type) => (
-                  <button key={type} type="button" className={`sp-btn sp-btn-small sp-type-${type}`} onClick={() => addNode(type)}>
+                  <button key={type} type="button" className={`sp-chip-btn sp-type-${type}`} onClick={() => addNode(type)}>
                     + {NODE_LABEL[type]}
                   </button>
                 ))}
               </div>
             </div>
             <div className="sp-workspace">
-              <aside className="sp-outline">
-                <h2>This graph</h2>
-                <ul>
-                  {graph.nodes.map((node) => (
-                    <li key={node.id}>
-                      <button
-                        type="button"
-                        className="sp-outline-item"
-                        onClick={() => useProjectStore.getState().select({ kind: "node", id: node.id })}
-                      >
-                        <i className={`sp-dot sp-type-${node.type}`} />
-                        <span>
-                          <small>{NODE_LABEL[node.type]}</small>
-                          {node.title || "Untitled"}
-                        </span>
-                      </button>
-                      {node.subgraphId && (
-                        <button type="button" className="sp-icon-btn" aria-label="Open inner graph" onClick={() => openGraph(node.subgraphId!)}>
-                          ↳
-                        </button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </aside>
+              <LeftPanel />
               <GraphCanvas />
               <Inspector />
             </div>
           </>
         )}
         {screen === "play" && <PlayMode />}
-        {screen === "variables" && <VariablesManager />}
-        {screen === "tags" && <TagsManager />}
       </div>
       <footer className="sp-status">
         <span className="sp-status-path">{path}</span>
         <span>
-          {graph ? `${graph.nodes.length} beats` : ""} · schema v{SCHEMA_VERSION}
+          {graph ? `${graph.nodes.length} beats · ${graph.edges.length} transitions` : ""} · {project.variables.length} variables · schema v{SCHEMA_VERSION}
           {dirty ? " · unsaved" : " · saved"}
         </span>
       </footer>

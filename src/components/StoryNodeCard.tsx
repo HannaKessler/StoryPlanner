@@ -26,8 +26,7 @@ export function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
       <h3>{story.title || "Untitled"}</h3>
       {preview && <p>{preview}</p>}
       <footer>
-        {story.choices.length > 0 && <span>{story.choices.length} choices</span>}
-        {story.effects.length > 0 && <span>Sets variables</span>}
+        {story.lines.length > 0 && <span>{story.lines.length} lines</span>}
         {(story.type === "event" || story.type === "scene" || story.type === "dialogue") && (
           <button
             type="button"
@@ -41,12 +40,6 @@ export function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
           </button>
         )}
       </footer>
-      {story.choices.map((choice) => (
-        <div key={choice.id} className="sp-choice-port">
-          <span>{choice.label || "Choice"}</span>
-          <Handle type="source" position={Position.Right} id={choice.id} />
-        </div>
-      ))}
       {story.type !== "end" && (
         <Handle type="source" position={Position.Right} id="out" className="sp-handle-out" />
       )}

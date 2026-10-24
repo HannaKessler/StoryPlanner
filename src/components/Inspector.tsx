@@ -1,216 +1,328 @@
+import { describeCondition } from "../domain/conditions";
+import { describeEffect } from "../domain/effects";
 import { NODE_LABEL } from "../domain/labels";
+import type { GraphDocument, ProjectDocument, StoryEdge } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { ConditionBuilder } from "./ConditionBuilder";
 import { DialogueEditor } from "./DialogueEditor";
 import { EffectsEditor } from "./EffectsEditor";
-import { Field } from "./Modal";
+import { IconButton, Row, Section } from "./Panel";
 
 export function Inspector() {
   const selection = useProjectStore((state) => state.selection);
-  const currentGraphId = useProjectStore((state) => state.currentGraphId);
   const graph = useProjectStore((state) => (state.currentGraphId ? state.graphs[state.currentGraphId] : null));
-  if (!graph || !currentGraphId) return null;
-  if (selection?.kind === "edge") {
-    const edge = graph.edges.find((item) => item.id === selection.id);
-    if (edge) return <EdgeInspector edgeId={edge.id} />;
+  if (!graph) return null;
+  let body = <GraphInspector graph={graph} />;
+  if (selection?.kind === "edge" && graph.edges.some((item) => item.id === selection.id)) {
+    body = <EdgeInspector key={selection.id} graph={graph} edgeId={selection.id} />;
+  } else if (selection?.kind === "node" && graph.nodes.some((item) => item.id === selection.id)) {
+    body = <NodeInspector key={selection.id} graph={graph} nodeId={selection.id} />;
   }
-  if (selection?.kind === "node") {
-    const node = graph.nodes.find((item) => item.id === selection.id);
-    if (node) return <NodeInspector nodeId={node.id} />;
-  }
-  return <GraphInspector />;
+  return <aside className="sp-inspector sp-panel">{body}</aside>;
 }
 
-function GraphInspector() {
-  const graph = useProjectStore((state) => (state.currentGraphId ? state.graphs[state.currentGraphId] : null));
+function GraphInspector({ graph }: { graph: GraphDocument }) {
   const updateGraphMeta = useProjectStore((state) => state.updateGraphMeta);
-  if (!graph) return null;
+  const conditional = graph.edges.filter((edge) => edge.condition).length;
   return (
-    <aside className="sp-inspector">
-      <p className="sp-kicker">Graph</p>
-      <Field label="Name">
-        <input className="sp-input" value={graph.name} onChange={(event) => updateGraphMeta({ name: event.target.value })} />
-      </Field>
-      <Field label="Scene notes">
+    <>
+      <div className="sp-insp-head">
+        <span className="sp-kicker">Graph</span>
+        <input className="sp-head-input" aria-label="Graph name" value={graph.name} onChange={(event) => updateGraphMeta({ name: event.target.value })} />
+      </div>
+      <p className="sp-stats">
+        {graph.nodes.length} beats · {graph.edges.length} transitions · {conditional} conditional
+      </p>
+      <Section id="insp:graph-notes" title="Scene notes" summary={graph.sceneNotes}>
         <textarea
-          className="sp-textarea"
-          rows={5}
+          className="sp-cell sp-area"
+          rows={3}
           placeholder="Notes that cover this whole graph."
           value={graph.sceneNotes}
           onChange={(event) => updateGraphMeta({ sceneNotes: event.target.value })}
         />
-      </Field>
-      <p className="sp-muted">
-        Select a beat or a connection. Events, scenes, and dialogue can open into their own graph. There is no depth limit.
+      </Section>
+      <p className="sp-hint">
+        Select a beat or a transition. Drag from a beat’s right handle to another beat to add a transition. Branching lives on transitions: each has its own conditions and variable changes.
       </p>
-    </aside>
+    </>
   );
 }
 
-function NodeInspector({ nodeId }: { nodeId: string }) {
-  const graph = useProjectStore((state) => (state.currentGraphId ? state.graphs[state.currentGraphId] : null));
+function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string }) {
+  const project = useProjectStore((state) => state.project);
   const graphs = useProjectStore((state) => state.graphs);
-  const node = graph?.nodes.find((item) => item.id === nodeId);
   const updateNode = useProjectStore((state) => state.updateNode);
   const openSubgraph = useProjectStore((state) => state.openSubgraph);
   const deleteSubgraph = useProjectStore((state) => state.deleteSubgraph);
   const deleteNodes = useProjectStore((state) => state.deleteNodes);
-  const addNodeEffect = useProjectStore((state) => state.addNodeEffect);
-  const updateNodeEffect = useProjectStore((state) => state.updateNodeEffect);
-  const deleteNodeEffect = useProjectStore((state) => state.deleteNodeEffect);
-  const addChoice = useProjectStore((state) => state.addChoice);
-  const updateChoice = useProjectStore((state) => state.updateChoice);
-  const deleteChoice = useProjectStore((state) => state.deleteChoice);
-  const moveChoice = useProjectStore((state) => state.moveChoice);
-  const addChoiceEffect = useProjectStore((state) => state.addChoiceEffect);
-  const updateChoiceEffect = useProjectStore((state) => state.updateChoiceEffect);
-  const deleteChoiceEffect = useProjectStore((state) => state.deleteChoiceEffect);
-  if (!graph || !node) return null;
+  const connectNodes = useProjectStore((state) => state.connectNodes);
+  const addLine = useProjectStore((state) => state.addLine);
+  const node = graph.nodes.find((item) => item.id === nodeId);
+  if (!node || !project) return null;
   const child = node.subgraphId ? graphs[node.subgraphId] : undefined;
-  const showNotes = node.type === "event" || node.type === "scene" || node.type === "dialogue";
+  const content = node.type === "event" || node.type === "scene" || node.type === "dialogue";
+  const outgoing = graph.edges.filter((edge) => edge.source === node.id);
+  const incoming = graph.edges.filter((edge) => edge.target === node.id);
 
   return (
-    <aside className="sp-inspector">
-      <p className={`sp-kicker sp-type-${node.type}`}>{NODE_LABEL[node.type]}</p>
-      <Field label="Title">
-        <input className="sp-input" value={node.title} onChange={(event) => updateNode(node.id, { title: event.target.value })} />
-      </Field>
-      {node.type !== "start" && (
-        <Field label="Summary">
-          <textarea className="sp-textarea" rows={3} value={node.summary} onChange={(event) => updateNode(node.id, { summary: event.target.value })} />
-        </Field>
-      )}
-      {showNotes && (
-        <Field label="Scene notes">
-          <textarea
-            className="sp-textarea"
-            rows={4}
-            placeholder="Setting, action, and direction."
-            value={node.sceneNotes}
-            onChange={(event) => updateNode(node.id, { sceneNotes: event.target.value })}
-          />
-        </Field>
-      )}
+    <>
+      <div className="sp-insp-head">
+        <span className={`sp-kicker sp-type-${node.type}`}>{NODE_LABEL[node.type]}</span>
+        <input className="sp-head-input" aria-label="Title" value={node.title} onChange={(event) => updateNode(node.id, { title: event.target.value })} />
+        {node.type !== "start" && (
+          <IconButton label="Delete beat" danger onClick={() => deleteNodes([node.id])}>
+            ×
+          </IconButton>
+        )}
+      </div>
 
-      {showNotes && (
-        <section>
-          <h3>Inner graph</h3>
-          <p className="sp-muted">{child ? `Opens “${child.name}”.` : "This beat has no inner graph yet."}</p>
-          <div className="sp-inline">
-            <button type="button" className="sp-btn sp-btn-small" onClick={() => openSubgraph(node.id)}>
-              {child ? "Open" : "Create inner graph"}
-            </button>
-            {child && (
-              <button type="button" className="sp-btn sp-btn-small is-danger" onClick={() => deleteSubgraph(node.id)}>
-                Remove inner graph
-              </button>
-            )}
-          </div>
-        </section>
-      )}
-
-      <section>
-        <h3>On enter</h3>
-        <EffectsEditor
-          effects={node.effects}
-          onAdd={() => addNodeEffect(node.id)}
-          onUpdate={(effectId, patch) => updateNodeEffect(node.id, effectId, patch)}
-          onDelete={(effectId) => deleteNodeEffect(node.id, effectId)}
-        />
-      </section>
-
-      {node.type === "dialogue" && (
-        <section>
-          <h3>Dialogue</h3>
-          <DialogueEditor nodeId={node.id} lines={node.lines} />
-        </section>
-      )}
-
-      {node.type === "dialogue" && (
-        <section>
-          <h3>Choices</h3>
-          {node.choices.map((choice, index) => {
-            const edge = graph.edges.find((item) => item.choiceId === choice.id);
-            const target = edge ? graph.nodes.find((item) => item.id === edge.target) : undefined;
-            return (
-              <article key={choice.id} className="sp-choice-card">
-                <div className="sp-choice-head">
-                  <input
-                    className="sp-input"
-                    value={choice.label}
-                    aria-label="Choice label"
-                    onChange={(event) => updateChoice(node.id, choice.id, { label: event.target.value })}
-                  />
-                  <button type="button" className="sp-icon-btn" disabled={index === 0} onClick={() => moveChoice(node.id, choice.id, -1)} aria-label="Move choice up">
-                    ↑
-                  </button>
-                  <button type="button" className="sp-icon-btn" disabled={index === node.choices.length - 1} onClick={() => moveChoice(node.id, choice.id, 1)} aria-label="Move choice down">
-                    ↓
-                  </button>
-                  <button type="button" className="sp-icon-btn" onClick={() => deleteChoice(node.id, choice.id)} aria-label="Delete choice">
-                    ×
-                  </button>
-                </div>
-                <p className="sp-muted">{target ? `Connects to ${target.title || "Untitled"}.` : "Drag from this choice’s handle to connect it."}</p>
-                <h4>When</h4>
-                <ConditionBuilder
-                  value={choice.condition}
-                  onChange={(condition) => updateChoice(node.id, choice.id, { condition })}
-                />
-                <h4>Then</h4>
-                <EffectsEditor
-                  effects={choice.effects}
-                  onAdd={() => addChoiceEffect(node.id, choice.id)}
-                  onUpdate={(effectId, patch) => updateChoiceEffect(node.id, choice.id, effectId, patch)}
-                  onDelete={(effectId) => deleteChoiceEffect(node.id, choice.id, effectId)}
-                />
-              </article>
-            );
-          })}
-          <button type="button" className="sp-btn sp-btn-small" onClick={() => addChoice(node.id)}>
-            + Choice
+      {content && (
+        <div className="sp-inner-row">
+          <span className="sp-faint">Inner graph</span>
+          <span className="sp-inner-name">{child ? child.name || "Untitled" : "none"}</span>
+          <button type="button" className="sp-chip-btn" onClick={() => openSubgraph(node.id)}>
+            {child ? "Open" : "Create"}
           </button>
-        </section>
+          {child && (
+            <IconButton label="Remove inner graph" danger onClick={() => deleteSubgraph(node.id)}>
+              ×
+            </IconButton>
+          )}
+        </div>
       )}
 
       {node.type !== "start" && (
-        <button type="button" className="sp-btn is-danger" onClick={() => deleteNodes([node.id])}>
-          Delete beat
-        </button>
+        <Section id="insp:notes" title="Notes" summary={node.summary || node.sceneNotes}>
+          <Row label="Summary">
+            <textarea className="sp-cell sp-area" rows={2} value={node.summary} onChange={(event) => updateNode(node.id, { summary: event.target.value })} />
+          </Row>
+          {content && (
+            <Row label="Scene">
+              <textarea
+                className="sp-cell sp-area"
+                rows={2}
+                placeholder="Setting, action, direction"
+                value={node.sceneNotes}
+                onChange={(event) => updateNode(node.id, { sceneNotes: event.target.value })}
+              />
+            </Row>
+          )}
+        </Section>
       )}
-    </aside>
+
+      {node.type === "dialogue" && (
+        <Section
+          id="insp:lines"
+          title="Lines"
+          count={node.lines.length}
+          actions={
+            <button type="button" className="sp-chip-btn" onClick={() => addLine(node.id)}>
+              + line
+            </button>
+          }
+        >
+          <DialogueEditor nodeId={node.id} lines={node.lines} />
+        </Section>
+      )}
+
+      {node.type !== "end" && (
+        <Section
+          id="insp:out"
+          title="Transitions out"
+          count={outgoing.length}
+          actions={
+            <select
+              className="sp-chip-select"
+              aria-label="Add a transition to"
+              value=""
+              onChange={(event) => event.target.value && connectNodes(node.id, event.target.value)}
+            >
+              <option value="">+ to…</option>
+              {graph.nodes
+                .filter((item) => item.id !== node.id && item.type !== "start")
+                .map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.title || "Untitled"}
+                  </option>
+                ))}
+            </select>
+          }
+        >
+          <TransitionList graph={graph} edges={outgoing} project={project} side="target" reorder />
+        </Section>
+      )}
+
+      {node.type !== "start" && (
+        <Section id="insp:in" title="Transitions in" count={incoming.length} defaultOpen={false}>
+          <TransitionList graph={graph} edges={incoming} project={project} side="source" />
+        </Section>
+      )}
+    </>
   );
 }
 
-function EdgeInspector({ edgeId }: { edgeId: string }) {
-  const graph = useProjectStore((state) => (state.currentGraphId ? state.graphs[state.currentGraphId] : null));
-  const edge = graph?.edges.find((item) => item.id === edgeId);
+function TransitionList({
+  graph,
+  edges,
+  project,
+  side,
+  reorder = false,
+}: {
+  graph: GraphDocument;
+  edges: StoryEdge[];
+  project: ProjectDocument;
+  side: "source" | "target";
+  reorder?: boolean;
+}) {
+  const select = useProjectStore((state) => state.select);
+  const moveEdge = useProjectStore((state) => state.moveEdge);
+  if (edges.length === 0) return <p className="sp-hint">None.</p>;
+  return (
+    <ul className="sp-trans-list">
+      {edges.map((edge, index) => {
+        const other = graph.nodes.find((item) => item.id === edge[side]);
+        const otherTitle = other?.title || "Untitled";
+        const logic = transitionLogic(edge, project);
+        return (
+          <li key={edge.id}>
+            <button type="button" className="sp-trans" onClick={() => select({ kind: "edge", id: edge.id })}>
+              <span className="sp-trans-top">
+                {edge.condition && <i className="sp-cond-dot" title="Has conditions" />}
+                <strong>{edge.label || (side === "target" ? `→ ${otherTitle}` : `${otherTitle} →`)}</strong>
+                {edge.label && <span className="sp-faint">{side === "target" ? `→ ${otherTitle}` : `from ${otherTitle}`}</span>}
+              </span>
+              {logic && <span className="sp-trans-logic">{logic}</span>}
+            </button>
+            {reorder && (
+              <span className="sp-trans-order">
+                <IconButton label="Move up" disabled={index === 0} onClick={() => moveEdge(edge.id, -1)}>
+                  ↑
+                </IconButton>
+                <IconButton label="Move down" disabled={index === edges.length - 1} onClick={() => moveEdge(edge.id, 1)}>
+                  ↓
+                </IconButton>
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function transitionLogic(edge: StoryEdge, project: ProjectDocument): string {
+  const parts: string[] = [];
+  if (edge.condition) parts.push(`if ${describeCondition(edge.condition, project)}`);
+  if (edge.effects.length) parts.push(edge.effects.map((effect) => describeEffect(effect, project)).join(", "));
+  return parts.join(" · ");
+}
+
+function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string }) {
+  const project = useProjectStore((state) => state.project);
   const updateEdge = useProjectStore((state) => state.updateEdge);
   const deleteEdges = useProjectStore((state) => state.deleteEdges);
-  if (!graph || !edge) return null;
-  const source = graph.nodes.find((node) => node.id === edge.source);
-  const target = graph.nodes.find((node) => node.id === edge.target);
-  const choice = source?.choices.find((item) => item.id === edge.choiceId);
+  const moveEdge = useProjectStore((state) => state.moveEdge);
+  const select = useProjectStore((state) => state.select);
+  const addEdgeEffect = useProjectStore((state) => state.addEdgeEffect);
+  const updateEdgeEffect = useProjectStore((state) => state.updateEdgeEffect);
+  const deleteEdgeEffect = useProjectStore((state) => state.deleteEdgeEffect);
+  const edge = graph.edges.find((item) => item.id === edgeId);
+  if (!edge || !project) return null;
+  const siblings = graph.edges.filter((item) => item.source === edge.source);
+  const order = siblings.indexOf(edge);
+  const source = graph.nodes.find((item) => item.id === edge.source);
 
   return (
-    <aside className="sp-inspector">
-      <p className="sp-kicker">Connection</p>
-      <p className="sp-muted">
-        {source?.title || "Untitled"} → {target?.title || "Untitled"}
-      </p>
-      <Field label="Label">
-        <input className="sp-input" value={edge.label} onChange={(event) => updateEdge(edge.id, { label: event.target.value })} />
-      </Field>
-      {choice && (
-        <p className="sp-muted">
-          This is the branch for the choice “{choice.label}”. The choice’s own condition is edited on the dialogue beat.
-        </p>
-      )}
-      <h3>When this connection is available</h3>
-      <ConditionBuilder value={edge.condition} onChange={(condition) => updateEdge(edge.id, { condition })} />
-      <button type="button" className="sp-btn is-danger" onClick={() => deleteEdges([edge.id])}>
-        Delete connection
-      </button>
-    </aside>
+    <>
+      <div className="sp-insp-head">
+        <span className="sp-kicker">Transition</span>
+        <input
+          className="sp-head-input"
+          aria-label="Transition label"
+          placeholder="Label (optional)"
+          value={edge.label}
+          onChange={(event) => updateEdge(edge.id, { label: event.target.value })}
+        />
+        <IconButton label="Delete transition" danger onClick={() => deleteEdges([edge.id])}>
+          ×
+        </IconButton>
+      </div>
+      <Row label="From">
+        <span className="sp-row-pair">
+          <select
+            className="sp-cell"
+            aria-label="From beat"
+            value={edge.source}
+            onChange={(event) => event.target.value !== edge.target && updateEdge(edge.id, { source: event.target.value })}
+          >
+            {graph.nodes
+              .filter((item) => item.type !== "end")
+              .map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.title || "Untitled"}
+                </option>
+              ))}
+          </select>
+          <IconButton label="Select source beat" onClick={() => select({ kind: "node", id: edge.source })}>
+            ↗
+          </IconButton>
+        </span>
+      </Row>
+      <Row label="To">
+        <span className="sp-row-pair">
+          <select
+            className="sp-cell"
+            aria-label="To beat"
+            value={edge.target}
+            onChange={(event) => event.target.value !== edge.source && updateEdge(edge.id, { target: event.target.value })}
+          >
+            {graph.nodes
+              .filter((item) => item.type !== "start")
+              .map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.title || "Untitled"}
+                </option>
+              ))}
+          </select>
+          <IconButton label="Select target beat" onClick={() => select({ kind: "node", id: edge.target })}>
+            ↗
+          </IconButton>
+        </span>
+      </Row>
+      <Row label="Order">
+        <span className="sp-row-pair">
+          <span className="sp-faint">
+            {order + 1} of {siblings.length} from {source?.title || "Untitled"}
+          </span>
+          <IconButton label="Move up" disabled={order <= 0} onClick={() => moveEdge(edge.id, -1)}>
+            ↑
+          </IconButton>
+          <IconButton label="Move down" disabled={order >= siblings.length - 1} onClick={() => moveEdge(edge.id, 1)}>
+            ↓
+          </IconButton>
+        </span>
+      </Row>
+      <Section id="insp:conditions" title="Conditions" summary={describeCondition(edge.condition, project)}>
+        <ConditionBuilder value={edge.condition} onChange={(condition) => updateEdge(edge.id, { condition })} />
+      </Section>
+      <Section
+        id="insp:effects"
+        title="Effects"
+        count={edge.effects.length}
+        summary={edge.effects.map((effect) => describeEffect(effect, project)).join(", ")}
+        actions={
+          <button type="button" className="sp-chip-btn" disabled={project.variables.length === 0} onClick={() => addEdgeEffect(edge.id)}>
+            + effect
+          </button>
+        }
+      >
+        <EffectsEditor
+          effects={edge.effects}
+          onUpdate={(effectId, patch) => updateEdgeEffect(edge.id, effectId, patch)}
+          onDelete={(effectId) => deleteEdgeEffect(edge.id, effectId)}
+        />
+      </Section>
+    </>
   );
 }

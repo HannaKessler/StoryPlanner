@@ -11,15 +11,18 @@ import {
   useEdgesState,
   useNodesState,
   useReactFlow,
-  type Edge,
   type NodeChange,
   type EdgeChange,
 } from "@xyflow/react";
-import type { GraphDocument } from "../domain/types";
+import { describeCondition } from "../domain/conditions";
+import { describeEffect } from "../domain/effects";
+import type { GraphDocument, ProjectDocument } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { StoryNodeCard, type StoryFlowNode } from "./StoryNodeCard";
+import { TransitionEdge, type TransitionFlowEdge } from "./TransitionEdge";
 
 const nodeTypes = { story: StoryNodeCard };
+const edgeTypes = { transition: TransitionEdge };
 
 const NODE_COLORS: Record<string, string> = {
   start: "#9cba92",
@@ -31,15 +34,16 @@ const NODE_COLORS: Record<string, string> = {
 
 export function GraphCanvas() {
   const graph = useProjectStore((state) => (state.currentGraphId ? state.graphs[state.currentGraphId] : null));
-  if (!graph) return null;
+  const project = useProjectStore((state) => state.project);
+  if (!graph || !project) return null;
   return (
     <ReactFlowProvider>
-      <CanvasBody key={graph.id} graph={graph} />
+      <CanvasBody key={graph.id} graph={graph} project={project} />
     </ReactFlowProvider>
   );
 }
 
-function CanvasBody({ graph }: { graph: GraphDocument }) {
+function CanvasBody({ graph, project }: { graph: GraphDocument; project: ProjectDocument }) {
   const selection = useProjectStore((state) => state.selection);
   const select = useProjectStore((state) => state.select);
   const connectNodes = useProjectStore((state) => state.connectNodes);
@@ -49,19 +53,21 @@ function CanvasBody({ graph }: { graph: GraphDocument }) {
   const { fitView } = useReactFlow();
 
   const [nodes, setNodes] = useNodesState(toNodes(graph));
-  const [edges, setEdges] = useEdgesState(toEdges(graph));
+  const [edges, setEdges] = useEdgesState(toEdges(graph, project));
 
   const signature = useMemo(
     () =>
       JSON.stringify({
         nodes: graph.nodes.map(({ position: _position, ...rest }) => rest),
         edges: graph.edges,
+        variables: project.variables,
+        tags: project.tagCategories,
       }),
-    [graph],
+    [graph, project],
   );
 
   useEffect(() => {
-    const frame = window.setTimeout(() => fitView({ padding: 0.18, duration: 180 }), 40);
+    const frame = window.setTimeout(() => fitView({ padding: 0.08, duration: 180 }), 40);
     return () => window.clearTimeout(frame);
   }, [graph.id, fitView]);
 
@@ -72,7 +78,7 @@ function CanvasBody({ graph }: { graph: GraphDocument }) {
         return previous ? { ...node, position: previous.position } : node;
       }),
     );
-    setEdges(toEdges(graph));
+    setEdges(toEdges(graph, project));
     // Signature tracks content other than drag position.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature, setNodes, setEdges]);
@@ -95,7 +101,7 @@ function CanvasBody({ graph }: { graph: GraphDocument }) {
   const onNodesChange = (changes: NodeChange<StoryFlowNode>[]) => {
     setNodes((current) => applyNodeChanges(changes, current));
   };
-  const onEdgesChange = (changes: EdgeChange<Edge>[]) => {
+  const onEdgesChange = (changes: EdgeChange<TransitionFlowEdge>[]) => {
     setEdges((current) => applyEdgeChanges(changes, current));
   };
 
@@ -105,11 +111,12 @@ function CanvasBody({ graph }: { graph: GraphDocument }) {
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={(connection) => {
           if (!connection.source || !connection.target) return;
-          connectNodes(connection.source, connection.target, connection.sourceHandle);
+          connectNodes(connection.source, connection.target);
         }}
         onNodeClick={(_, node) => select({ kind: "node", id: node.id })}
         onEdgeClick={(_, edge) => select({ kind: "edge", id: edge.id })}
@@ -127,6 +134,7 @@ function CanvasBody({ graph }: { graph: GraphDocument }) {
         <MiniMap
           pannable
           zoomable
+          style={{ width: 150, height: 96 }}
           nodeColor={(node) => NODE_COLORS[(node.data as { story?: { type?: string } }).story?.type ?? ""] ?? "#5c5348"}
           maskColor="rgba(18, 17, 15, 0.7)"
         />
@@ -144,19 +152,23 @@ function toNodes(graph: GraphDocument): StoryFlowNode[] {
   }));
 }
 
-function toEdges(graph: GraphDocument): Edge[] {
-  return graph.edges.map((edge) => ({
-    id: edge.id,
-    source: edge.source,
-    target: edge.target,
-    sourceHandle: edge.choiceId ?? "out",
-    targetHandle: "in",
-    label: edge.label || (edge.condition ? "If" : undefined),
-    markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color: edge.condition ? "#e3a15a" : "#8a7d6c" },
-    style: { stroke: edge.condition ? "#e3a15a" : "#8a7d6c", strokeWidth: 1.6 },
-    labelStyle: { fill: "#d9d0c3", fontSize: 11 },
-    labelBgStyle: { fill: "#1c1a17" },
-    labelBgPadding: [4, 2] as [number, number],
-    labelBgBorderRadius: 4,
-  }));
+function toEdges(graph: GraphDocument, project: ProjectDocument): TransitionFlowEdge[] {
+  return graph.edges.map((edge) => {
+    const color = edge.condition ? "#e3a15a" : "#8a7d6c";
+    return {
+      id: edge.id,
+      type: "transition",
+      source: edge.source,
+      target: edge.target,
+      sourceHandle: "out",
+      targetHandle: "in",
+      data: {
+        label: edge.label,
+        condition: edge.condition ? describeCondition(edge.condition, project) : "",
+        effects: edge.effects.map((effect) => describeEffect(effect, project)).join(", "),
+      },
+      markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color },
+      style: { stroke: color, strokeWidth: 1.6 },
+    };
+  });
 }

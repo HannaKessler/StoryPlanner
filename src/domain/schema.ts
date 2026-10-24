@@ -2,9 +2,9 @@ import {
   BUNDLE_KIND,
   COMPARE_OPS,
   EFFECT_OPS,
+  READABLE_SCHEMA_VERSIONS,
   SCHEMA_VERSION,
   STORY_NODE_TYPES,
-  type Choice,
   type CompareOp,
   type Condition,
   type DialogueLine,
@@ -85,10 +85,10 @@ function optionalString(obj: Record<string, unknown>, key: string, path: string)
 function readVersion(obj: Record<string, unknown>, path: string): number {
   if (!("schemaVersion" in obj)) fail(path, "missing schemaVersion");
   const version = asNumber(obj.schemaVersion, child(path, "schemaVersion"));
-  if (version !== SCHEMA_VERSION) {
+  if (!(READABLE_SCHEMA_VERSIONS as readonly number[]).includes(version)) {
     fail(
       path,
-      `unsupported schemaVersion ${version} (this app reads version ${SCHEMA_VERSION})`,
+      `unsupported schemaVersion ${version} (this app reads versions ${READABLE_SCHEMA_VERSIONS.join(" and ")})`,
     );
   }
   return version;
@@ -153,16 +153,8 @@ function parseLine(value: unknown, path: string): DialogueLine {
   };
 }
 
-function parseChoice(value: unknown, path: string): Choice {
-  if (!isRecord(value)) fail(path, "expected a choice");
-  return {
-    id: asNonEmpty(value.id, child(path, "id")),
-    label: asString(value.label, child(path, "label")),
-    condition: parseConditionField(value.condition ?? null, child(path, "condition")),
-    effects: asArray(value.effects ?? [], child(path, "effects")).map((item, index) =>
-      parseEffect(item, child(child(path, "effects"), index)),
-    ),
-  };
+function parseEffects(value: unknown, path: string): Effect[] {
+  return asArray(value ?? [], path).map((item, index) => parseEffect(item, child(path, index)));
 }
 
 function parseNode(value: unknown, path: string): StoryNode {
@@ -188,29 +180,75 @@ function parseNode(value: unknown, path: string): StoryNode {
     lines: asArray(value.lines ?? [], child(path, "lines")).map((item, index) =>
       parseLine(item, child(child(path, "lines"), index)),
     ),
-    choices: asArray(value.choices ?? [], child(path, "choices")).map((item, index) =>
-      parseChoice(item, child(child(path, "choices"), index)),
-    ),
-    effects: asArray(value.effects ?? [], child(path, "effects")).map((item, index) =>
-      parseEffect(item, child(child(path, "effects"), index)),
-    ),
   };
 }
 
 function parseEdge(value: unknown, path: string): StoryEdge {
   if (!isRecord(value)) fail(path, "expected an edge");
-  const choiceId = value.choiceId;
-  if (choiceId !== null && choiceId !== undefined && typeof choiceId !== "string") {
-    fail(child(path, "choiceId"), "expected a string or null");
-  }
   return {
     id: asNonEmpty(value.id, child(path, "id")),
     source: asNonEmpty(value.source, child(path, "source")),
     target: asNonEmpty(value.target, child(path, "target")),
-    choiceId: typeof choiceId === "string" ? choiceId : null,
     label: optionalString(value, "label", path),
     condition: parseConditionField(value.condition ?? null, child(path, "condition")),
+    effects: parseEffects(value.effects, child(path, "effects")),
   };
+}
+
+function combineConditions(a: Condition | null, b: Condition | null): Condition | null {
+  if (!a) return b;
+  if (!b) return a;
+  return { type: "group", op: "and", children: [a, b] };
+}
+
+/**
+ * Version 1 kept player choices and on-enter effects on nodes. Version 2 keeps
+ * all branching logic on edges. A choice folds into the edge that carried it
+ * (label, both conditions joined with and, choice effects). On-enter effects
+ * are appended to every incoming edge of that node. Choices without an edge,
+ * and on-enter effects of a node nobody connects into, have nowhere to go and
+ * are dropped.
+ */
+function migrateGraphV1(value: Record<string, unknown>): Record<string, unknown> {
+  const nodes = asArray(value.nodes ?? [], "graph.nodes");
+  const edges = asArray(value.edges ?? [], "graph.edges");
+  const choices = new Map<string, { source: string; choice: Record<string, unknown> }>();
+  const onEnter = new Map<string, unknown[]>();
+  for (const node of nodes) {
+    if (!isRecord(node) || typeof node.id !== "string") continue;
+    for (const choice of Array.isArray(node.choices) ? node.choices : []) {
+      if (isRecord(choice) && typeof choice.id === "string") {
+        choices.set(choice.id, { source: node.id, choice });
+      }
+    }
+    if (Array.isArray(node.effects) && node.effects.length > 0) onEnter.set(node.id, node.effects);
+  }
+  const migratedEdges = edges.map((edge, index) => {
+    if (!isRecord(edge)) return edge;
+    const path = child("graph.edges", index);
+    const found = typeof edge.choiceId === "string" ? choices.get(edge.choiceId) : undefined;
+    const fromChoice = found && found.source === edge.source ? found.choice : null;
+    const edgeCondition = parseConditionField(edge.condition ?? null, child(path, "condition"));
+    const choiceCondition = fromChoice
+      ? parseConditionField(fromChoice.condition ?? null, child(path, "choice.condition"))
+      : null;
+    const effects: unknown[] = fromChoice && Array.isArray(fromChoice.effects) ? [...fromChoice.effects] : [];
+    const entered = typeof edge.target === "string" ? onEnter.get(edge.target) ?? [] : [];
+    for (const effect of entered) {
+      effects.push(isRecord(effect) ? { ...effect, id: `${String(edge.id)}:${String(effect.id)}` } : effect);
+    }
+    const choiceLabel = typeof fromChoice?.label === "string" ? fromChoice.label : "";
+    const label = typeof edge.label === "string" && edge.label ? edge.label : choiceLabel;
+    return {
+      id: edge.id,
+      source: edge.source,
+      target: edge.target,
+      label,
+      condition: combineConditions(choiceCondition, edgeCondition),
+      effects,
+    };
+  });
+  return { ...value, edges: migratedEdges };
 }
 
 function parseTag(value: unknown, path: string): Tag {
@@ -265,8 +303,9 @@ function parseVariable(value: unknown, path: string): VariableDef {
 
 export function parseProject(value: unknown): ProjectDocument {
   if (!isRecord(value)) fail("project", "expected an object");
+  readVersion(value, "project");
   return {
-    schemaVersion: readVersion(value, "project"),
+    schemaVersion: SCHEMA_VERSION,
     id: asNonEmpty(value.id, "project.id"),
     name: asString(value.name, "project.name"),
     createdAt: asString(value.createdAt, "project.createdAt"),
@@ -281,8 +320,9 @@ export function parseProject(value: unknown): ProjectDocument {
   };
 }
 
-export function parseGraph(value: unknown): GraphDocument {
-  if (!isRecord(value)) fail("graph", "expected an object");
+export function parseGraph(input: unknown): GraphDocument {
+  if (!isRecord(input)) fail("graph", "expected an object");
+  const value = readVersion(input, "graph") === 1 ? migrateGraphV1(input) : input;
   const parentGraphId = value.parentGraphId;
   const parentNodeId = value.parentNodeId;
   if (parentGraphId !== null && typeof parentGraphId !== "string") {
@@ -292,7 +332,7 @@ export function parseGraph(value: unknown): GraphDocument {
     fail("graph.parentNodeId", "expected a string or null");
   }
   return {
-    schemaVersion: readVersion(value, "graph"),
+    schemaVersion: SCHEMA_VERSION,
     id: asNonEmpty(value.id, "graph.id"),
     name: asString(value.name, "graph.name"),
     parentGraphId: parentGraphId ?? null,
@@ -309,7 +349,7 @@ export function parseGraph(value: unknown): GraphDocument {
 
 export function parseBundle(value: unknown): ProjectBundle {
   if (!isRecord(value)) fail("bundle", "expected an object");
-  const version = readVersion(value, "bundle");
+  readVersion(value, "bundle");
   const kind = asString(value.kind, "bundle.kind");
   if (kind !== BUNDLE_KIND) fail("bundle.kind", `expected ${BUNDLE_KIND}`);
   const graphs = asArray(value.graphs, "bundle.graphs").map((item, index) => {
@@ -321,7 +361,7 @@ export function parseBundle(value: unknown): ProjectBundle {
     }
   });
   return {
-    schemaVersion: version,
+    schemaVersion: SCHEMA_VERSION,
     kind: BUNDLE_KIND,
     exportedAt: asString(value.exportedAt, "bundle.exportedAt"),
     project: parseProject(value.project),

@@ -19,13 +19,37 @@ export function TagSelect({
   const category = project?.tagCategories.find((item) => item.id === categoryId);
 
   if (!category) {
-    return <span className="sp-muted">Pick a tag category on the variable.</span>;
+    return <span className="sp-hint">No tag category on this variable.</span>;
+  }
+
+  if (adding) {
+    return (
+      <form
+        className="sp-tag-select"
+        onSubmit={(event) => {
+          event.preventDefault();
+          const id = addTag(category.id, name);
+          if (id) onChange(id);
+          setName("");
+          setAdding(false);
+        }}
+      >
+        <input
+          className="sp-cell"
+          value={name}
+          placeholder={`New ${category.name} tag`}
+          onChange={(event) => setName(event.target.value)}
+          onBlur={() => !name.trim() && setAdding(false)}
+          autoFocus
+        />
+      </form>
+    );
   }
 
   return (
     <div className="sp-tag-select">
       <select
-        className="sp-select"
+        className="sp-cell"
         value={value ?? ""}
         onChange={(event) => {
           if (event.target.value === "__new__") {
@@ -41,31 +65,8 @@ export function TagSelect({
             {tag.name}
           </option>
         ))}
-        <option value="__new__">+ New tag in {category.name}</option>
+        <option value="__new__">+ new {category.name} tag</option>
       </select>
-      {adding && (
-        <form
-          className="sp-inline"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const id = addTag(category.id, name);
-            if (id) onChange(id);
-            setName("");
-            setAdding(false);
-          }}
-        >
-          <input
-            className="sp-input"
-            value={name}
-            placeholder={`New ${category.name} tag`}
-            onChange={(event) => setName(event.target.value)}
-            autoFocus
-          />
-          <button type="submit" className="sp-btn sp-btn-small">
-            Add
-          </button>
-        </form>
-      )}
     </div>
   );
 }

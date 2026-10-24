@@ -1,31 +1,46 @@
 import { describeEffect, opsForVariable } from "../domain/effects";
 import type { Effect, EffectOp, Scalar } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
+import { IconButton } from "./Panel";
 import { TagSelect } from "./TagSelect";
+
+const OP_LABEL: Record<EffectOp, string> = { set: "set", add: "add", toggle: "toggle", clear: "clear" };
 
 export function EffectsEditor({
   effects,
-  onAdd,
   onUpdate,
   onDelete,
 }: {
   effects: Effect[];
-  onAdd: () => void;
   onUpdate: (effectId: string, patch: Partial<Effect>) => void;
   onDelete: (effectId: string) => void;
 }) {
   const project = useProjectStore((state) => state.project);
   if (!project) return null;
+  if (project.variables.length === 0) return <p className="sp-hint">Add a variable in the left panel first.</p>;
+  if (effects.length === 0) return <p className="sp-hint">No variable changes.</p>;
   return (
     <div className="sp-effects">
-      {effects.length === 0 && <p className="sp-muted">No variable changes.</p>}
       {effects.map((effect) => {
         const variable = project.variables.find((item) => item.id === effect.variableId);
         const ops = opsForVariable(variable?.kind);
         return (
-          <div key={effect.id} className="sp-effect-row">
+          <div key={effect.id} className="sp-effect-row" title={describeEffect(effect, project)}>
             <select
-              className="sp-select"
+              className="sp-cell"
+              aria-label="Operation"
+              value={effect.op}
+              onChange={(event) => onUpdate(effect.id, { op: event.target.value as EffectOp })}
+            >
+              {ops.map((op) => (
+                <option key={op} value={op}>
+                  {OP_LABEL[op]}
+                </option>
+              ))}
+            </select>
+            <select
+              className="sp-cell"
+              aria-label="Variable"
               value={effect.variableId}
               onChange={(event) => {
                 const next = project.variables.find((item) => item.id === event.target.value);
@@ -37,25 +52,14 @@ export function EffectsEditor({
                 });
               }}
             >
-              <option value="">Variable…</option>
+              <option value="">variable…</option>
               {project.variables.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
                 </option>
               ))}
             </select>
-            <select
-              className="sp-select"
-              value={effect.op}
-              onChange={(event) => onUpdate(effect.id, { op: event.target.value as EffectOp })}
-            >
-              {ops.map((op) => (
-                <option key={op} value={op}>
-                  {op === "set" ? "Set" : op === "add" ? "Add" : op === "toggle" ? "Toggle" : "Clear"}
-                </option>
-              ))}
-            </select>
-            {effect.op !== "toggle" && effect.op !== "clear" && (
+            {effect.op !== "toggle" && effect.op !== "clear" ? (
               <EffectValue
                 kind={variable?.kind}
                 categoryId={variable?.tagCategoryId ?? null}
@@ -63,17 +67,15 @@ export function EffectsEditor({
                 value={effect.value}
                 onChange={(value) => onUpdate(effect.id, { value })}
               />
+            ) : (
+              <span />
             )}
-            <button type="button" className="sp-icon-btn" aria-label="Remove effect" onClick={() => onDelete(effect.id)}>
+            <IconButton label="Remove effect" danger onClick={() => onDelete(effect.id)}>
               ×
-            </button>
-            <p className="sp-effect-readout">{describeEffect(effect, project)}</p>
+            </IconButton>
           </div>
         );
       })}
-      <button type="button" className="sp-btn sp-btn-small" onClick={onAdd} disabled={project.variables.length === 0}>
-        {project.variables.length === 0 ? "Add a variable first" : "+ Effect"}
-      </button>
     </div>
   );
 }
@@ -93,17 +95,18 @@ function EffectValue({
 }) {
   if (kind === "boolean") {
     return (
-      <select className="sp-select" value={value === true ? "true" : "false"} onChange={(event) => onChange(event.target.value === "true")}>
-        <option value="true">true</option>
-        <option value="false">false</option>
+      <select className="sp-cell" aria-label="Value" value={value === true ? "true" : "false"} onChange={(event) => onChange(event.target.value === "true")}>
+        <option value="true">to true</option>
+        <option value="false">to false</option>
       </select>
     );
   }
   if (kind === "value" || op === "add") {
     return (
       <input
-        className="sp-input"
+        className="sp-cell"
         type="number"
+        aria-label="Amount"
         value={typeof value === "number" ? value : 0}
         onChange={(event) => onChange(Number(event.target.value))}
       />
@@ -112,5 +115,5 @@ function EffectValue({
   if (kind === "tag") {
     return <TagSelect categoryId={categoryId} value={typeof value === "string" ? value : null} onChange={onChange} allowEmpty />;
   }
-  return <input className="sp-input" value={value == null ? "" : String(value)} onChange={(event) => onChange(event.target.value)} />;
+  return <input className="sp-cell" aria-label="Value" value={value == null ? "" : String(value)} onChange={(event) => onChange(event.target.value)} />;
 }

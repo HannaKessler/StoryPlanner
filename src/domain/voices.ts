@@ -11,7 +11,7 @@ import type {
 interface Cue {
   line: DialogueLine;
   speaker: string;
-  viaChoiceLabel: string | null;
+  viaLabel: string | null;
 }
 
 /**
@@ -63,8 +63,8 @@ export function exportVoiceSheets(
         } else {
           lines.push("*Responds to:*", "");
           for (const cue of cues) {
-            const choice = cue.viaChoiceLabel ? ` *(after “${cue.viaChoiceLabel}”)*` : "";
-            lines.push(`> **${cue.speaker}:** *${cue.line.text.trim() || "…"}*${choice}`, "");
+            const via = cue.viaLabel ? ` *(then “${cue.viaLabel}”)*` : "";
+            lines.push(`> **${cue.speaker}:** *${cue.line.text.trim() || "…"}*${via}`, "");
           }
         }
         lines.push(`**${tag.name.toUpperCase()}**`, "", line.text.trim() || "…", "", "---", "");
@@ -144,7 +144,7 @@ function tailCues(
   if (guard.has(visit)) return [];
   const nextGuard = new Set(guard);
   nextGuard.add(visit);
-  const choice = choiceLabel(node, viaEdge);
+  const via = transitionLabel(viaEdge);
 
   if (node.subgraphId && graphs[node.subgraphId]) {
     const child = graphs[node.subgraphId];
@@ -154,16 +154,16 @@ function tailCues(
       nested.push(...tailCues(child, terminal, null, graphs, project, nextGuard));
     }
     if (nested.length) {
-      return nested.map((cue) => ({ ...cue, viaChoiceLabel: cue.viaChoiceLabel ?? choice }));
+      return nested.map((cue) => ({ ...cue, viaLabel: cue.viaLabel ?? via }));
     }
   }
 
   if (node.lines.length > 0) {
-    return [makeCue(project, node.lines[node.lines.length - 1], choice)];
+    return [makeCue(project, node.lines[node.lines.length - 1], via)];
   }
   return incomingCues(graph, node, graphs, project, nextGuard).map((cue) => ({
     ...cue,
-    viaChoiceLabel: cue.viaChoiceLabel ?? choice,
+    viaLabel: cue.viaLabel ?? via,
   }));
 }
 
@@ -183,16 +183,15 @@ function cuesBeforeGraph(
   return incomingCues(parent, parentNode, graphs, project, guard);
 }
 
-function choiceLabel(node: StoryNode, edge: StoryEdge | null): string | null {
-  if (!edge?.choiceId) return null;
-  return node.choices.find((choice) => choice.id === edge.choiceId)?.label ?? null;
+function transitionLabel(edge: StoryEdge | null): string | null {
+  return edge?.label || null;
 }
 
-function makeCue(project: ProjectDocument, line: DialogueLine, viaChoiceLabel: string | null): Cue {
+function makeCue(project: ProjectDocument, line: DialogueLine, viaLabel: string | null): Cue {
   return {
     line,
     speaker: speakerName(project, line.speakerTagId),
-    viaChoiceLabel,
+    viaLabel,
   };
 }
 
@@ -200,7 +199,7 @@ function dedupe(cues: Cue[]): Cue[] {
   const seen = new Set<string>();
   const result: Cue[] = [];
   for (const cue of cues) {
-    const key = `${cue.line.id}:${cue.viaChoiceLabel ?? ""}`;
+    const key = `${cue.line.id}:${cue.viaLabel ?? ""}`;
     if (seen.has(key)) continue;
     seen.add(key);
     result.push(cue);

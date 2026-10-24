@@ -23,7 +23,7 @@ export function exportScreenplay(
   const lines: string[] = [
     `# ${project.name || "Untitled story"}`,
     "",
-    "Branching screenplay. Each beat is written in full the first time it appears. Later visits point back to it with an arrow. Scene notes are block quotes. Choices and conditional exits show the logic in words, not code.",
+    "Branching screenplay. Each beat is written in full the first time it appears. Later visits point back to it with an arrow. Scene notes are block quotes. Transitions show their conditions and variable changes in words, not code.",
     "",
   ];
   const seen = new Set<string>();
@@ -90,11 +90,6 @@ function writeNode(
     if (line.direction.trim()) lines.push(`*(${line.direction.trim()})*`);
     lines.push("", line.text.trim() || "…", "");
   }
-  for (const effect of node.effects) {
-    lines.push(`*On enter: ${describeEffect(effect, project)}.*`);
-  }
-  if (node.effects.length) lines.push("");
-
   if (node.subgraphId && graphs[node.subgraphId]) {
     const child = graphs[node.subgraphId];
     lines.push(`*Inner graph: ${child.name || "Untitled"}*`, "");
@@ -113,42 +108,34 @@ function writeExits(
   project: ProjectDocument,
   graphs: Record<string, GraphDocument>,
 ) {
-  const choiceEdges = new Map<string, StoryEdge>();
-  const plain: StoryEdge[] = [];
-  for (const edge of graph.edges) {
-    if (edge.source !== node.id) continue;
-    if (edge.choiceId) choiceEdges.set(edge.choiceId, edge);
-    else plain.push(edge);
+  const outgoing = graph.edges.filter((edge) => edge.source === node.id);
+  const branching = outgoing.length > 1;
+  if (branching) lines.push(`**Transitions from ${node.title || "this beat"}**`, "");
+  for (const edge of outgoing) {
+    const target = graph.nodes.find((item) => item.id === edge.target);
+    if (branching || hasLogic(edge)) writeTransition(edge, target, lines, project);
+    if (target) writeNode(graph, target, level, lines, seen, project, graphs);
   }
+}
 
-  if (node.choices.length || (plain.length > 0 && node.type !== "start")) {
-    lines.push("**Branches**", "");
+function hasLogic(edge: StoryEdge): boolean {
+  return Boolean(edge.label || edge.condition || edge.effects.length);
+}
+
+function writeTransition(
+  edge: StoryEdge,
+  target: StoryNode | undefined,
+  lines: string[],
+  project: ProjectDocument,
+) {
+  const title = target?.title || "Untitled";
+  const heading = edge.label ? `${edge.label} → ${title}` : `→ ${title}`;
+  lines.push(`**${heading}**`);
+  lines.push(`*When ${describeCondition(edge.condition, project)}.*`);
+  if (edge.effects.length) {
+    lines.push(`*Then ${edge.effects.map((effect) => describeEffect(effect, project)).join(", ")}.*`);
   }
-  for (const choice of node.choices) {
-    lines.push(`**Choice — ${choice.label || "Untitled choice"}**`);
-    lines.push(`*When ${describeCondition(choice.condition, project)}.*`);
-    if (choice.effects.length) {
-      lines.push(`*Then ${choice.effects.map((effect) => describeEffect(effect, project)).join(". ")}.*`);
-    }
-    lines.push("");
-    const edge = choiceEdges.get(choice.id);
-    if (!edge) {
-      lines.push("_This choice is not connected._", "");
-      continue;
-    }
-    if (edge.condition) lines.push(`*Connection: ${describeCondition(edge.condition, project)}.*`, "");
-    const target = graph.nodes.find((item) => item.id === edge.target);
-    if (target) writeNode(graph, target, level, lines, seen, project, graphs);
-  }
-  for (const edge of plain) {
-    const target = graph.nodes.find((item) => item.id === edge.target);
-    if (node.type !== "start") {
-      const label = edge.label || target?.title || "Continue";
-      lines.push(`**Exit — ${label}**`);
-      lines.push(`*When ${describeCondition(edge.condition, project)}.*`, "");
-    }
-    if (target) writeNode(graph, target, level, lines, seen, project, graphs);
-  }
+  lines.push("");
 }
 
 function key(graph: GraphDocument, node: StoryNode): string {

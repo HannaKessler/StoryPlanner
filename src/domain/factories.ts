@@ -1,6 +1,6 @@
 import { createId } from "./ids";
+import { SCHEMA_VERSION } from "./types";
 import type {
-  Choice,
   DialogueLine,
   Effect,
   GraphDocument,
@@ -41,8 +41,6 @@ export function createNode(type: StoryNodeType, partial: Partial<StoryNode> = {}
     sceneNotes: partial.sceneNotes ?? "",
     subgraphId: partial.subgraphId ?? null,
     lines: partial.lines ?? [],
-    choices: partial.choices ?? [],
-    effects: partial.effects ?? [],
   };
 }
 
@@ -55,9 +53,9 @@ export function createEdge(
     id: partial.id ?? createId(),
     source,
     target,
-    choiceId: partial.choiceId ?? null,
     label: partial.label ?? "",
     condition: partial.condition ?? null,
+    effects: partial.effects ?? [],
   };
 }
 
@@ -67,15 +65,6 @@ export function createLine(partial: Partial<DialogueLine> = {}): DialogueLine {
     speakerTagId: partial.speakerTagId ?? null,
     text: partial.text ?? "",
     direction: partial.direction ?? "",
-  };
-}
-
-export function createChoice(partial: Partial<Choice> = {}): Choice {
-  return {
-    id: partial.id ?? createId(),
-    label: partial.label ?? "New choice",
-    condition: partial.condition ?? null,
-    effects: partial.effects ?? [],
   };
 }
 
@@ -128,7 +117,7 @@ export function createTag(name: string, index: number, partial: Partial<Tag> = {
 
 export function createGraph(partial: Partial<GraphDocument> & { id?: string; name: string }): GraphDocument {
   return {
-    schemaVersion: partial.schemaVersion ?? 1,
+    schemaVersion: partial.schemaVersion ?? SCHEMA_VERSION,
     id: partial.id ?? createId(),
     name: partial.name,
     parentGraphId: partial.parentGraphId ?? null,

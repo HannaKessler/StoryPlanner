@@ -1,18 +1,11 @@
 import { describeCondition, evaluateCondition } from "./conditions";
-import { applyEffects, defaultValues } from "./effects";
+import { applyEffects, defaultValues, describeEffect } from "./effects";
 import { findEntryNode } from "./graphOps";
-import type {
-  GraphDocument,
-  ProjectDocument,
-  Scalar,
-  StoryEdge,
-  StoryNode,
-} from "./types";
+import type { GraphDocument, ProjectDocument, Scalar, StoryNode } from "./types";
 
 export interface PlayFrame {
   graphId: string;
   nodeId: string;
-  spentChoiceIds: string[];
 }
 
 export interface PlayState {
@@ -24,12 +17,13 @@ export interface PlayState {
 
 export interface PlayAction {
   id: string;
-  kind: "enter" | "choice" | "edge" | "return";
+  kind: "enter" | "transition" | "return";
   label: string;
-  detail: string;
+  /** Target beat title for transitions. */
+  target: string;
+  condition: string;
+  effects: string;
   enabled: boolean;
-  reason: string;
-  choiceId?: string;
   edgeId?: string;
 }
 
@@ -39,12 +33,11 @@ export function createPlayState(
 ): PlayState {
   const root = graphs[project.rootGraphId];
   const entry = root ? findEntryNode(root) : null;
-  if (!root || !entry) {
-    return { frames: [], values: defaultValues(project.variables), log: [] };
-  }
+  const values = defaultValues(project.variables);
+  if (!root || !entry) return { frames: [], values, log: [] };
   return {
-    frames: [{ graphId: root.id, nodeId: entry.id, spentChoiceIds: [] }],
-    values: applyEffects(defaultValues(project.variables), entry.effects, project.variables),
+    frames: [{ graphId: root.id, nodeId: entry.id }],
+    values,
     log: [entry.title || "Untitled"],
   };
 }
@@ -61,6 +54,7 @@ export function playLocation(
   return { graph, node };
 }
 
+/** Ways forward from the current beat: its inner graph, its outgoing transitions, and the way back up. */
 export function availableActions(
   state: PlayState,
   project: ProjectDocument,
@@ -68,7 +62,6 @@ export function availableActions(
 ): PlayAction[] {
   const location = playLocation(state, graphs);
   if (!location) return [];
-  const frame = state.frames[state.frames.length - 1];
   const { graph, node } = location;
   const actions: PlayAction[] = [];
 
@@ -78,59 +71,40 @@ export function availableActions(
       id: `enter:${node.id}`,
       kind: "enter",
       label: `Step into ${node.title || "this beat"}`,
-      detail: child.name ? `Inner graph “${child.name}”` : "Open the inner graph",
+      target: child.name || "Inner graph",
+      condition: "",
+      effects: "",
       enabled: true,
-      reason: "",
-    });
-  }
-
-  for (const choice of node.choices) {
-    const edge = graph.edges.find((item) => item.choiceId === choice.id && item.source === node.id);
-    const spent = frame.spentChoiceIds.includes(choice.id);
-    const choiceOk = evaluateCondition(choice.condition, state.values, project.variables);
-    const edgeOk = edge ? evaluateCondition(edge.condition, state.values, project.variables) : true;
-    const enabled = choiceOk && edgeOk && !spent;
-    let reason = "";
-    if (spent) reason = "Already taken";
-    else if (!choiceOk) reason = describeCondition(choice.condition, project);
-    else if (!edgeOk && edge) reason = describeCondition(edge.condition, project);
-    actions.push({
-      id: `choice:${choice.id}`,
-      kind: "choice",
-      label: choice.label || "Untitled choice",
-      detail: edge
-        ? describeCondition(choice.condition, project)
-        : "Not connected yet — effects still apply",
-      enabled,
-      reason,
-      choiceId: choice.id,
-      edgeId: edge?.id,
     });
   }
 
   for (const edge of graph.edges) {
-    if (edge.source !== node.id || edge.choiceId) continue;
+    if (edge.source !== node.id) continue;
     const target = graph.nodes.find((item) => item.id === edge.target);
-    const enabled = evaluateCondition(edge.condition, state.values, project.variables);
+    const targetTitle = target?.title || "Untitled";
     actions.push({
       id: `edge:${edge.id}`,
-      kind: "edge",
-      label: edge.label || target?.title || "Continue",
-      detail: describeCondition(edge.condition, project),
-      enabled,
-      reason: enabled ? "" : describeCondition(edge.condition, project),
+      kind: "transition",
+      label: edge.label || targetTitle,
+      target: targetTitle,
+      condition: edge.condition ? describeCondition(edge.condition, project) : "",
+      effects: edge.effects.map((effect) => describeEffect(effect, project)).join(", "),
+      enabled: evaluateCondition(edge.condition, state.values, project.variables),
       edgeId: edge.id,
     });
   }
 
   if (state.frames.length > 1) {
+    const parent = state.frames[state.frames.length - 2];
+    const parentNode = graphs[parent.graphId]?.nodes.find((item) => item.id === parent.nodeId);
     actions.push({
       id: "return",
       kind: "return",
       label: "Return",
-      detail: "Back to the beat that contains this graph",
+      target: parentNode?.title || "Parent beat",
+      condition: "",
+      effects: "",
       enabled: true,
-      reason: "",
     });
   }
 
@@ -153,7 +127,11 @@ export function performAction(
     const child = graphs[node.subgraphId];
     const entry = child ? findEntryNode(child) : null;
     if (!child || !entry) return state;
-    return pushFrame(state, child.id, entry, project);
+    return {
+      ...state,
+      frames: [...state.frames, { graphId: child.id, nodeId: entry.id }],
+      log: [...state.log, entry.title || "Untitled"],
+    };
   }
 
   if (fresh.kind === "return") {
@@ -161,27 +139,17 @@ export function performAction(
     return { ...state, frames: state.frames.slice(0, -1) };
   }
 
-  if (fresh.kind === "choice" && fresh.choiceId) {
-    const choice = node.choices.find((item) => item.id === fresh.choiceId);
-    if (!choice) return state;
-    const withEffects: PlayState = {
-      ...state,
-      values: applyEffects(state.values, choice.effects, project.variables),
-    };
-    const edge = fresh.edgeId ? graph.edges.find((item) => item.id === fresh.edgeId) : undefined;
-    if (!edge) {
-      const frames = state.frames.slice();
-      const top = { ...frames[frames.length - 1], spentChoiceIds: [...frames[frames.length - 1].spentChoiceIds, choice.id] };
-      frames[frames.length - 1] = top;
-      return { ...withEffects, frames };
-    }
-    return moveAlong(withEffects, graph, edge, project);
-  }
-
-  if (fresh.kind === "edge" && fresh.edgeId) {
+  if (fresh.kind === "transition" && fresh.edgeId) {
     const edge = graph.edges.find((item) => item.id === fresh.edgeId);
-    if (!edge) return state;
-    return moveAlong(state, graph, edge, project);
+    const target = edge ? graph.nodes.find((item) => item.id === edge.target) : undefined;
+    if (!edge || !target) return state;
+    const frames = state.frames.slice(0, -1);
+    frames.push({ graphId: graph.id, nodeId: target.id });
+    return {
+      frames,
+      values: applyEffects(state.values, edge.effects, project.variables),
+      log: [...state.log, target.title || "Untitled"],
+    };
   }
 
   return state;
@@ -189,43 +157,4 @@ export function performAction(
 
 export function setPlayValue(state: PlayState, variableId: string, value: Scalar): PlayState {
   return { ...state, values: { ...state.values, [variableId]: value } };
-}
-
-function moveAlong(
-  state: PlayState,
-  graph: GraphDocument,
-  edge: StoryEdge,
-  project: ProjectDocument,
-): PlayState {
-  const target = graph.nodes.find((item) => item.id === edge.target);
-  if (!target) return state;
-  return replaceTop(state, graph.id, target, project);
-}
-
-function replaceTop(
-  state: PlayState,
-  graphId: string,
-  node: StoryNode,
-  project: ProjectDocument,
-): PlayState {
-  const frames = state.frames.slice(0, -1);
-  frames.push({ graphId, nodeId: node.id, spentChoiceIds: [] });
-  return {
-    frames,
-    values: applyEffects(state.values, node.effects, project.variables),
-    log: [...state.log, node.title || "Untitled"],
-  };
-}
-
-function pushFrame(
-  state: PlayState,
-  graphId: string,
-  node: StoryNode,
-  project: ProjectDocument,
-): PlayState {
-  return {
-    frames: [...state.frames, { graphId, nodeId: node.id, spentChoiceIds: [] }],
-    values: applyEffects(state.values, node.effects, project.variables),
-    log: [...state.log, node.title || "Untitled"],
-  };
 }

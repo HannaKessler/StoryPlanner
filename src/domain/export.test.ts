@@ -8,13 +8,14 @@ import { exportVoiceSheets, responseCues } from "./voices";
 const { project, graphs } = buildSample();
 
 describe("screenplay and voice exports", () => {
-  it("includes scene notes, dialogue, and choice logic", () => {
+  it("includes scene notes, dialogue, and transition logic", () => {
     const text = exportScreenplay(project, graphs);
     expect(text).toContain("# The Lantern Gate");
     expect(text).toContain("Two iron lanterns burn beside the gate.");
     expect(text).toContain("**GATEKEEPER**");
     expect(text).toContain("The gate is shut. What business have you past nightfall?");
-    expect(text).toContain("**Choice — Show the lantern token**");
+    expect(text).toContain("**Transitions from At the gate**");
+    expect(text).toContain("**Show the lantern token → The token**");
     expect(text).toContain("hasToken is true");
     expect(text).toContain("subtract 1 from gold");
     expect(text).toContain("Mind the step. The stones are slick.");
@@ -38,6 +39,11 @@ describe("screenplay and voice exports", () => {
     expect(mind).toContain("*Then I will not waste the night.*");
     expect(mind).toContain("*Spend it on a dry watch, then.*");
     expect(mind).toContain("The gate begins to open onto wet stone.");
+
+    const token = approach.nodes.find((node) => node.id === "node_ap_token");
+    const tokenCues = responseCues(approach, token!, 0, graphs, project);
+    expect(tokenCues.map((cue) => [cue.line.id, cue.viaLabel])).toEqual([["line_gate_2", "Show the lantern token"]]);
+    expect(sheets).toContain("*(then “Show the lantern token”)*");
 
     const walked = sheets.split("### I have walked since the east village.")[1]?.split("### ")[0] ?? "";
     expect(walked).toContain("*The gate is shut. What business have you past nightfall?*");

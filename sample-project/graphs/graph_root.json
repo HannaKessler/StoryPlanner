@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "graph_root",
   "name": "The Lantern Gate",
   "parentGraphId": null,
@@ -17,9 +17,7 @@
       "summary": "",
       "sceneNotes": "",
       "subgraphId": null,
-      "lines": [],
-      "choices": [],
-      "effects": []
+      "lines": []
     },
     {
       "id": "node_root_approach",
@@ -32,9 +30,7 @@
       "summary": "The traveler reaches the shut gate and has to talk their way onward.",
       "sceneNotes": "Night rain on the east road. Two iron lanterns burn beside the gate.",
       "subgraphId": "graph_approach",
-      "lines": [],
-      "choices": [],
-      "effects": []
+      "lines": []
     },
     {
       "id": "node_root_inside",
@@ -47,9 +43,7 @@
       "summary": "The gate closes behind the traveler.",
       "sceneNotes": "Wet stone and a quieter dark.",
       "subgraphId": "graph_inside",
-      "lines": [],
-      "choices": [],
-      "effects": []
+      "lines": []
     },
     {
       "id": "node_root_road",
@@ -62,9 +56,7 @@
       "summary": "The traveler leaves the gate and follows the lanterns downhill.",
       "sceneNotes": "The stones are slick and the lanterns thin out.",
       "subgraphId": null,
-      "lines": [],
-      "choices": [],
-      "effects": []
+      "lines": []
     },
     {
       "id": "node_root_turned",
@@ -77,9 +69,7 @@
       "summary": "The gate stays shut. The night keeps the traveler.",
       "sceneNotes": "Rain, and the road back.",
       "subgraphId": null,
-      "lines": [],
-      "choices": [],
-      "effects": []
+      "lines": []
     }
   ],
   "edges": [
@@ -87,15 +77,14 @@
       "id": "edge_root_start",
       "source": "node_root_start",
       "target": "node_root_approach",
-      "choiceId": null,
       "label": "",
-      "condition": null
+      "condition": null,
+      "effects": []
     },
     {
       "id": "edge_root_inside",
       "source": "node_root_approach",
       "target": "node_root_inside",
-      "choiceId": null,
       "label": "Enter the walls",
       "condition": {
         "type": "group",
@@ -114,13 +103,13 @@
             "value": 5
           }
         ]
-      }
+      },
+      "effects": []
     },
     {
       "id": "edge_root_road",
       "source": "node_root_approach",
       "target": "node_root_road",
-      "choiceId": null,
       "label": "Take the old road",
       "condition": {
         "type": "group",
@@ -139,13 +128,13 @@
             "value": "tag_loc_road"
           }
         ]
-      }
+      },
+      "effects": []
     },
     {
       "id": "edge_root_turned",
       "source": "node_root_approach",
       "target": "node_root_turned",
-      "choiceId": null,
       "label": "Leave",
       "condition": {
         "type": "group",
@@ -176,7 +165,8 @@
             }
           }
         ]
-      }
+      },
+      "effects": []
     }
   ]
 }

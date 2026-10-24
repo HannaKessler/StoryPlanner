@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "graph_inside",
   "name": "Within the walls",
   "parentGraphId": "graph_root",
@@ -17,9 +17,7 @@
       "summary": "",
       "sceneNotes": "",
       "subgraphId": null,
-      "lines": [],
-      "choices": [],
-      "effects": []
+      "lines": []
     },
     {
       "id": "node_in_court",
@@ -39,9 +37,7 @@
           "text": "The rain sounds different in here.",
           "direction": ""
         }
-      ],
-      "choices": [],
-      "effects": []
+      ]
     },
     {
       "id": "node_in_end",
@@ -54,9 +50,7 @@
       "summary": "The night changes its sound.",
       "sceneNotes": "",
       "subgraphId": null,
-      "lines": [],
-      "choices": [],
-      "effects": []
+      "lines": []
     }
   ],
   "edges": [
@@ -64,17 +58,17 @@
       "id": "edge_in_start",
       "source": "node_in_start",
       "target": "node_in_court",
-      "choiceId": null,
       "label": "",
-      "condition": null
+      "condition": null,
+      "effects": []
     },
     {
       "id": "edge_in_end",
       "source": "node_in_court",
       "target": "node_in_end",
-      "choiceId": null,
       "label": "",
-      "condition": null
+      "condition": null,
+      "effects": []
     }
   ]
 }

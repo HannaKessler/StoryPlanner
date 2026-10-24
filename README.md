@@ -11,7 +11,7 @@ MyStory/
     <graphId>.json      one file per graph, including nested graphs
 ```
 
-`project.json` and every graph file include `"schemaVersion": 1`.
+`project.json` and every graph file include `"schemaVersion": 2`. Version 1 projects are migrated when opened.
 
 ## Run it
 
@@ -47,14 +47,15 @@ npm run build
 
 ## What you can do
 
+The story model works like a state machine, similar to Unity’s Animator. Beats (events, scenes, dialogue) are states that hold content. Branching happens only on the transitions between them. Each transition has its own conditions and variable changes.
+
 - **New / Open / Save** a project folder, from the start screen or the File menu. Recent projects are remembered in this window.
-- **Graph.** The top level is a graph of events. Double-purpose beats (events, scenes, dialogue) can open an inner graph. Breadcrumbs show the path and jump back up. There is no fixed depth.
-- **Variables.** Project-wide booleans, numbers (`value`), and tags. The kind list in the file is open-ended so more can be added later.
-- **Tags.** Your own categories. Mark a category as characters and its tags can speak. New tags can be added from the line editor or from a condition.
-- **Dialogue.** Ordered lines, a speaker, and a line note. Scene notes sit on the beat.
-- **Choices and connections.** Each can require a condition built from All / Any / Not groups, and can set variables (set, add, toggle, clear).
-- **Play.** Step through the story. Choices and exits that fail their conditions stay visible but disabled. The variables panel is live, so you can flip a flag and see the branch open.
-- **Export.** Bundled JSON for add-ons, a Markdown screenplay (scene notes included, branches written out), and per-character voice sheets. On a voice sheet, the line a cue answers is in italics, and a line that answers different lines on different paths lists each of them.
+- **Graph.** The top level is a graph of events. Any event, scene, or dialogue beat can open an inner graph, which works like a sub-state machine. Breadcrumbs show the path and jump back up. There is no fixed depth.
+- **Transitions.** Drag from a beat’s right handle to another beat, or use **+ to…** in the inspector. Each transition has a label, a condition built from All / Any / Not groups, and effects (set, add, toggle, clear). The canvas labels show the condition and effects in words.
+- **Left panel.** Beats in this graph, plus a compact list of project-wide variables (boolean, number, tag: name, kind, default value) and tag categories. Everything is edited inline. Click a variable’s kind badge for its description and tag category. Mark a category as **speakers** to use its tags as dialogue speakers.
+- **Inspector.** Collapsible sections for the selected beat (notes, dialogue lines with a speaker and direction, transitions out and in) or the selected transition (from, to, order, conditions, effects).
+- **Play.** Step through the story. The current beat’s outgoing transitions are the ways forward. Closed ones stay visible, marked blocked, with their condition. The live variables panel shows changed values and can be edited to open another branch.
+- **Export.** Bundled JSON for add-ons, a Markdown screenplay (scene notes included, transitions written out), and per-character voice sheets. On a voice sheet, the line a cue answers is in italics, and a line that answers different lines on different paths lists each of them.
 
 The included sample is [sample-project](sample-project): *The Lantern Gate*. **Open sample** on the start screen loads that folder. Saving it writes back into `sample-project/`.
 

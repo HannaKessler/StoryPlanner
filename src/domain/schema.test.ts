@@ -13,8 +13,82 @@ describe("schema", () => {
 
   it("rejects a newer schema version", () => {
     const { project } = buildSample();
-    expect(() => parseProject({ ...project, schemaVersion: 2 })).toThrow(SchemaError);
-    expect(() => parseProject({ ...project, schemaVersion: 2 })).toThrow(/schemaVersion 2/);
+    expect(() => parseProject({ ...project, schemaVersion: 3 })).toThrow(SchemaError);
+    expect(() => parseProject({ ...project, schemaVersion: 3 })).toThrow(/schemaVersion 3/);
+  });
+
+  it("migrates a version 1 graph: choices and on-enter effects move onto edges", () => {
+    const v1 = {
+      schemaVersion: 1,
+      id: "g",
+      name: "Old",
+      parentGraphId: null,
+      parentNodeId: null,
+      sceneNotes: "",
+      nodes: [
+        {
+          id: "talk",
+          type: "dialogue",
+          position: { x: 0, y: 0 },
+          title: "Talk",
+          lines: [],
+          choices: [
+            {
+              id: "ch_pay",
+              label: "Pay",
+              condition: { type: "compare", variableId: "var_gold", op: "gte", value: 1 },
+              effects: [{ id: "fx_pay", variableId: "var_gold", op: "add", value: -1 }],
+            },
+            { id: "ch_loose", label: "Never connected", condition: null, effects: [] },
+          ],
+          effects: [],
+        },
+        {
+          id: "paid",
+          type: "scene",
+          position: { x: 200, y: 0 },
+          title: "Paid",
+          lines: [],
+          choices: [],
+          effects: [{ id: "fx_enter", variableId: "var_convinced", op: "set", value: true }],
+        },
+      ],
+      edges: [
+        {
+          id: "e1",
+          source: "talk",
+          target: "paid",
+          choiceId: "ch_pay",
+          label: "",
+          condition: { type: "compare", variableId: "var_asked_road", op: "eq", value: false },
+        },
+      ],
+    };
+    const graph = parseGraph(v1);
+    expect(graph.schemaVersion).toBe(2);
+    expect(graph.nodes[0]).not.toHaveProperty("choices");
+    expect(graph.nodes[1]).not.toHaveProperty("effects");
+    expect(graph.edges).toEqual([
+      {
+        id: "e1",
+        source: "talk",
+        target: "paid",
+        label: "Pay",
+        condition: {
+          type: "group",
+          op: "and",
+          children: [
+            { type: "compare", variableId: "var_gold", op: "gte", value: 1 },
+            { type: "compare", variableId: "var_asked_road", op: "eq", value: false },
+          ],
+        },
+        effects: [
+          { id: "fx_pay", variableId: "var_gold", op: "add", value: -1 },
+          { id: "e1:fx_enter", variableId: "var_convinced", op: "set", value: true },
+        ],
+      },
+    ]);
+    expect(parseProject({ ...buildSample().project, schemaVersion: 1 }).schemaVersion).toBe(2);
   });
 
   it("preserves an unknown variable kind", () => {

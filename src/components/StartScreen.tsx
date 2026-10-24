@@ -32,7 +32,7 @@ export function StartScreen() {
         <h1>Plan the story before the script.</h1>
         <p className="sp-lede">
           Start with the big events, open any beat into its own graph, and keep going until you reach the line
-          someone actually says. Variables, tags, and choices stay with the project.
+          someone actually says. Beats are states; conditional transitions between them carry the branching.
         </p>
         <div className="sp-start-actions">
           <button type="button" className="sp-btn is-primary" disabled={busy} onClick={() => setCreating(true)}>

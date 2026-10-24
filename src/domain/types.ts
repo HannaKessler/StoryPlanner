@@ -1,5 +1,8 @@
 /** Document shape shared by every project file, graph file, and bundle. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
+
+/** Older versions this app can still read. They are migrated on load. */
+export const READABLE_SCHEMA_VERSIONS = [1, 2] as const;
 
 /**
  * Kinds the editor knows how to edit. `kind` is stored as a plain string so a
@@ -69,13 +72,7 @@ export interface DialogueLine {
   direction: string;
 }
 
-export interface Choice {
-  id: string;
-  label: string;
-  condition: Condition | null;
-  effects: Effect[];
-}
-
+/** A state in the story graph. Nodes hold content only; branching lives on edges. */
 export interface StoryNode {
   id: string;
   type: StoryNodeType;
@@ -86,18 +83,20 @@ export interface StoryNode {
   /** Another graph file, or null when this beat has no inner graph. */
   subgraphId: string | null;
   lines: DialogueLine[];
-  choices: Choice[];
-  effects: Effect[];
 }
 
+/**
+ * A transition between two nodes in the same graph. It is available when its
+ * condition passes, and its effects run when play follows it. Outgoing
+ * transitions keep their array order.
+ */
 export interface StoryEdge {
   id: string;
   source: string;
   target: string;
-  /** Set when this connection is the branch for a dialogue choice. */
-  choiceId: string | null;
   label: string;
   condition: Condition | null;
+  effects: Effect[];
 }
 
 export interface GraphDocument {

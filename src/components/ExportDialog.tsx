@@ -15,7 +15,7 @@ const OPTIONS: Array<{ id: ExportKind; title: string; detail: string }> = [
   {
     id: "screenplay",
     title: "Full screenplay",
-    detail: "Markdown that follows the branches and keeps scene notes, choices, and conditions.",
+    detail: "Markdown that follows the branches and keeps scene notes, transitions, and their conditions.",
   },
   {
     id: "voices",

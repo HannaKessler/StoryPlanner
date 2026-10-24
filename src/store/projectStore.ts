@@ -10,7 +10,6 @@ import {
 import { opsForVariable } from "../domain/effects";
 import {
   createCategory,
-  createChoice,
   createEdge,
   createEffect,
   createGraph,
@@ -34,7 +33,6 @@ import { exportScreenplay } from "../domain/screenplay";
 import { stringifyDoc } from "../domain/schema";
 import { exportVoiceSheets } from "../domain/voices";
 import type {
-  Choice,
   DialogueLine,
   Effect,
   GraphDocument,
@@ -59,7 +57,7 @@ export interface RecentProject {
 }
 
 export type Selection = { kind: "node" | "edge"; id: string } | null;
-export type Screen = "graph" | "play" | "variables" | "tags";
+export type Screen = "graph" | "play";
 export type ResumeIntent = "new" | "open" | null;
 export type ExportKind = "bundle" | "screenplay" | "voices";
 
@@ -109,8 +107,9 @@ interface ProjectStore {
   addNode: (type: StoryNodeType) => void;
   deleteNodes: (nodeIds: string[]) => void;
   deleteEdges: (edgeIds: string[]) => void;
-  connectNodes: (source: string, target: string, sourceHandle: string | null) => void;
+  connectNodes: (source: string, target: string) => void;
   updateEdge: (edgeId: string, patch: Partial<StoryEdge>) => void;
+  moveEdge: (edgeId: string, direction: -1 | 1) => void;
   openSubgraph: (nodeId: string) => void;
   deleteSubgraph: (nodeId: string) => void;
 
@@ -118,17 +117,10 @@ interface ProjectStore {
   updateLine: (nodeId: string, lineId: string, patch: Partial<DialogueLine>) => void;
   deleteLine: (nodeId: string, lineId: string) => void;
   moveLine: (nodeId: string, lineId: string, direction: -1 | 1) => void;
-  addChoice: (nodeId: string) => void;
-  updateChoice: (nodeId: string, choiceId: string, patch: Partial<Choice>) => void;
-  deleteChoice: (nodeId: string, choiceId: string) => void;
-  moveChoice: (nodeId: string, choiceId: string, direction: -1 | 1) => void;
 
-  addNodeEffect: (nodeId: string) => void;
-  updateNodeEffect: (nodeId: string, effectId: string, patch: Partial<Effect>) => void;
-  deleteNodeEffect: (nodeId: string, effectId: string) => void;
-  addChoiceEffect: (nodeId: string, choiceId: string) => void;
-  updateChoiceEffect: (nodeId: string, choiceId: string, effectId: string, patch: Partial<Effect>) => void;
-  deleteChoiceEffect: (nodeId: string, choiceId: string, effectId: string) => void;
+  addEdgeEffect: (edgeId: string) => void;
+  updateEdgeEffect: (edgeId: string, effectId: string, patch: Partial<Effect>) => void;
+  deleteEdgeEffect: (edgeId: string, effectId: string) => void;
 
   addVariable: (kind: string) => void;
   updateVariable: (variableId: string, patch: Partial<VariableDef>) => void;
@@ -199,6 +191,13 @@ function withNode(nodeId: string, update: (node: StoryNode) => StoryNode) {
   withGraph((graph) => ({
     ...graph,
     nodes: graph.nodes.map((node) => (node.id === nodeId ? update(node) : node)),
+  }));
+}
+
+function withEdge(edgeId: string, update: (edge: StoryEdge) => StoryEdge) {
+  withGraph((graph) => ({
+    ...graph,
+    edges: graph.edges.map((edge) => (edge.id === edgeId ? update(edge) : edge)),
   }));
 }
 
@@ -481,22 +480,32 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     );
   },
 
-  connectNodes(source, target, sourceHandle) {
+  connectNodes(source, target) {
     if (!source || !target || source === target) return;
-    const choiceId = sourceHandle && sourceHandle !== "out" && sourceHandle !== "in" ? sourceHandle : null;
-    withGraph((graph) => {
-      const sourceNode = graph.nodes.find((node) => node.id === source);
-      if (choiceId && !sourceNode?.choices.some((choice) => choice.id === choiceId)) return graph;
-      const edges = graph.edges.filter((edge) => !(choiceId && edge.choiceId === choiceId && edge.source === source));
-      return { ...graph, edges: [...edges, createEdge(source, target, { choiceId })] };
-    });
+    const edge = createEdge(source, target);
+    withGraph((graph) => ({ ...graph, edges: [...graph.edges, edge] }));
+    set({ selection: { kind: "edge", id: edge.id } });
   },
 
   updateEdge(edgeId, patch) {
-    withGraph((graph) => ({
-      ...graph,
-      edges: graph.edges.map((edge) => (edge.id === edgeId ? { ...edge, ...patch, id: edge.id } : edge)),
-    }));
+    withEdge(edgeId, (edge) => ({ ...edge, ...patch, id: edge.id }));
+  },
+
+  moveEdge(edgeId, direction) {
+    withGraph((graph) => {
+      const edge = graph.edges.find((item) => item.id === edgeId);
+      if (!edge) return graph;
+      const siblings = graph.edges.filter((item) => item.source === edge.source);
+      const index = siblings.indexOf(edge);
+      const swap = siblings[index + direction];
+      if (!swap) return graph;
+      const edges = graph.edges.slice();
+      const a = edges.indexOf(edge);
+      const b = edges.indexOf(swap);
+      edges[a] = swap;
+      edges[b] = edge;
+      return { ...graph, edges };
+    });
   },
 
   openSubgraph(nodeId) {
@@ -571,85 +580,20 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     });
   },
 
-  addChoice(nodeId) {
-    withNode(nodeId, (node) => ({ ...node, choices: [...node.choices, createChoice()] }));
-  },
-
-  updateChoice(nodeId, choiceId, patch) {
-    withNode(nodeId, (node) => ({
-      ...node,
-      choices: node.choices.map((choice) => (choice.id === choiceId ? { ...choice, ...patch, id: choice.id } : choice)),
-    }));
-  },
-
-  deleteChoice(nodeId, choiceId) {
-    withGraph((graph) => ({
-      ...graph,
-      nodes: graph.nodes.map((node) =>
-        node.id === nodeId ? { ...node, choices: node.choices.filter((choice) => choice.id !== choiceId) } : node,
-      ),
-      edges: graph.edges.filter((edge) => edge.choiceId !== choiceId),
-    }));
-  },
-
-  moveChoice(nodeId, choiceId, direction) {
-    withNode(nodeId, (node) => {
-      const index = node.choices.findIndex((choice) => choice.id === choiceId);
-      return { ...node, choices: moveItem(node.choices, index, direction) };
-    });
-  },
-
-  addNodeEffect(nodeId) {
+  addEdgeEffect(edgeId) {
     const effect = blankEffect(get().project?.variables ?? []);
-    withNode(nodeId, (node) => ({ ...node, effects: [...node.effects, effect] }));
+    withEdge(edgeId, (edge) => ({ ...edge, effects: [...edge.effects, effect] }));
   },
 
-  updateNodeEffect(nodeId, effectId, patch) {
-    withNode(nodeId, (node) => ({
-      ...node,
-      effects: node.effects.map((effect) => (effect.id === effectId ? { ...effect, ...patch, id: effect.id } : effect)),
+  updateEdgeEffect(edgeId, effectId, patch) {
+    withEdge(edgeId, (edge) => ({
+      ...edge,
+      effects: edge.effects.map((effect) => (effect.id === effectId ? { ...effect, ...patch, id: effect.id } : effect)),
     }));
   },
 
-  deleteNodeEffect(nodeId, effectId) {
-    withNode(nodeId, (node) => ({ ...node, effects: node.effects.filter((effect) => effect.id !== effectId) }));
-  },
-
-  addChoiceEffect(nodeId, choiceId) {
-    const effect = blankEffect(get().project?.variables ?? []);
-    withNode(nodeId, (node) => ({
-      ...node,
-      choices: node.choices.map((choice) =>
-        choice.id === choiceId ? { ...choice, effects: [...choice.effects, effect] } : choice,
-      ),
-    }));
-  },
-
-  updateChoiceEffect(nodeId, choiceId, effectId, patch) {
-    withNode(nodeId, (node) => ({
-      ...node,
-      choices: node.choices.map((choice) =>
-        choice.id === choiceId
-          ? {
-              ...choice,
-              effects: choice.effects.map((effect) =>
-                effect.id === effectId ? { ...effect, ...patch, id: effect.id } : effect,
-              ),
-            }
-          : choice,
-      ),
-    }));
-  },
-
-  deleteChoiceEffect(nodeId, choiceId, effectId) {
-    withNode(nodeId, (node) => ({
-      ...node,
-      choices: node.choices.map((choice) =>
-        choice.id === choiceId
-          ? { ...choice, effects: choice.effects.filter((effect) => effect.id !== effectId) }
-          : choice,
-      ),
-    }));
+  deleteEdgeEffect(edgeId, effectId) {
+    withEdge(edgeId, (edge) => ({ ...edge, effects: edge.effects.filter((effect) => effect.id !== effectId) }));
   },
 
   addVariable(kind) {
