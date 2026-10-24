@@ -242,7 +242,10 @@ input.sp-cell[type="number"]::-webkit-inner-spin-button, input.sp-cell[type="num
 .sp-faint { color: var(--text-faint); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sp-grow { flex: 1; }
 
-.sp-panel { overflow: auto; background: var(--bg-elev); padding: 0 0 12px; }
+.sp-panel { overflow: auto; background: var(--bg-elev); padding: 0 10px 12px 0; scrollbar-gutter: stable; }
+.sp-panel::-webkit-scrollbar, .sp-play-stage::-webkit-scrollbar { width: 8px; }
+.sp-panel::-webkit-scrollbar-thumb, .sp-play-stage::-webkit-scrollbar-thumb { background: var(--line); border-radius: 8px; border: 2px solid var(--bg-elev); }
+.sp-panel::-webkit-scrollbar-track { background: transparent; }
 .sp-sec { border-bottom: 1px solid var(--line); }
 .sp-sec-head { display: flex; align-items: center; gap: 4px; padding: 0 8px 0 4px; min-height: 26px; }
 .sp-sec-toggle {

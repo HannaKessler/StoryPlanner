@@ -124,6 +124,7 @@ function CanvasBody({ graph, project }: { graph: GraphDocument; project: Project
         onNodeDragStop={(_, node) => updateNodePosition(node.id, node.position)}
         onNodesDelete={(deleted) => deleteNodes(deleted.map((node) => node.id))}
         onEdgesDelete={(deleted) => deleteEdges(deleted.map((edge) => edge.id))}
+        connectionRadius={90}
         deleteKeyCode={["Backspace", "Delete"]}
         colorMode="dark"
         fitView
