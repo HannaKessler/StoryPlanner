@@ -86,7 +86,19 @@ export interface StoryNode {
   subgraphId: string | null;
   /** Tags on this beat, including location tags. Order does not pick a primary place. */
   tagIds: string[];
+  /**
+   * Point of this beat inside its location box. Null until the location view
+   * has placed it. This is not `position`.
+   */
+  locationPosition: { x: number; y: number } | null;
   lines: DialogueLine[];
+}
+
+/** A location box on the location view. `id` is a location tag id, or `unassigned`. */
+export interface LocationBox {
+  id: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
 }
 
 /**
@@ -110,6 +122,8 @@ export interface GraphDocument {
   parentGraphId: string | null;
   parentNodeId: string | null;
   sceneNotes: string;
+  /** Location-view boxes. Empty until a box is moved or resized. */
+  locationBoxes: LocationBox[];
   nodes: StoryNode[];
   edges: StoryEdge[];
 }

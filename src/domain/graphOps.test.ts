@@ -36,6 +36,7 @@ describe("splitTransition", () => {
       parentGraphId: null,
       parentNodeId: null,
       sceneNotes: "",
+      locationBoxes: [],
       nodes: [source, target],
       edges: [edge],
     };

@@ -107,12 +107,15 @@ There are no enums and no nested types.
   "parentGraphId": "graph_root",
   "parentNodeId": "node_root_approach",
   "sceneNotes": "The conversation at the shut gate.",
+  "locationBoxes": [],
   "nodes": [],
   "edges": []
 }
 ```
 
 The root graph uses `null` for both parent fields. `sceneNotes` on a graph cover that whole graph. Notes on a node cover that beat.
+
+`locationBoxes` is the location view for this graph. Each entry is one box: `id` is a location tag id, or `"unassigned"` for beats with no location tag. `position` is the box’s point on that canvas. `size` is its width and height. Moving a box moves the beats inside it. An empty array, or a missing field, means no box has been moved or resized yet; the editor then lays the boxes out itself. Boxes the user has not touched are left out of the array.
 
 ### Node
 
@@ -126,6 +129,7 @@ The root graph uses `null` for both parent fields. `sceneNotes` on a graph cover
   "sceneNotes": "The gatekeeper does not open the shutter at first.",
   "subgraphId": null,
   "tagIds": ["tag_loc_gate"],
+  "locationPosition": null,
   "lines": []
 }
 ```
@@ -142,9 +146,11 @@ The root graph uses `null` for both parent fields. `sceneNotes` on a graph cover
 
 Start is an ordinary beat. It can be added, deleted, and connected like any other type. A file with no start node, or with several, is valid. The editor warns when the graph currently open has none.
 
-`position` is the editor’s graph-view point in pixels. Other views, including the location columns, must not write it. Add-ons can ignore it.
+`position` is the editor’s graph-view point in pixels. The location view must not write it. Add-ons can ignore it.
 
-`tagIds` lists tags on the beat. Location tags are the ones whose category has `isLocations: true`. A beat may carry more than one. The location view draws the beat once, in the column of the earliest of those tags in project order (category order, then tag order). Tags that are not places stay on the beat and do not make a column.
+`locationPosition` is that beat’s point inside its location box, in pixels from the box’s top left. `null` means the location view has not placed it yet and will use a default. A missing field is read as `null`.
+
+`tagIds` lists tags on the beat. Location tags are the ones whose category has `isLocations: true`. A beat may carry more than one. The location view draws the beat once, inside the box of the earliest of those tags in project order (category order, then tag order). Tags that are not places stay on the beat and do not make a box.
 
 `subgraphId` is another graph id, or `null`. Opening that graph is how a writer drills in. Any node may own one. Nesting is unlimited.
 
@@ -282,6 +288,8 @@ Derived exports in this version are Markdown:
 Version 2 is the state-machine file described above, without `tagIds` on nodes and without `isLocations` on categories. StoryPlanner fills those in on load and writes version 3 on the next save:
 
 - A node with no `tagIds` gets `[]`.
+- A node with no `locationPosition` gets `null`.
+- A graph with no `locationBoxes` gets `[]`.
 - A category with no `isLocations` gets `false`.
 
 Start nodes already in the file stay as they are. Several starts are allowed; nothing in the file is rewritten to enforce a single start.

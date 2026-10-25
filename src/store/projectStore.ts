@@ -36,6 +36,7 @@ import type {
   DialogueLine,
   Effect,
   GraphDocument,
+  LocationBox,
   ProjectDocument,
   Scalar,
   StoryEdge,
@@ -106,6 +107,7 @@ interface ProjectStore {
   updateGraphMeta: (patch: Partial<Pick<GraphDocument, "name" | "sceneNotes">>) => void;
   updateNode: (nodeId: string, patch: Partial<StoryNode>) => void;
   updateNodePosition: (nodeId: string, position: { x: number; y: number }) => void;
+  saveLocationLayout: (patch: { box?: LocationBox; nodePositions?: Record<string, { x: number; y: number }> }) => void;
   addNode: (type: StoryNodeType, position?: { x: number; y: number }) => void;
   deleteNodes: (nodeIds: string[]) => void;
   deleteEdges: (edgeIds: string[]) => void;
@@ -439,6 +441,25 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   updateNodePosition(nodeId, position) {
     withNode(nodeId, (node) => ({ ...node, position }));
+  },
+
+  saveLocationLayout(patch) {
+    withGraph((graph) => {
+      let locationBoxes = graph.locationBoxes;
+      if (patch.box) {
+        const next = locationBoxes.filter((box) => box.id !== patch.box!.id);
+        next.push(patch.box);
+        locationBoxes = next;
+      }
+      const nodePositions = patch.nodePositions ?? {};
+      return {
+        ...graph,
+        locationBoxes,
+        nodes: graph.nodes.map((node) =>
+          nodePositions[node.id] ? { ...node, locationPosition: nodePositions[node.id] } : node,
+        ),
+      };
+    });
   },
 
   addNode(type, position) {

@@ -5,11 +5,13 @@
   "parentGraphId": "graph_root",
   "parentNodeId": "node_root_inside",
   "sceneNotes": "Beyond the gate.",
+  "locationBoxes": [],
   "nodes": [
     {
       "tagIds": [
         "tag_loc_inside"
       ],
+      "locationPosition": null,
       "id": "node_in_start",
       "type": "start",
       "position": {
@@ -26,6 +28,7 @@
       "tagIds": [
         "tag_loc_inside"
       ],
+      "locationPosition": null,
       "id": "node_in_court",
       "type": "dialogue",
       "position": {
@@ -49,6 +52,7 @@
       "tagIds": [
         "tag_loc_inside"
       ],
+      "locationPosition": null,
       "id": "node_in_end",
       "type": "end",
       "position": {

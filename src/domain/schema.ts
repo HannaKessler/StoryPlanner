@@ -178,6 +178,7 @@ function parseNode(value: unknown, path: string): StoryNode {
     sceneNotes: optionalString(value, "sceneNotes", path),
     subgraphId: typeof subgraph === "string" ? subgraph : null,
     tagIds: parseTagIds(value.tagIds, child(path, "tagIds")),
+    locationPosition: parseOptionalPoint(value.locationPosition, child(path, "locationPosition")),
     lines: asArray(value.lines ?? [], child(path, "lines")).map((item, index) =>
       parseLine(item, child(child(path, "lines"), index)),
     ),
@@ -187,6 +188,36 @@ function parseNode(value: unknown, path: string): StoryNode {
 function parseTagIds(value: unknown, path: string): string[] {
   if (value === undefined || value === null) return [];
   return asArray(value, path).map((item, index) => asNonEmpty(item, child(path, index)));
+}
+
+function parsePoint(value: unknown, path: string): { x: number; y: number } {
+  if (!isRecord(value)) fail(path, "expected a point");
+  return {
+    x: asNumber(value.x, child(path, "x")),
+    y: asNumber(value.y, child(path, "y")),
+  };
+}
+
+function parseOptionalPoint(value: unknown, path: string): { x: number; y: number } | null {
+  if (value === undefined || value === null) return null;
+  return parsePoint(value, path);
+}
+
+function parseLocationBoxes(value: unknown, path: string) {
+  if (value === undefined || value === null) return [];
+  return asArray(value, path).map((item, index) => {
+    const boxPath = child(path, index);
+    if (!isRecord(item)) fail(boxPath, "expected a location box");
+    const size = parsePoint(
+      isRecord(item.size) ? { x: item.size.width, y: item.size.height } : item.size,
+      child(boxPath, "size"),
+    );
+    return {
+      id: asNonEmpty(item.id, child(boxPath, "id")),
+      position: parsePoint(item.position, child(boxPath, "position")),
+      size: { width: size.x, height: size.y },
+    };
+  });
 }
 
 function parseEdge(value: unknown, path: string): StoryEdge {
@@ -348,6 +379,7 @@ export function parseGraph(input: unknown): GraphDocument {
     parentGraphId: parentGraphId ?? null,
     parentNodeId: parentNodeId ?? null,
     sceneNotes: optionalString(value, "sceneNotes", "graph"),
+    locationBoxes: parseLocationBoxes(value.locationBoxes, "graph.locationBoxes"),
     nodes: asArray(value.nodes ?? [], "graph.nodes").map((item, index) =>
       parseNode(item, child("graph.nodes", index)),
     ),

@@ -110,6 +110,12 @@ describe("schema", () => {
     expect(parsedGraph.schemaVersion).toBe(3);
     expect(parsedGraph.nodes[0].tagIds).toEqual([]);
     expect(parsedGraph.nodes[0].id).toBe(node.id);
+    const bare = { ...graphs.graph_root, schemaVersion: 2 as const, nodes: [{ ...node }], edges: [] };
+    delete (bare as { locationBoxes?: unknown }).locationBoxes;
+    delete (bare.nodes[0] as { locationPosition?: unknown }).locationPosition;
+    const defaults = parseGraph(bare);
+    expect(defaults.locationBoxes).toEqual([]);
+    expect(defaults.nodes[0].locationPosition).toBeNull();
   });
 
   it("preserves an unknown variable kind", () => {

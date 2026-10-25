@@ -5,11 +5,13 @@
   "parentGraphId": "graph_root",
   "parentNodeId": "node_root_approach",
   "sceneNotes": "The conversation at the shut gate.",
+  "locationBoxes": [],
   "nodes": [
     {
       "tagIds": [
         "tag_loc_gate"
       ],
+      "locationPosition": null,
       "id": "node_ap_start",
       "type": "start",
       "position": {
@@ -26,6 +28,7 @@
       "tagIds": [
         "tag_loc_gate"
       ],
+      "locationPosition": null,
       "id": "node_ap_gate",
       "type": "dialogue",
       "position": {
@@ -55,6 +58,7 @@
       "tagIds": [
         "tag_loc_gate"
       ],
+      "locationPosition": null,
       "id": "node_ap_token",
       "type": "dialogue",
       "position": {
@@ -84,6 +88,7 @@
       "tagIds": [
         "tag_loc_gate"
       ],
+      "locationPosition": null,
       "id": "node_ap_bribe",
       "type": "dialogue",
       "position": {
@@ -113,6 +118,7 @@
       "tagIds": [
         "tag_loc_road"
       ],
+      "locationPosition": null,
       "id": "node_ap_downhill",
       "type": "dialogue",
       "position": {
@@ -148,6 +154,7 @@
       "tagIds": [
         "tag_loc_gate"
       ],
+      "locationPosition": null,
       "id": "node_ap_cross",
       "type": "dialogue",
       "position": {
@@ -171,6 +178,7 @@
       "tagIds": [
         "tag_loc_inside"
       ],
+      "locationPosition": null,
       "id": "node_ap_end_granted",
       "type": "end",
       "position": {
@@ -187,6 +195,7 @@
       "tagIds": [
         "tag_loc_road"
       ],
+      "locationPosition": null,
       "id": "node_ap_end_road",
       "type": "end",
       "position": {
@@ -203,6 +212,7 @@
       "tagIds": [
         "tag_loc_gate"
       ],
+      "locationPosition": null,
       "id": "node_ap_end_back",
       "type": "end",
       "position": {

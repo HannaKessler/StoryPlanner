@@ -41,6 +41,7 @@ export function createNode(type: StoryNodeType, partial: Partial<StoryNode> = {}
     sceneNotes: partial.sceneNotes ?? "",
     subgraphId: partial.subgraphId ?? null,
     tagIds: partial.tagIds ?? [],
+    locationPosition: partial.locationPosition ?? null,
     lines: partial.lines ?? [],
   };
 }
@@ -125,6 +126,7 @@ export function createGraph(partial: Partial<GraphDocument> & { id?: string; nam
     parentGraphId: partial.parentGraphId ?? null,
     parentNodeId: partial.parentNodeId ?? null,
     sceneNotes: partial.sceneNotes ?? "",
+    locationBoxes: partial.locationBoxes ?? [],
     nodes: partial.nodes ?? [],
     edges: partial.edges ?? [],
   };

@@ -3,12 +3,14 @@ import {
   Background,
   Controls,
   MarkerType,
+  NodeResizer,
   ReactFlow,
   ReactFlowProvider,
   applyEdgeChanges,
   applyNodeChanges,
   useEdgesState,
   useNodesState,
+  useNodeId,
   useReactFlow,
   type Node,
   type NodeChange,
@@ -18,7 +20,7 @@ import {
 import { describeCondition } from "../domain/conditions";
 import { parallelOffset } from "../domain/edgeGeometry";
 import { describeEffect } from "../domain/effects";
-import { LOCATION_LANE_WIDTH, locationLaneFrame, locationPlacement } from "../domain/locations";
+import { locationFrames } from "../domain/locations";
 import type { GraphDocument, ProjectDocument } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { useContextMenu } from "./ContextMenu";
@@ -26,10 +28,10 @@ import { addBeatItems, connectBeatItems, edgeItems } from "./menuItems";
 import { StoryNodeCard, type StoryFlowNode } from "./StoryNodeCard";
 import { TransitionEdge, type TransitionFlowEdge } from "./TransitionEdge";
 
-type LaneNode = Node<{ name: string }, "lane">;
-type CanvasNode = StoryFlowNode | LaneNode;
+type BoxNode = Node<{ locationId: string; name: string; minWidth: number; minHeight: number }, "box">;
+type CanvasNode = StoryFlowNode | BoxNode;
 
-const nodeTypes = { story: StoryNodeCard, lane: LaneLabel };
+const nodeTypes = { story: StoryNodeCard, box: LocationBoxNode };
 const edgeTypes = { transition: TransitionEdge };
 
 export function GraphCanvas() {
@@ -44,8 +46,35 @@ export function GraphCanvas() {
   );
 }
 
-function LaneLabel({ data }: NodeProps<LaneNode>) {
-  return <div className="sp-lane-title">{data.name}</div>;
+function LocationBoxNode({ data, selected }: NodeProps<BoxNode>) {
+  const nodeId = useNodeId();
+  const { getNodes } = useReactFlow();
+  const saveLocationLayout = useProjectStore((state) => state.saveLocationLayout);
+  return (
+    <div className="sp-box">
+      <NodeResizer
+        isVisible={selected}
+        minWidth={data.minWidth}
+        minHeight={data.minHeight}
+        lineStyle={{ borderColor: "transparent" }}
+        handleStyle={{ width: 8, height: 8, border: "none", borderRadius: 1, background: "#8b8174" }}
+        onResizeEnd={(_, params) => {
+          const children = getNodes().filter((node) => node.parentId === nodeId);
+          saveLocationLayout({
+            box: {
+              id: data.locationId,
+              position: { x: Math.round(params.x), y: Math.round(params.y) },
+              size: { width: Math.round(params.width), height: Math.round(params.height) },
+            },
+            nodePositions: Object.fromEntries(
+              children.map((node) => [node.id, { x: Math.round(node.position.x), y: Math.round(node.position.y) }]),
+            ),
+          });
+        }}
+      />
+      <div className="sp-box-title">{data.name}</div>
+    </div>
+  );
 }
 
 function CanvasBody({
@@ -61,15 +90,17 @@ function CanvasBody({
   const select = useProjectStore((state) => state.select);
   const connectNodes = useProjectStore((state) => state.connectNodes);
   const updateNodePosition = useProjectStore((state) => state.updateNodePosition);
+  const saveLocationLayout = useProjectStore((state) => state.saveLocationLayout);
   const deleteNodes = useProjectStore((state) => state.deleteNodes);
   const deleteEdges = useProjectStore((state) => state.deleteEdges);
-  const { fitView, screenToFlowPosition } = useReactFlow();
+  const { fitView, screenToFlowPosition, getNodes } = useReactFlow();
   const openMenu = useContextMenu((state) => state.open);
   const closeMenu = useContextMenu((state) => state.close);
   const arranging = mode === "locations";
 
   const onPaneMenu = (event: ReactMouseEvent | MouseEvent) => {
     event.preventDefault();
+    // A pane click here is in location-view coordinates, which must not become a graph position.
     if (arranging) return;
     const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
     openMenu(event.clientX, event.clientY, addBeatItems(position));
@@ -83,6 +114,7 @@ function CanvasBody({
       JSON.stringify({
         nodes: graph.nodes.map(({ position: _position, ...rest }) => rest),
         edges: graph.edges,
+        boxes: graph.locationBoxes,
         variables: project.variables,
         tags: project.tagCategories,
         mode,
@@ -118,7 +150,7 @@ function CanvasBody({
       });
     });
     setEdges(toEdges(graph, project));
-    // Signature tracks content other than drag position.
+    // Signature tracks content other than the graph-view drag position.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature, setNodes, setEdges]);
 
@@ -138,8 +170,7 @@ function CanvasBody({
   }, [selection, setNodes, setEdges]);
 
   const onNodesChange = (changes: NodeChange<CanvasNode>[]) => {
-    const next = arranging ? changes.filter((change) => change.type !== "position") : changes;
-    setNodes((current) => applyNodeChanges(next, current));
+    setNodes((current) => applyNodeChanges(changes, current));
   };
   const onEdgesChange = (changes: EdgeChange<TransitionFlowEdge>[]) => {
     setEdges((current) => applyEdgeChanges(changes, current));
@@ -155,7 +186,7 @@ function CanvasBody({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={(connection) => {
-          if (!connection.source || !connection.target || connection.source.startsWith("lane:")) return;
+          if (!connection.source || !connection.target || connection.source.startsWith("box:")) return;
           connectNodes(connection.source, connection.target);
         }}
         onConnectEnd={(event, connection) => {
@@ -180,12 +211,46 @@ function CanvasBody({
         onPaneContextMenu={onPaneMenu}
         onMoveStart={closeMenu}
         onNodeDragStop={(_, node) => {
-          if (arranging || node.type !== "story") return;
+          if (node.type === "box") {
+            const width = node.measured?.width ?? node.width ?? 0;
+            const height = node.measured?.height ?? node.height ?? 0;
+            if (width < 1 || height < 1) return;
+            saveLocationLayout({
+              box: {
+                id: node.data.locationId,
+                position: { x: Math.round(node.position.x), y: Math.round(node.position.y) },
+                size: { width: Math.round(width), height: Math.round(height) },
+              },
+            });
+            return;
+          }
+          if (node.type !== "story") return;
+          if (arranging) {
+            saveLocationLayout({
+              nodePositions: { [node.id]: { x: Math.round(node.position.x), y: Math.round(node.position.y) } },
+            });
+            const parent = getNodes().find((item) => item.id === node.parentId);
+            if (parent?.type === "box") {
+              const box = parent as BoxNode;
+              const width = box.measured?.width ?? box.width ?? 0;
+              const height = box.measured?.height ?? box.height ?? 0;
+              if (width > 0 && height > 0) {
+                saveLocationLayout({
+                  box: {
+                    id: box.data.locationId,
+                    position: { x: Math.round(parent.position.x), y: Math.round(parent.position.y) },
+                    size: { width: Math.round(width), height: Math.round(height) },
+                  },
+                });
+              }
+            }
+            return;
+          }
           updateNodePosition(node.id, node.position);
         }}
         onNodesDelete={(deleted) => deleteNodes(deleted.filter((node) => node.type === "story").map((node) => node.id))}
         onEdgesDelete={(deleted) => deleteEdges(deleted.map((edge) => edge.id))}
-        nodesDraggable={!arranging}
+        nodesDraggable
         connectionRadius={90}
         deleteKeyCode={["Backspace", "Delete"]}
         colorMode="dark"
@@ -214,27 +279,38 @@ function toNodes(graph: GraphDocument, project: ProjectDocument, mode: "graph" |
       data: { story },
     }));
   }
-  const placed = locationPlacement(graph, project);
-  const lanes: LaneNode[] = locationLaneFrame(graph, project).map((lane) => ({
-    id: `lane:${lane.id}`,
-    type: "lane",
-    position: { x: lane.x, y: 0 },
-    data: { name: lane.name },
-    style: { width: LOCATION_LANE_WIDTH, height: lane.height },
-    selectable: false,
-    draggable: false,
-    connectable: false,
-    focusable: false,
-  }));
-  const stories: StoryFlowNode[] = graph.nodes.map((story) => ({
-    id: story.id,
-    type: "story",
-    position: placed.get(story.id) ?? story.position,
-    data: { story },
-    draggable: false,
-    zIndex: 1,
-  }));
-  return [...lanes, ...stories];
+  const boxes: BoxNode[] = [];
+  const stories: StoryFlowNode[] = [];
+  for (const frame of locationFrames(graph, project)) {
+    const boxId = `box:${frame.id}`;
+    boxes.push({
+      id: boxId,
+      type: "box",
+      position: frame.position,
+      width: frame.size.width,
+      height: frame.size.height,
+      style: { width: frame.size.width, height: frame.size.height },
+      data: { locationId: frame.id, name: frame.name, minWidth: frame.minWidth, minHeight: frame.minHeight },
+      dragHandle: ".sp-box-title",
+      connectable: false,
+      deletable: false,
+      zIndex: 0,
+    });
+    for (const item of frame.nodes) {
+      const story = graph.nodes.find((node) => node.id === item.id);
+      if (!story) continue;
+      stories.push({
+        id: story.id,
+        type: "story",
+        parentId: boxId,
+        extent: "parent",
+        position: item.position,
+        data: { story },
+        zIndex: 1,
+      });
+    }
+  }
+  return [...boxes, ...stories];
 }
 
 function toEdges(graph: GraphDocument, project: ProjectDocument): TransitionFlowEdge[] {

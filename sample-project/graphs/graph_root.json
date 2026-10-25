@@ -5,11 +5,13 @@
   "parentGraphId": null,
   "parentNodeId": null,
   "sceneNotes": "A shut gate, two iron lanterns, and a choice about how the night goes.",
+  "locationBoxes": [],
   "nodes": [
     {
       "tagIds": [
         "tag_loc_gate"
       ],
+      "locationPosition": null,
       "id": "node_root_start",
       "type": "start",
       "position": {
@@ -26,6 +28,7 @@
       "tagIds": [
         "tag_loc_gate"
       ],
+      "locationPosition": null,
       "id": "node_root_approach",
       "type": "event",
       "position": {
@@ -42,6 +45,7 @@
       "tagIds": [
         "tag_loc_inside"
       ],
+      "locationPosition": null,
       "id": "node_root_inside",
       "type": "event",
       "position": {
@@ -58,6 +62,7 @@
       "tagIds": [
         "tag_loc_road"
       ],
+      "locationPosition": null,
       "id": "node_root_road",
       "type": "event",
       "position": {
@@ -75,6 +80,7 @@
         "tag_loc_gate",
         "tag_loc_road"
       ],
+      "locationPosition": null,
       "id": "node_root_turned",
       "type": "end",
       "position": {
@@ -91,6 +97,7 @@
       "tagIds": [
         "tag_loc_road"
       ],
+      "locationPosition": null,
       "id": "node_root_hill",
       "type": "start",
       "position": {
@@ -107,6 +114,7 @@
       "tagIds": [
         "tag_loc_road"
       ],
+      "locationPosition": null,
       "id": "node_root_word",
       "type": "event",
       "position": {

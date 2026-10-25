@@ -24,8 +24,8 @@ function effect(
   return { id, variableId, op, value };
 }
 
-function node(partial: Omit<StoryNode, "tagIds"> & { tagIds?: string[] }): StoryNode {
-  return { tagIds: [], ...partial };
+function node(partial: Omit<StoryNode, "tagIds" | "locationPosition"> & { tagIds?: string[] }): StoryNode {
+  return { tagIds: [], locationPosition: null, ...partial };
 }
 
 /** The bundled sample story. Fixed ids so the folder on disk can match this builder. */
@@ -147,6 +147,7 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
     parentGraphId: null,
     parentNodeId: null,
     sceneNotes: "A shut gate, two iron lanterns, and a choice about how the night goes.",
+    locationBoxes: [],
     nodes: [
       node({
         id: "node_root_start",
@@ -278,6 +279,7 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
     parentGraphId: "graph_root",
     parentNodeId: "node_root_approach",
     sceneNotes: "The conversation at the shut gate.",
+    locationBoxes: [],
     nodes: [
       node({
         id: "node_ap_start",
@@ -527,6 +529,7 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
     parentGraphId: "graph_root",
     parentNodeId: "node_root_inside",
     sceneNotes: "Beyond the gate.",
+    locationBoxes: [],
     nodes: [
       node({
         id: "node_in_start",
