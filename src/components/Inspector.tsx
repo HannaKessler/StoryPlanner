@@ -6,6 +6,8 @@ import { useProjectStore } from "../store/projectStore";
 import { ConditionBuilder } from "./ConditionBuilder";
 import { DialogueEditor } from "./DialogueEditor";
 import { EffectsEditor } from "./EffectsEditor";
+import { focusRename, menuHandler, type MenuItem } from "./ContextMenu";
+import { conditionAddItems } from "./menuItems";
 import { IconButton, Row, Section } from "./Panel";
 
 export function Inspector() {
@@ -55,12 +57,17 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
   const child = node.subgraphId ? graphs[node.subgraphId] : undefined;
   const content = node.type === "event" || node.type === "scene" || node.type === "dialogue";
   const outgoing = graph.edges.filter((edge) => edge.source === node.id);
+  const targets = graph.nodes.filter((item) => item.id !== node.id && item.type !== "start");
+  const addTransitionItems = (): MenuItem[] =>
+    targets.length === 0
+      ? [{ label: "Add transition", disabled: true, onSelect: () => undefined }]
+      : targets.map((item) => ({ label: `Add transition to ${item.title || "Untitled"}`, onSelect: () => connectNodes(node.id, item.id) }));
 
   return (
     <>
       <div className="sp-insp-head">
         <span className="sp-kicker">{NODE_LABEL[node.type]}</span>
-        <input className="sp-head-input" aria-label="Title" value={node.title} onChange={(event) => updateNode(node.id, { title: event.target.value })} />
+        <input className="sp-head-input" aria-label="Title" data-rename={node.id} value={node.title} onChange={(event) => updateNode(node.id, { title: event.target.value })} />
         {content && !child && (
           <button type="button" className="sp-chip-btn" title="Create an inner graph for this beat" onClick={() => openSubgraph(node.id)}>
             + inner
@@ -113,6 +120,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
           id="insp:lines"
           title="Lines"
           count={node.lines.length}
+          onContextMenu={menuHandler(() => [{ label: "Add line", onSelect: () => addLine(node.id) }])}
           actions={
             <button type="button" className="sp-chip-btn" onClick={() => addLine(node.id)}>
               + line
@@ -128,6 +136,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
           id="insp:out"
           title="Transitions out"
           count={outgoing.length}
+          onContextMenu={menuHandler(addTransitionItems)}
           actions={
             <select
               className="sp-chip-select"
@@ -136,9 +145,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
               onChange={(event) => event.target.value && connectNodes(node.id, event.target.value)}
             >
               <option value="">+ to…</option>
-              {graph.nodes
-                .filter((item) => item.id !== node.id && item.type !== "start")
-                .map((item) => (
+              {targets.map((item) => (
                   <option key={item.id} value={item.id}>
                     {item.title || "Untitled"}
                   </option>
@@ -146,7 +153,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
             </select>
           }
         >
-          <TransitionList graph={graph} edges={outgoing} project={project} side="target" reorder />
+          <TransitionList graph={graph} edges={outgoing} project={project} side="target" reorder addItems={addTransitionItems} />
         </Section>
       )}
 
@@ -160,15 +167,18 @@ function TransitionList({
   project,
   side,
   reorder = false,
+  addItems,
 }: {
   graph: GraphDocument;
   edges: StoryEdge[];
   project: ProjectDocument;
   side: "source" | "target";
   reorder?: boolean;
+  addItems?: () => MenuItem[];
 }) {
   const select = useProjectStore((state) => state.select);
   const moveEdge = useProjectStore((state) => state.moveEdge);
+  const deleteEdges = useProjectStore((state) => state.deleteEdges);
   if (edges.length === 0) return null;
   return (
     <ul className="sp-trans-list">
@@ -177,7 +187,20 @@ function TransitionList({
         const otherTitle = other?.title || "Untitled";
         const logic = transitionLogic(edge, project);
         return (
-          <li key={edge.id}>
+          <li
+            key={edge.id}
+            onContextMenu={menuHandler(() => [
+              ...(addItems ? [...addItems(), "separator" as const] : []),
+              {
+                label: "Rename",
+                onSelect: () => {
+                  select({ kind: "edge", id: edge.id });
+                  focusRename(edge.id);
+                },
+              },
+              { label: "Delete", danger: true, onSelect: () => deleteEdges([edge.id]) },
+            ])}
+          >
             <button type="button" className="sp-trans" onClick={() => select({ kind: "edge", id: edge.id })}>
               <span className="sp-trans-top">
                 <strong>{edge.label || (side === "target" ? `→ ${otherTitle}` : `${otherTitle} →`)}</strong>
@@ -226,6 +249,7 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
         <input
           className="sp-head-input"
           aria-label="Transition label"
+          data-rename={edge.id}
           placeholder="Label"
           value={edge.label}
           onChange={(event) => updateEdge(edge.id, { label: event.target.value })}
@@ -270,12 +294,22 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
           </select>
         </span>
       </Row>
-      <Section id="insp:conditions" title="Conditions" summary={describeCondition(edge.condition, project)}>
+      <Section
+        id="insp:conditions"
+        title="Conditions"
+        summary={describeCondition(edge.condition, project)}
+        onContextMenu={menuHandler(() =>
+          conditionAddItems(edge.condition, project.variables[0]?.id ?? "", (condition) => updateEdge(edge.id, { condition })),
+        )}
+      >
         <ConditionBuilder value={edge.condition} onChange={(condition) => updateEdge(edge.id, { condition })} />
       </Section>
       <Section
         id="insp:effects"
         title="Effects"
+        onContextMenu={menuHandler(() => [
+          { label: "Add effect", disabled: project.variables.length === 0, onSelect: () => addEdgeEffect(edge.id) },
+        ])}
         count={edge.effects.length}
         summary={edge.effects.map((effect) => describeEffect(effect, project)).join(", ")}
         actions={
@@ -292,6 +326,7 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
       >
         <EffectsEditor
           effects={edge.effects}
+          onAdd={() => addEdgeEffect(edge.id)}
           onUpdate={(effectId, patch) => updateEdgeEffect(edge.id, effectId, patch)}
           onDelete={(effectId) => deleteEdgeEffect(edge.id, effectId)}
         />

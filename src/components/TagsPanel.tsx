@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { TagCategory } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
+import { focusRename, menuHandler, type MenuItem } from "./ContextMenu";
 import { IconButton, Section } from "./Panel";
 
 export function TagsPanel() {
@@ -12,6 +13,7 @@ export function TagsPanel() {
       id="left:tags"
       title="Tags"
       count={project.tagCategories.length}
+      onContextMenu={menuHandler(() => [{ label: "Add category", onSelect: addCategory }])}
       actions={
         <button type="button" className="sp-chip-btn" onClick={addCategory}>
           + category
@@ -33,9 +35,24 @@ function CategoryBlock({ category }: { category: TagCategory }) {
   const deleteTag = useProjectStore((state) => state.deleteTag);
   const [open, setOpen] = useState(true);
   const [name, setName] = useState("");
+  const addTagItem: MenuItem = {
+    label: "Add tag",
+    onSelect: () => {
+      setOpen(true);
+      focusRename(`newtag:${category.id}`);
+    },
+  };
 
   return (
-    <div className="sp-cat">
+    <div
+      className="sp-cat"
+      onContextMenu={menuHandler(() => [
+        addTagItem,
+        "separator",
+        { label: "Rename category", onSelect: () => focusRename(category.id) },
+        { label: "Delete category", danger: true, onSelect: () => deleteCategory(category.id) },
+      ])}
+    >
       <div className="sp-cat-head">
         <button type="button" className="sp-chev-btn" aria-expanded={open} aria-label="Toggle category" onClick={() => setOpen(!open)}>
           {open ? "▾" : "▸"}
@@ -43,6 +60,7 @@ function CategoryBlock({ category }: { category: TagCategory }) {
         <input
           className="sp-cell sp-cat-name"
           aria-label="Category name"
+          data-rename={category.id}
           value={category.name}
           onChange={(event) => updateCategory(category.id, { name: event.target.value })}
         />
@@ -64,10 +82,20 @@ function CategoryBlock({ category }: { category: TagCategory }) {
         <div className="sp-cat-body">
           <div className="sp-chips">
             {category.tags.map((tag) => (
-              <span key={tag.id} className="sp-tag-chip">
+              <span
+                key={tag.id}
+                className="sp-tag-chip"
+                onContextMenu={menuHandler(() => [
+                  addTagItem,
+                  "separator",
+                  { label: "Rename tag", onSelect: () => focusRename(tag.id) },
+                  { label: "Delete tag", danger: true, onSelect: () => deleteTag(category.id, tag.id) },
+                ])}
+              >
                 <input
                   className="sp-chip-input"
                   aria-label="Tag name"
+                  data-rename={tag.id}
                   style={{ width: `${Math.max(3, tag.name.length) * 0.92}ch` }}
                   value={tag.name}
                   onChange={(event) => updateTag(category.id, tag.id, { name: event.target.value })}
@@ -85,7 +113,7 @@ function CategoryBlock({ category }: { category: TagCategory }) {
                 setName("");
               }}
             >
-              <input className="sp-chip-input" placeholder="+ tag" size={6} value={name} onChange={(event) => setName(event.target.value)} />
+              <input className="sp-chip-input" placeholder="+ tag" size={6} data-rename={`newtag:${category.id}`} value={name} onChange={(event) => setName(event.target.value)} />
             </form>
           </div>
           <input

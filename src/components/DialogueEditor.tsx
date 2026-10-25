@@ -2,18 +2,28 @@ import { useState } from "react";
 import { characterCategories } from "../domain/format";
 import type { DialogueLine } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
+import { menuHandler } from "./ContextMenu";
 import { IconButton } from "./Panel";
 
 export function DialogueEditor({ nodeId, lines }: { nodeId: string; lines: DialogueLine[] }) {
   const updateLine = useProjectStore((state) => state.updateLine);
   const deleteLine = useProjectStore((state) => state.deleteLine);
   const moveLine = useProjectStore((state) => state.moveLine);
+  const addLine = useProjectStore((state) => state.addLine);
 
   if (lines.length === 0) return null;
   return (
     <ol className="sp-lines">
       {lines.map((line, index) => (
-        <li key={line.id} className="sp-line">
+        <li
+          key={line.id}
+          className="sp-line"
+          onContextMenu={menuHandler(() => [
+            { label: "Add line", onSelect: () => addLine(nodeId) },
+            "separator",
+            { label: "Delete line", danger: true, onSelect: () => deleteLine(nodeId, line.id) },
+          ])}
+        >
           <div className="sp-line-top">
             <span className="sp-line-no">{index + 1}</span>
             <SpeakerPicker value={line.speakerTagId} onChange={(speakerTagId) => updateLine(nodeId, line.id, { speakerTagId })} />

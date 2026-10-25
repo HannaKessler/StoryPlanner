@@ -90,6 +90,13 @@ export function defaultCompare(variableId = ""): Condition {
   return { type: "compare", variableId, op: "eq", value: true };
 }
 
+/** Adds a child at the root. A rule or NOT root is wrapped in an ALL group first. */
+export function appendCondition(root: Condition | null, child: Condition): Condition {
+  if (!root) return child;
+  if (root.type === "group") return { ...root, children: [...root.children, child] };
+  return { type: "group", op: "and", children: [root, child] };
+}
+
 export function opsForKind(kind: string | undefined): CompareOp[] {
   if (kind === "value") return ["eq", "neq", "gt", "gte", "lt", "lte"];
   return ["eq", "neq"];

@@ -1,6 +1,7 @@
 import { describeEffect, opsForVariable } from "../domain/effects";
 import type { Effect, EffectOp, Scalar } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
+import { menuHandler } from "./ContextMenu";
 import { IconButton } from "./Panel";
 import { TagSelect } from "./TagSelect";
 
@@ -8,10 +9,12 @@ const OP_LABEL: Record<EffectOp, string> = { set: "set", add: "add", toggle: "to
 
 export function EffectsEditor({
   effects,
+  onAdd,
   onUpdate,
   onDelete,
 }: {
   effects: Effect[];
+  onAdd: () => void;
   onUpdate: (effectId: string, patch: Partial<Effect>) => void;
   onDelete: (effectId: string) => void;
 }) {
@@ -24,7 +27,16 @@ export function EffectsEditor({
         const variable = project.variables.find((item) => item.id === effect.variableId);
         const ops = opsForVariable(variable?.kind);
         return (
-          <div key={effect.id} className="sp-effect-row" title={describeEffect(effect, project)}>
+          <div
+            key={effect.id}
+            className="sp-effect-row"
+            title={describeEffect(effect, project)}
+            onContextMenu={menuHandler(() => [
+              { label: "Add effect", onSelect: onAdd },
+              "separator",
+              { label: "Delete effect", danger: true, onSelect: () => onDelete(effect.id) },
+            ])}
+          >
             <select
               className="sp-cell"
               aria-label="Operation"

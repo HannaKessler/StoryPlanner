@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { setWindowTitle } from "./desktop/tauri";
 import { AppShell } from "./components/AppShell";
+import { ContextMenu } from "./components/ContextMenu";
 import { StartScreen } from "./components/StartScreen";
 import { useProjectStore } from "./store/projectStore";
 
@@ -28,5 +29,10 @@ export function App() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  return project ? <AppShell /> : <StartScreen />;
+  return (
+    <>
+      {project ? <AppShell /> : <StartScreen />}
+      <ContextMenu />
+    </>
+  );
 }

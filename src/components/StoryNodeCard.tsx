@@ -16,8 +16,18 @@ export function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
     ? `${speakerName(project ?? emptyProject(), first.speakerTagId)}: ${first.text}`
     : story.summary;
 
+  const canOpen = story.type === "event" || story.type === "scene" || story.type === "dialogue";
   return (
-    <article className={`sp-node sp-type-${story.type}${selected ? " is-selected" : ""}`}>
+    <article
+      className={`sp-node sp-type-${story.type}${selected ? " is-selected" : ""}`}
+      onDoubleClickCapture={(event) => {
+        // Capture runs before the pane's dblclick zoom listener, so a node
+        // double-click drills in instead of zooming. Empty canvas still zooms.
+        event.preventDefault();
+        event.stopPropagation();
+        if (canOpen) openSubgraph(story.id);
+      }}
+    >
       {story.type !== "start" && <Handle type="target" position={Position.Left} id="in" />}
       <header>
         <span>{NODE_LABEL[story.type]}</span>
@@ -27,7 +37,7 @@ export function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
       {preview && <p>{preview}</p>}
       <footer>
         {story.lines.length > 0 && <span>{story.lines.length} lines</span>}
-        {(story.type === "event" || story.type === "scene" || story.type === "dialogue") && (
+        {canOpen && (
           <button
             type="button"
             className="nodrag sp-node-open"

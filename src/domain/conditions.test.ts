@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { describeCondition, evaluateCondition } from "./conditions";
+import { appendCondition, describeCondition, evaluateCondition } from "./conditions";
 import { applyEffect, applyEffects } from "./effects";
 import { buildSample } from "./sample";
 import type { Condition, Effect } from "./types";
@@ -116,6 +116,30 @@ describe("effects", () => {
       value: null,
     }, variables);
     expect(cleared.var_location).toBeNull();
+  });
+});
+
+describe("appendCondition", () => {
+  const rule: Condition = { type: "compare", variableId: "var_gold", op: "gte", value: 1 };
+  const extra: Condition = { type: "compare", variableId: "var_convinced", op: "eq", value: true };
+
+  it("uses the child as the root when there is no condition yet", () => {
+    expect(appendCondition(null, rule)).toEqual(rule);
+  });
+
+  it("appends into an existing group", () => {
+    const group: Condition = { type: "group", op: "or", children: [rule] };
+    expect(appendCondition(group, extra)).toEqual({ type: "group", op: "or", children: [rule, extra] });
+  });
+
+  it("wraps a rule or NOT in an ALL group", () => {
+    const wrapped = appendCondition(rule, extra);
+    expect(wrapped).toEqual({ type: "group", op: "and", children: [rule, extra] });
+    expect(appendCondition({ type: "not", child: rule }, extra)).toEqual({
+      type: "group",
+      op: "and",
+      children: [{ type: "not", child: rule }, extra],
+    });
   });
 });
 

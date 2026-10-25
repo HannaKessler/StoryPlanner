@@ -1,6 +1,7 @@
 import { defaultCompare, opLabel, opsForKind } from "../domain/conditions";
 import type { CompareOp, Condition, Scalar } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
+import { menuHandler } from "./ContextMenu";
 import { IconButton } from "./Panel";
 import { TagSelect } from "./TagSelect";
 
@@ -48,7 +49,14 @@ function ConditionNode({
 
   if (value.type === "not") {
     return (
-      <div className="sp-cond-group is-not">
+      <div
+        className="sp-cond-group is-not"
+        onContextMenu={menuHandler(() => [
+          { label: "Unwrap", onSelect: () => onChange(value.child) },
+          "separator",
+          { label: "Delete", danger: true, onSelect: () => onChange(null) },
+        ])}
+      >
         <div className="sp-cond-head">
           <span className="sp-cond-op">NOT</span>
           <span className="sp-grow" />
@@ -75,6 +83,24 @@ function ConditionNode({
       <div
         className={`sp-cond-group is-${value.op}`}
         title={value.children.length === 0 ? (value.op === "and" ? "Empty: always passes" : "Empty: never passes") : undefined}
+        onContextMenu={menuHandler(() => [
+          {
+            label: "Add rule",
+            disabled: !firstVariable,
+            onSelect: () => onChange({ ...value, children: [...value.children, defaultCompare(firstVariable)] }),
+          },
+          {
+            label: "Add group",
+            onSelect: () =>
+              onChange({
+                ...value,
+                children: [...value.children, { type: "group", op: value.op === "and" ? "or" : "and", children: [] }],
+              }),
+          },
+          { label: "Wrap in NOT", onSelect: () => onChange({ type: "not", child: value }) },
+          "separator",
+          { label: "Delete group", danger: true, onSelect: () => onChange(null) },
+        ])}
       >
         <div className="sp-cond-head">
           <select
@@ -124,7 +150,14 @@ function ConditionNode({
   const variable = project.variables.find((item) => item.id === value.variableId);
   const ops = opsForKind(variable?.kind);
   return (
-    <div className="sp-cond-rule">
+    <div
+      className="sp-cond-rule"
+      onContextMenu={menuHandler(() => [
+        { label: "Wrap in NOT", onSelect: () => onChange({ type: "not", child: value }) },
+        "separator",
+        { label: "Delete rule", danger: true, onSelect: () => onChange(null) },
+      ])}
+    >
       <select
         className="sp-cell"
         aria-label="Variable"

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, type MouseEvent, type ReactNode } from "react";
 
 const openState = new Map<string, boolean>();
 
@@ -10,6 +10,7 @@ export function Section({
   summary,
   actions,
   defaultOpen = true,
+  onContextMenu,
   children,
 }: {
   id: string;
@@ -18,6 +19,7 @@ export function Section({
   summary?: string;
   actions?: ReactNode;
   defaultOpen?: boolean;
+  onContextMenu?: (event: MouseEvent) => void;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(() => openState.get(id) ?? defaultOpen);
@@ -26,7 +28,7 @@ export function Section({
     setOpen(!open);
   };
   return (
-    <section className={open ? "sp-sec is-open" : "sp-sec"}>
+    <section className={open ? "sp-sec is-open" : "sp-sec"} onContextMenu={onContextMenu}>
       <header className="sp-sec-head">
         <button type="button" className="sp-sec-toggle" onClick={toggle} aria-expanded={open}>
           <span className="sp-chev" aria-hidden>

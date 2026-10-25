@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useMemo, type MouseEvent as ReactMouseEvent } from "react";
 import {
   Background,
   Controls,
@@ -15,10 +15,10 @@ import {
 } from "@xyflow/react";
 import { describeCondition } from "../domain/conditions";
 import { describeEffect } from "../domain/effects";
-import { addableNodeTypes } from "../domain/graphOps";
-import { NODE_LABEL } from "../domain/labels";
 import type { GraphDocument, ProjectDocument } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
+import { useContextMenu } from "./ContextMenu";
+import { addBeatItems } from "./menuItems";
 import { StoryNodeCard, type StoryFlowNode } from "./StoryNodeCard";
 import { TransitionEdge, type TransitionFlowEdge } from "./TransitionEdge";
 
@@ -43,34 +43,14 @@ function CanvasBody({ graph, project }: { graph: GraphDocument; project: Project
   const updateNodePosition = useProjectStore((state) => state.updateNodePosition);
   const deleteNodes = useProjectStore((state) => state.deleteNodes);
   const deleteEdges = useProjectStore((state) => state.deleteEdges);
-  const addNode = useProjectStore((state) => state.addNode);
   const { fitView, screenToFlowPosition } = useReactFlow();
-  const canvasRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [menu, setMenu] = useState<{ left: number; top: number; flow: { x: number; y: number } } | null>(null);
+  const openMenu = useContextMenu((state) => state.open);
+  const closeMenu = useContextMenu((state) => state.close);
 
-  useEffect(() => {
-    if (!menu) return;
-    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setMenu(null);
-    const onDown = (event: MouseEvent) => {
-      if (!menuRef.current?.contains(event.target as Node)) setMenu(null);
-    };
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("mousedown", onDown, true);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("mousedown", onDown, true);
-    };
-  }, [menu]);
-
-  const openMenu = (event: ReactMouseEvent | MouseEvent) => {
+  const onPaneMenu = (event: ReactMouseEvent | MouseEvent) => {
     event.preventDefault();
-    const bounds = canvasRef.current?.getBoundingClientRect();
-    if (!bounds) return;
-    const types = addableNodeTypes(graph).length;
-    const left = Math.min(event.clientX - bounds.left, bounds.width - 128);
-    const top = Math.min(event.clientY - bounds.top, bounds.height - (types * 24 + 10));
-    setMenu({ left, top, flow: screenToFlowPosition({ x: event.clientX, y: event.clientY }) });
+    const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
+    openMenu(event.clientX, event.clientY, addBeatItems(graph, position));
   };
 
   const [nodes, setNodes] = useNodesState(toNodes(graph));
@@ -91,6 +71,19 @@ function CanvasBody({ graph, project }: { graph: GraphDocument; project: Project
     const frame = window.setTimeout(() => fitView({ padding: 0.08, duration: 180 }), 40);
     return () => window.clearTimeout(frame);
   }, [graph.id, fitView]);
+
+  useEffect(() => {
+    const pane = document.querySelector(".sp-canvas .react-flow__renderer");
+    if (!pane) return;
+    // d3 zoom listens for dblclick on the renderer during bubble. Stopping it
+    // in capture keeps pane zoom and skips it when the click lands on a node.
+    const stopNodeZoom = (event: Event) => {
+      const target = event.target;
+      if (target instanceof Element && target.closest(".react-flow__node")) event.stopPropagation();
+    };
+    pane.addEventListener("dblclick", stopNodeZoom, true);
+    return () => pane.removeEventListener("dblclick", stopNodeZoom, true);
+  }, []);
 
   useEffect(() => {
     setNodes((current) =>
@@ -127,7 +120,7 @@ function CanvasBody({ graph, project }: { graph: GraphDocument; project: Project
   };
 
   return (
-    <div className="sp-canvas" ref={canvasRef}>
+    <div className="sp-canvas">
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -142,8 +135,8 @@ function CanvasBody({ graph, project }: { graph: GraphDocument; project: Project
         onNodeClick={(_, node) => select({ kind: "node", id: node.id })}
         onEdgeClick={(_, edge) => select({ kind: "edge", id: edge.id })}
         onPaneClick={() => select(null)}
-        onPaneContextMenu={openMenu}
-        onMoveStart={() => setMenu(null)}
+        onPaneContextMenu={onPaneMenu}
+        onMoveStart={closeMenu}
         onNodeDragStop={(_, node) => updateNodePosition(node.id, node.position)}
         onNodesDelete={(deleted) => deleteNodes(deleted.map((node) => node.id))}
         onEdgesDelete={(deleted) => deleteEdges(deleted.map((edge) => edge.id))}
@@ -156,23 +149,6 @@ function CanvasBody({ graph, project }: { graph: GraphDocument; project: Project
         <Background color="#3a342c" gap={20} size={1.1} />
         <Controls showInteractive={false} />
       </ReactFlow>
-      {menu && (
-        <div ref={menuRef} className="sp-context" role="menu" style={{ left: menu.left, top: menu.top }}>
-          {addableNodeTypes(graph).map((type) => (
-            <button
-              key={type}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                addNode(type, menu.flow);
-                setMenu(null);
-              }}
-            >
-              {NODE_LABEL[type]}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
