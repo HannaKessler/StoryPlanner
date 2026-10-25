@@ -25,7 +25,7 @@ export function nodeGraphItems(node: Pick<StoryNode, "id" | "type" | "subgraphId
   const state = useProjectStore.getState();
   const exists = Boolean(node.subgraphId && state.graphs[node.subgraphId]);
   if (exists) {
-    return [{ label: "Open sub-graph", onSelect: () => state.openSubgraph(node.id) }];
+    return [{ label: "Open", onSelect: () => state.openSubgraph(node.id) }];
   }
   if (!canOwnInnerGraph(node.type)) return [];
   return [{ label: "Create sub-graph", onSelect: () => state.createSubgraph(node.id) }];
