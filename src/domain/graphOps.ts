@@ -1,4 +1,9 @@
-import type { GraphDocument, ProjectDocument, StoryNode } from "./types";
+import type { GraphDocument, ProjectDocument, StoryNode, StoryNodeType } from "./types";
+
+export function addableNodeTypes(graph: GraphDocument): StoryNodeType[] {
+  const types: StoryNodeType[] = ["event", "scene", "dialogue", "end"];
+  return graph.nodes.some((node) => node.type === "start") ? types : ["start", ...types];
+}
 
 export function findEntryNode(graph: GraphDocument): StoryNode | null {
   const start = graph.nodes.find((node) => node.type === "start");

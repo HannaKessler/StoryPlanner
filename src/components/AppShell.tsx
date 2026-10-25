@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { graphBreadcrumbs } from "../domain/graphOps";
+import { addableNodeTypes, graphBreadcrumbs } from "../domain/graphOps";
 import { NODE_LABEL } from "../domain/labels";
-import type { StoryNodeType } from "../domain/types";
 import { SCHEMA_VERSION } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { ExportDialog } from "./ExportDialog";
@@ -10,8 +9,6 @@ import { Inspector } from "./Inspector";
 import { LeftPanel } from "./LeftPanel";
 import { Modal } from "./Modal";
 import { PlayMode } from "./PlayMode";
-
-const ADDABLE: StoryNodeType[] = ["event", "scene", "dialogue", "end"];
 
 export function AppShell() {
   const project = useProjectStore((state) => state.project);
@@ -37,7 +34,6 @@ export function AppShell() {
   if (!project || !currentGraphId) return null;
   const graph = graphs[currentGraphId];
   const crumbs = graphBreadcrumbs(graphs, currentGraphId);
-  const hasStart = graph?.nodes.some((node) => node.type === "start");
 
   return (
     <div className="sp-app">
@@ -122,12 +118,7 @@ export function AppShell() {
                 ))}
               </nav>
               <div className="sp-toolbar">
-                {!hasStart && (
-                  <button type="button" className="sp-chip-btn" onClick={() => addNode("start")}>
-                    + Start
-                  </button>
-                )}
-                {ADDABLE.map((type) => (
+                {addableNodeTypes(graph).map((type) => (
                   <button key={type} type="button" className="sp-chip-btn" onClick={() => addNode(type)}>
                     + {NODE_LABEL[type]}
                   </button>

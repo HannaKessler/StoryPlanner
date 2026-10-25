@@ -104,7 +104,7 @@ interface ProjectStore {
   updateGraphMeta: (patch: Partial<Pick<GraphDocument, "name" | "sceneNotes">>) => void;
   updateNode: (nodeId: string, patch: Partial<StoryNode>) => void;
   updateNodePosition: (nodeId: string, position: { x: number; y: number }) => void;
-  addNode: (type: StoryNodeType) => void;
+  addNode: (type: StoryNodeType, position?: { x: number; y: number }) => void;
   deleteNodes: (nodeIds: string[]) => void;
   deleteEdges: (edgeIds: string[]) => void;
   connectNodes: (source: string, target: string) => void;
@@ -428,7 +428,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     withNode(nodeId, (node) => ({ ...node, position }));
   },
 
-  addNode(type) {
+  addNode(type, position) {
     const state = get();
     const graph = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
     if (!graph) return;
@@ -437,7 +437,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       return;
     }
     const maxX = graph.nodes.reduce((max, node) => Math.max(max, node.position.x), 0);
-    const node = createNode(type, { position: { x: maxX + 280, y: 140 + (graph.nodes.length % 4) * 48 } });
+    const node = createNode(type, { position: position ?? { x: maxX + 280, y: 140 + (graph.nodes.length % 4) * 48 } });
     withGraph((current) => ({ ...current, nodes: [...current.nodes, node] }));
     set({ selection: { kind: "node", id: node.id } });
   },
