@@ -35,7 +35,7 @@ export function AppShell() {
 
   if (!project || !currentGraphId) return null;
   const graph = graphs[currentGraphId];
-  const crumbs = graphBreadcrumbs(graphs, currentGraphId);
+  const crumbs = graphBreadcrumbs(graphs, currentGraphId, project);
 
   return (
     <div className="sp-app">

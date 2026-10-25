@@ -1,7 +1,7 @@
 import { appendCondition, defaultCompare } from "../domain/conditions";
-import { BEAT_TYPES } from "../domain/graphOps";
+import { BEAT_TYPES, canOwnInnerGraph } from "../domain/graphOps";
 import { NODE_LABEL } from "../domain/labels";
-import type { Condition } from "../domain/types";
+import type { Condition, StoryNode } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import type { MenuItem } from "./ContextMenu";
 
@@ -18,6 +18,17 @@ export function connectBeatItems(sourceId: string, position: { x: number; y: num
     label: `Add ${NODE_LABEL[type].toLowerCase()}`,
     onSelect: () => useProjectStore.getState().addConnectedNode(sourceId, type, position),
   }));
+}
+
+/** Right-click menu for a beat. Creating an inner graph is only this action. */
+export function nodeGraphItems(node: Pick<StoryNode, "id" | "type" | "subgraphId">): MenuItem[] {
+  const state = useProjectStore.getState();
+  const exists = Boolean(node.subgraphId && state.graphs[node.subgraphId]);
+  if (exists) {
+    return [{ label: "Open inner graph", onSelect: () => state.openSubgraph(node.id) }];
+  }
+  if (!canOwnInnerGraph(node.type)) return [];
+  return [{ label: "Create inner graph", onSelect: () => state.createSubgraph(node.id) }];
 }
 
 /** Right-click menu for an existing transition. */

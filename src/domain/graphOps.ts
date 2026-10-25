@@ -1,3 +1,4 @@
+import { beatLabel } from "./labels";
 import type { GraphDocument, ProjectDocument, StoryEdge, StoryNode, StoryNodeType } from "./types";
 
 /** Every beat type, including Start. A graph may contain any number of each. */
@@ -5,6 +6,11 @@ export const BEAT_TYPES: StoryNodeType[] = ["start", "event", "scene", "dialogue
 
 export function addableNodeTypes(): StoryNodeType[] {
   return [...BEAT_TYPES];
+}
+
+/** Event, scene, and dialogue can own an inner graph. Start and end do not. */
+export function canOwnInnerGraph(type: StoryNodeType): boolean {
+  return type === "event" || type === "scene" || type === "dialogue";
 }
 
 export function startNodes(graph: GraphDocument): StoryNode[] {
@@ -51,6 +57,7 @@ export function splitTransition(graph: GraphDocument, edgeId: string, node: Stor
 export function graphBreadcrumbs(
   graphs: Record<string, GraphDocument>,
   graphId: string,
+  project?: ProjectDocument | null,
 ): Array<{ id: string; name: string }> {
   const crumbs: Array<{ id: string; name: string }> = [];
   const seen = new Set<string>();
@@ -59,10 +66,26 @@ export function graphBreadcrumbs(
     seen.add(current);
     const graph: GraphDocument | undefined = graphs[current];
     if (!graph) break;
-    crumbs.push({ id: graph.id, name: graph.name || "Untitled graph" });
+    crumbs.push({ id: graph.id, name: graphCrumbName(graph, graphs, project) });
     current = graph.parentGraphId;
   }
   return crumbs.reverse();
+}
+
+/** The graph's own name, or a label derived from its parent beat. Does not write either. */
+function graphCrumbName(
+  graph: GraphDocument,
+  graphs: Record<string, GraphDocument>,
+  project?: ProjectDocument | null,
+): string {
+  const name = graph.name.trim();
+  if (name) return name;
+  if (graph.parentGraphId && graph.parentNodeId) {
+    const parent = graphs[graph.parentGraphId];
+    const node = parent?.nodes.find((item) => item.id === graph.parentNodeId);
+    if (node) return beatLabel(node, project);
+  }
+  return "Graph";
 }
 
 /** The graph id plus every graph nested inside it. */

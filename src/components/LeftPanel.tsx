@@ -1,6 +1,7 @@
+import { beatLabel } from "../domain/labels";
 import { useProjectStore } from "../store/projectStore";
 import { focusRename, menuHandler } from "./ContextMenu";
-import { addBeatItems } from "./menuItems";
+import { addBeatItems, nodeGraphItems } from "./menuItems";
 import { Section } from "./Panel";
 import { TagsPanel } from "./TagsPanel";
 import { VariablesPanel } from "./VariablesPanel";
@@ -16,6 +17,7 @@ export function LeftPanel() {
 }
 
 function BeatsOutline() {
+  const project = useProjectStore((state) => state.project);
   const graph = useProjectStore((state) => (state.currentGraphId ? state.graphs[state.currentGraphId] : null));
   const selection = useProjectStore((state) => state.selection);
   const select = useProjectStore((state) => state.select);
@@ -26,6 +28,7 @@ function BeatsOutline() {
       <ul className="sp-beats">
         {graph.nodes.map((node) => {
           const active = selection?.kind === "node" && selection.id === node.id;
+          const graphItems = nodeGraphItems(node);
           return (
             <li
               key={node.id}
@@ -33,6 +36,8 @@ function BeatsOutline() {
               onContextMenu={menuHandler(() => [
                 ...addBeatItems(),
                 "separator",
+                ...graphItems,
+                ...(graphItems.length > 0 ? (["separator"] as const) : []),
                 {
                   label: "Rename",
                   onSelect: () => {
@@ -44,7 +49,7 @@ function BeatsOutline() {
               ])}
             >
               <button type="button" className="sp-beat" onClick={() => select({ kind: "node", id: node.id })}>
-                <span className="sp-beat-title">{node.title || "Untitled"}</span>
+                <span className="sp-beat-title">{beatLabel(node, project)}</span>
               </button>
             </li>
           );

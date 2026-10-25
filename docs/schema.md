@@ -146,6 +146,8 @@ The root graph uses `null` for both parent fields. `sceneNotes` on a graph cover
 
 Start is an ordinary beat. It can be added, deleted, and connected like any other type. A file with no start node, or with several, is valid. The editor warns when the graph currently open has none.
 
+`title` may be empty. The editor does not store a generated name. A consumer that needs a label should treat an empty title as unnamed.
+
 `position` is the editor’s graph-view point in pixels. The location view must not write it. Add-ons can ignore it.
 
 `locationPosition` is that beat’s point inside its location box, in pixels from the box’s top left. `null` means the location view has not placed it yet and will use a default. A missing field is read as `null`.

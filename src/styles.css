@@ -439,14 +439,15 @@ form.sp-speaker { display: flex; }
   background: #241f1a;
   border: 1px solid var(--line-strong);
   border-radius: 12px;
-  padding: 10px 12px 8px;
+  padding: 5px 8px 6px;
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
 }
-.sp-node header { display: flex; justify-content: space-between; color: var(--text-faint); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
-.sp-node h3 { font-size: 15px; margin: 4px 0; }
-.sp-node p { margin: 0; color: var(--text-dim); font-size: 12px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.sp-node footer { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 8px; color: var(--text-faint); font-size: 11px; }
-.sp-node-open { background: transparent; border: 1px solid var(--line); color: var(--text); border-radius: 999px; padding: 2px 8px; font-size: 11px; }
+.sp-node header { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; color: var(--text-faint); font-size: 9px; letter-spacing: 0.06em; text-transform: uppercase; line-height: 1.2; }
+.sp-node-nest { text-transform: none; letter-spacing: 0; font-size: 11px; line-height: 1; }
+.sp-node h3 { font-size: 13px; font-weight: 650; line-height: 1.25; margin: 1px 0 0; }
+.sp-node p { margin: 2px 0 0; color: var(--text-dim); font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; }
+.sp-node-lines { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.sp-node-lines li { color: var(--text); font-size: 12px; line-height: 1.35; overflow-wrap: anywhere; white-space: normal; }
 .sp-node.is-selected { border-color: var(--accent); }
 .sp-node.sp-type-start { box-shadow: inset 3px 0 0 var(--sage); }
 .sp-node.sp-type-event { box-shadow: inset 3px 0 0 var(--accent); }

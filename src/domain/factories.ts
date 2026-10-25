@@ -23,20 +23,12 @@ export const TAG_COLORS = [
   "#c48b9f",
 ];
 
-const TITLES: Record<StoryNodeType, string> = {
-  start: "Start",
-  event: "New event",
-  scene: "New scene",
-  dialogue: "New dialogue",
-  end: "End",
-};
-
 export function createNode(type: StoryNodeType, partial: Partial<StoryNode> = {}): StoryNode {
   return {
     id: partial.id ?? createId(),
     type,
     position: partial.position ?? { x: 80, y: 160 },
-    title: partial.title ?? TITLES[type],
+    title: partial.title ?? "",
     summary: partial.summary ?? "",
     sceneNotes: partial.sceneNotes ?? "",
     subgraphId: partial.subgraphId ?? null,

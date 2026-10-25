@@ -6,11 +6,25 @@ export const UNASSIGNED_LOCATION = "unassigned";
 const PAD = 16;
 const TITLE = 36;
 const CARD_W = 230;
-const CARD_H = 168;
 const STACK_GAP = 16;
 const BOX_GAP = 72;
 const MIN_W = PAD + CARD_W + PAD;
 const MIN_H = TITLE + 96;
+
+/** Height the location layout reserves for a card. Dialogue grows with every line. */
+function cardHeight(node: StoryNode | undefined): number {
+  if (!node) return 72;
+  let body = node.title.trim() ? 18 : 0;
+  if (node.type === "dialogue" && node.lines.length > 0) {
+    for (const line of node.lines) {
+      const chars = 14 + line.text.length;
+      body += Math.max(1, Math.ceil(chars / 30)) * 16;
+    }
+  } else if (node.summary.trim()) {
+    body += Math.max(1, Math.ceil(node.summary.trim().length / 30)) * 16;
+  }
+  return Math.max(40, 16 + 16 + body);
+}
 
 export interface LocationFrameNode {
   id: string;
@@ -85,24 +99,24 @@ export function locationFrames(graph: GraphDocument, project: ProjectDocument): 
   const saved = new Map(graph.locationBoxes.map((box) => [box.id, box]));
   const drafts = locationGroups(graph, project).map((group) => {
     const placed = new Map<string, { x: number; y: number }>();
+    const heightOf = (id: string) => cardHeight(graph.nodes.find((node) => node.id === id));
     let bottom = TITLE;
     for (const id of group.nodeIds) {
       const stored = graph.nodes.find((node) => node.id === id)?.locationPosition;
       if (!stored) continue;
       placed.set(id, stored);
-      bottom = Math.max(bottom, stored.y + CARD_H + STACK_GAP);
+      bottom = Math.max(bottom, stored.y + heightOf(id) + STACK_GAP);
     }
-    let stack = 0;
     for (const id of group.nodeIds) {
       if (placed.has(id)) continue;
-      placed.set(id, { x: PAD, y: bottom + stack * (CARD_H + STACK_GAP) });
-      stack += 1;
+      placed.set(id, { x: PAD, y: bottom });
+      bottom += heightOf(id) + STACK_GAP;
     }
     let contentWidth = MIN_W;
     let contentHeight = MIN_H;
-    for (const position of placed.values()) {
+    for (const [id, position] of placed) {
       contentWidth = Math.max(contentWidth, position.x + CARD_W + PAD);
-      contentHeight = Math.max(contentHeight, position.y + CARD_H + PAD);
+      contentHeight = Math.max(contentHeight, position.y + heightOf(id) + PAD);
     }
     return { group, placed, contentWidth, contentHeight, saved: saved.get(group.id) };
   });

@@ -1,5 +1,6 @@
 import { speakerName } from "./format";
 import { graphBreadcrumbs, orderedGraphs } from "./graphOps";
+import { beatLabel } from "./labels";
 import type {
   DialogueLine,
   GraphDocument,
@@ -54,7 +55,7 @@ export function exportVoiceSheets(
         const { graph, node, line, index } = appearance;
         const cues = responseCues(graph, node, index, graphs, project);
         lines.push(`### ${line.text.trim() || "…"}`, "");
-        lines.push(`*${breadcrumbLabel(graphs, graph, node)}*`, "");
+        lines.push(`*${breadcrumbLabel(graphs, graph, node, project)}*`, "");
         const notes = [node.sceneNotes, graph.sceneNotes].map((note) => note.trim()).filter(Boolean);
         for (const note of notes) lines.push(`*${note.replace(/\s+/g, " ")}*`, "");
         if (line.direction.trim()) lines.push(`*(${line.direction.trim()})*`, "");
@@ -90,9 +91,10 @@ function breadcrumbLabel(
   graphs: Record<string, GraphDocument>,
   graph: GraphDocument,
   node: StoryNode,
+  project: ProjectDocument,
 ): string {
-  const crumbs = graphBreadcrumbs(graphs, graph.id).map((crumb) => crumb.name);
-  crumbs.push(node.title || "Untitled");
+  const crumbs = graphBreadcrumbs(graphs, graph.id, project).map((crumb) => crumb.name);
+  crumbs.push(beatLabel(node, project));
   return crumbs.join(" → ");
 }
 

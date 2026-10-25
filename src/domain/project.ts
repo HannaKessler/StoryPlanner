@@ -119,12 +119,8 @@ export function createNewProject(
   now = new Date().toISOString(),
 ): LoadedProject {
   const rootId = createId();
-  const start = createNode("start", { title: "Start", position: { x: 80, y: 220 } });
-  const beat = createNode("event", {
-    title: "First beat",
-    summary: "What happens first?",
-    position: { x: 380, y: 180 },
-  });
+  const start = createNode("start", { position: { x: 80, y: 220 } });
+  const beat = createNode("event", { position: { x: 380, y: 180 } });
   const graph = createGraph({
     id: rootId,
     name,

@@ -1,6 +1,6 @@
 import { describeCondition } from "../domain/conditions";
 import { describeEffect } from "../domain/effects";
-import { NODE_LABEL } from "../domain/labels";
+import { beatLabel, NODE_LABEL } from "../domain/labels";
 import type { GraphDocument, ProjectDocument, StoryEdge } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { ConditionBuilder } from "./ConditionBuilder";
@@ -62,18 +62,13 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
   const addTransitionItems = (): MenuItem[] =>
     targets.length === 0
       ? [{ label: "Add transition", disabled: true, onSelect: () => undefined }]
-      : targets.map((item) => ({ label: `Add transition to ${item.title || "Untitled"}`, onSelect: () => connectNodes(node.id, item.id) }));
+      : targets.map((item) => ({ label: `Add transition to ${beatLabel(item, project)}`, onSelect: () => connectNodes(node.id, item.id) }));
 
   return (
     <>
       <div className="sp-insp-head">
         <span className="sp-kicker">{NODE_LABEL[node.type]}</span>
-        <input className="sp-head-input" aria-label="Title" data-rename={node.id} value={node.title} onChange={(event) => updateNode(node.id, { title: event.target.value })} />
-        {content && !child && (
-          <button type="button" className="sp-chip-btn" title="Create an inner graph for this beat" onClick={() => openSubgraph(node.id)}>
-            + inner
-          </button>
-        )}
+        <input className="sp-head-input" aria-label="Title" placeholder="Title" data-rename={node.id} value={node.title} onChange={(event) => updateNode(node.id, { title: event.target.value })} />
         <IconButton label="Delete beat" danger onClick={() => deleteNodes([node.id])}>
           ×
         </IconButton>
@@ -106,7 +101,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
 
       {content && child && (
         <div className="sp-inner-row" title="Inner graph">
-          <span className="sp-inner-name">↳ {child.name || "Untitled"}</span>
+          <span className="sp-inner-name">↳ {child.name.trim() || beatLabel(node, project)}</span>
           <button type="button" className="sp-chip-btn" onClick={() => openSubgraph(node.id)}>
             Open
           </button>
@@ -169,7 +164,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
               <option value="">+ to…</option>
               {targets.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {item.title || "Untitled"}
+                    {beatLabel(item, project)}
                   </option>
                 ))}
             </select>
@@ -206,7 +201,7 @@ function TransitionList({
     <ul className="sp-trans-list">
       {edges.map((edge, index) => {
         const other = graph.nodes.find((item) => item.id === edge[side]);
-        const otherTitle = other?.title || "Untitled";
+        const otherTitle = other ? beatLabel(other, project) : "Missing beat";
         const logic = transitionLogic(edge, project);
         return (
           <li
@@ -292,7 +287,7 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
               .filter((item) => item.type !== "end")
               .map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.title || "Untitled"}
+                  {beatLabel(item, project)}
                 </option>
               ))}
           </select>
@@ -308,7 +303,7 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
           >
             {graph.nodes.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.title || "Untitled"}
+                  {beatLabel(item, project)}
                 </option>
               ))}
           </select>

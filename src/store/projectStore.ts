@@ -19,7 +19,7 @@ import {
   createVariable,
   moveItem,
 } from "../domain/factories";
-import { descendantGraphIds, splitTransition } from "../domain/graphOps";
+import { canOwnInnerGraph, descendantGraphIds, splitTransition } from "../domain/graphOps";
 import {
   bundleProject,
   createNewProject,
@@ -118,6 +118,7 @@ interface ProjectStore {
   updateEdge: (edgeId: string, patch: Partial<StoryEdge>) => void;
   moveEdge: (edgeId: string, direction: -1 | 1) => void;
   openSubgraph: (nodeId: string) => void;
+  createSubgraph: (nodeId: string) => void;
   deleteSubgraph: (nodeId: string) => void;
 
   addLine: (nodeId: string) => void;
@@ -580,25 +581,30 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
 
   openSubgraph(nodeId) {
     const state = get();
+    if (!state.currentGraphId) return;
+    const graph = state.graphs[state.currentGraphId];
+    const node = graph?.nodes.find((item) => item.id === nodeId);
+    if (!node?.subgraphId || !state.graphs[node.subgraphId]) return;
+    set({ currentGraphId: node.subgraphId, selection: null, screen: "graph" });
+  },
+
+  createSubgraph(nodeId) {
+    const state = get();
     if (!state.currentGraphId || !state.project) return;
     const graph = state.graphs[state.currentGraphId];
     const node = graph?.nodes.find((item) => item.id === nodeId);
-    if (!graph || !node) return;
+    if (!graph || !node || !canOwnInnerGraph(node.type)) return;
     if (node.subgraphId && state.graphs[node.subgraphId]) {
       set({ currentGraphId: node.subgraphId, selection: null, screen: "graph" });
       return;
     }
     const child = createGraph({
-      name: node.title || "Inner graph",
+      name: node.title.trim(),
       parentGraphId: graph.id,
       parentNodeId: node.id,
     });
-    const start = createNode("start", { title: "Start", position: { x: 80, y: 200 } });
-    const innerType = node.type === "dialogue" ? "dialogue" : "event";
-    const inner = createNode(innerType, {
-      title: innerType === "dialogue" ? "Dialogue" : "Beat",
-      position: { x: 380, y: 170 },
-    });
+    const start = createNode("start", { position: { x: 80, y: 200 } });
+    const inner = createNode(node.type, { position: { x: 380, y: 170 } });
     child.nodes = [start, inner];
     child.edges = [createEdge(start.id, inner.id)];
     withNode(nodeId, (current) => ({ ...current, subgraphId: child.id }));

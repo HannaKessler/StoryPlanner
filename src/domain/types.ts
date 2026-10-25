@@ -79,6 +79,7 @@ export interface StoryNode {
   id: string;
   type: StoryNodeType;
   position: { x: number; y: number };
+  /** Optional. Empty until the writer names the beat. Display fallbacks are not stored here. */
   title: string;
   summary: string;
   sceneNotes: string;

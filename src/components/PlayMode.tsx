@@ -1,4 +1,5 @@
 import { formatValue, speakerName } from "../domain/format";
+import { beatLabel } from "../domain/labels";
 import { startNodes } from "../domain/graphOps";
 import { availableActions, playLocation, type PlayAction } from "../domain/play";
 import { useProjectStore } from "../store/projectStore";
@@ -47,7 +48,7 @@ export function PlayMode() {
                 {starts.map((node) => (
                   <button key={node.id} type="button" className="sp-play-action is-enter" onClick={() => beginPlay(node.id)}>
                     <span className="sp-play-action-top">
-                      <strong>{node.title || "Untitled"}</strong>
+                      <strong>{beatLabel(node, project)}</strong>
                     </span>
                   </button>
                 ))}
@@ -63,7 +64,7 @@ export function PlayMode() {
         {!choosing && !location && <p className="sp-empty">Beat missing.</p>}
         {location && (
           <article className="sp-script">
-            <h2>{location.node.title || "Untitled"}</h2>
+            <h2>{beatLabel(location.node, project)}</h2>
             {location.node.summary.trim() && <p className="sp-script-summary">{location.node.summary}</p>}
             {location.node.sceneNotes.trim() && <p className="sp-script-note">{location.node.sceneNotes}</p>}
             {location.node.lines.length > 0 && (

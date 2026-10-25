@@ -2,6 +2,7 @@ import { describeCondition } from "./conditions";
 import { describeEffect } from "./effects";
 import { speakerName } from "./format";
 import { startNodes } from "./graphOps";
+import { beatLabel } from "./labels";
 import type { GraphDocument, ProjectDocument, StoryEdge, StoryNode } from "./types";
 
 const TYPE_LABEL: Record<StoryNode["type"], string> = {
@@ -67,16 +68,16 @@ function writeNode(
 ) {
   const id = key(graph, node);
   if (seen.has(id)) {
-    lines.push(`→ Continues at **${node.title || "Untitled"}**.`, "");
+    lines.push(`→ Continues at **${beatLabel(node, project)}**.`, "");
     return;
   }
   seen.add(id);
   if (node.type === "start") {
-    lines.push(heading(level, node.title || "Start"), "");
+    lines.push(heading(level, beatLabel(node, project)), "");
     writeExits(graph, node, level, lines, seen, project, graphs);
     return;
   }
-  lines.push(heading(level, node.title || "Untitled"), "");
+  lines.push(heading(level, beatLabel(node, project)), "");
   lines.push(`*${TYPE_LABEL[node.type]}*`, "");
   if (node.summary.trim()) {
     lines.push(node.summary.trim(), "");
@@ -92,7 +93,7 @@ function writeNode(
   }
   if (node.subgraphId && graphs[node.subgraphId]) {
     const child = graphs[node.subgraphId];
-    lines.push(`*Inner graph: ${child.name || "Untitled"}*`, "");
+    lines.push(`*Inner graph: ${child.name.trim() || beatLabel(node, project)}*`, "");
     writeGraph(child, Math.min(level + 1, 6), lines, seen, project, graphs);
   }
 
@@ -110,7 +111,7 @@ function writeExits(
 ) {
   const outgoing = graph.edges.filter((edge) => edge.source === node.id);
   const branching = outgoing.length > 1;
-  if (branching) lines.push(`**Transitions from ${node.title || "this beat"}**`, "");
+  if (branching) lines.push(`**Transitions from ${beatLabel(node, project)}**`, "");
   for (const edge of outgoing) {
     const target = graph.nodes.find((item) => item.id === edge.target);
     if (branching || hasLogic(edge)) writeTransition(edge, target, lines, project);
@@ -128,7 +129,7 @@ function writeTransition(
   lines: string[],
   project: ProjectDocument,
 ) {
-  const title = target?.title || "Untitled";
+  const title = target ? beatLabel(target, project) : "Missing beat";
   const heading = edge.label ? `${edge.label} → ${title}` : `→ ${title}`;
   lines.push(`**${heading}**`);
   lines.push(`*When ${describeCondition(edge.condition, project)}.*`);

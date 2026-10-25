@@ -1,6 +1,7 @@
 import { describeCondition, evaluateCondition } from "./conditions";
 import { applyEffects, defaultValues, describeEffect } from "./effects";
 import { startNodes } from "./graphOps";
+import { beatLabel } from "./labels";
 import type { GraphDocument, ProjectDocument, Scalar, StoryNode } from "./types";
 
 export interface PlayFrame {
@@ -51,7 +52,7 @@ function enterGraph(state: PlayState, graph: GraphDocument): PlayState {
   return {
     ...state,
     frames: [...state.frames, { graphId: graph.id, nodeId: entry.id }],
-    log: [...state.log, entry.title || "Untitled"],
+    log: [...state.log, beatLabel(entry)],
     choosingGraphId: null,
   };
 }
@@ -68,7 +69,7 @@ export function chooseStart(
   return {
     ...state,
     frames: [...state.frames, { graphId: graph.id, nodeId: node.id }],
-    log: [...state.log, node.title || "Untitled"],
+    log: [...state.log, beatLabel(node)],
     choosingGraphId: null,
   };
 }
@@ -102,7 +103,7 @@ export function availableActions(
       id: `enter:${node.id}`,
       kind: "enter",
       label: "Step in",
-      target: child.name || "Inner graph",
+      target: child.name.trim() || beatLabel(node, project),
       condition: "",
       effects: "",
       enabled: true,
@@ -112,7 +113,7 @@ export function availableActions(
   for (const edge of graph.edges) {
     if (edge.source !== node.id) continue;
     const target = graph.nodes.find((item) => item.id === edge.target);
-    const targetTitle = target?.title || "Untitled";
+    const targetTitle = target ? beatLabel(target, project) : "Missing beat";
     actions.push({
       id: `edge:${edge.id}`,
       kind: "transition",
@@ -132,7 +133,7 @@ export function availableActions(
       id: "return",
       kind: "return",
       label: "Return",
-      target: parentNode?.title || "Parent beat",
+      target: parentNode ? beatLabel(parentNode, project) : "Parent beat",
       condition: "",
       effects: "",
       enabled: true,
@@ -174,7 +175,7 @@ export function performAction(
     return {
       frames,
       values: applyEffects(state.values, edge.effects, project.variables),
-      log: [...state.log, target.title || "Untitled"],
+      log: [...state.log, beatLabel(target, project)],
       choosingGraphId: null,
     };
   }

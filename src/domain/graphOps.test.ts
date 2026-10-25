@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { parallelOffset, transitionCurve } from "./edgeGeometry";
-import { createEdge, createNode } from "./factories";
-import { addableNodeTypes, graphWarning, splitTransition } from "./graphOps";
+import { createEdge, createGraph, createNode } from "./factories";
+import { addableNodeTypes, graphBreadcrumbs, graphWarning, splitTransition } from "./graphOps";
+import { beatLabel } from "./labels";
 import { buildSample } from "./sample";
 
 describe("addableNodeTypes", () => {
@@ -81,5 +82,40 @@ describe("parallel transitions", () => {
     expect(bowed.path.endsWith(" 200,0")).toBe(true);
     expect(bowed.path).not.toBe(straight.path);
     expect(bowed.labelY).not.toBe(straight.labelY);
+  });
+});
+
+describe("untitled beats", () => {
+  it("stores no generated title and labels from the first line", () => {
+    const node = createNode("dialogue", {
+      id: "node_dialogue_abcdef",
+      lines: [{ id: "line", speakerTagId: "tag_traveler", text: "Yes well", direction: "" }],
+    });
+    expect(node.title).toBe("");
+    const project = buildSample().project;
+    expect(beatLabel(node, project)).toBe("Dialogue · Traveler: Yes well");
+    expect(node.title).toBe("");
+  });
+
+  it("falls back to the type and a short id when a beat has no lines", () => {
+    const node = createNode("event", { id: "node_event_123456" });
+    expect(beatLabel(node)).toBe("Event · 123456");
+  });
+
+  it("names an untitled inner graph from its parent beat without writing that name", () => {
+    const node = createNode("scene", { id: "node_parent_99aabb", title: "" });
+    const parent = createGraph({ id: "g", name: "Root", nodes: [node], edges: [] });
+    const child = createGraph({
+      id: "c",
+      name: "",
+      parentGraphId: "g",
+      parentNodeId: node.id,
+      nodes: [],
+      edges: [],
+    });
+    const crumbs = graphBreadcrumbs({ g: parent, c: child }, "c");
+    expect(crumbs.map((crumb) => crumb.name)).toEqual(["Root", "Scene · 99aabb"]);
+    expect(child.name).toBe("");
+    expect(node.title).toBe("");
   });
 });
