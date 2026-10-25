@@ -1,8 +1,8 @@
 /** Document shape shared by every project file, graph file, and bundle. */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /** Older versions this app can still read. They are migrated on load. */
-export const READABLE_SCHEMA_VERSIONS = [1, 2] as const;
+export const READABLE_SCHEMA_VERSIONS = [1, 2, 3] as const;
 
 /**
  * Kinds the editor knows how to edit. `kind` is stored as a plain string so a
@@ -47,6 +47,8 @@ export interface TagCategory {
   name: string;
   /** Tags in this category can be picked as dialogue speakers. */
   isCharacters: boolean;
+  /** Tags in this category are places. The location view groups beats by them. */
+  isLocations: boolean;
   description: string;
   tags: Tag[];
 }
@@ -82,6 +84,8 @@ export interface StoryNode {
   sceneNotes: string;
   /** Another graph file, or null when this beat has no inner graph. */
   subgraphId: string | null;
+  /** Tags on this beat, including location tags. Order does not pick a primary place. */
+  tagIds: string[];
   lines: DialogueLine[];
 }
 

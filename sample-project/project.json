@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "proj_lantern_gate",
   "name": "The Lantern Gate",
   "createdAt": "2026-01-15T18:00:00.000Z",
@@ -52,6 +52,7 @@
       "id": "cat_characters",
       "name": "Characters",
       "isCharacters": true,
+      "isLocations": false,
       "description": "People who speak.",
       "tags": [
         {
@@ -72,6 +73,7 @@
       "id": "cat_locations",
       "name": "Locations",
       "isCharacters": false,
+      "isLocations": true,
       "description": "Places the story can name.",
       "tags": [
         {
@@ -98,6 +100,7 @@
       "id": "cat_items",
       "name": "Items",
       "isCharacters": false,
+      "isLocations": false,
       "description": "Things a character can carry or mention.",
       "tags": [
         {

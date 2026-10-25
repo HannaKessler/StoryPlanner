@@ -22,7 +22,7 @@ function BeatsOutline() {
   const deleteNodes = useProjectStore((state) => state.deleteNodes);
   if (!graph) return null;
   return (
-    <Section id="left:beats" title="Beats" count={graph.nodes.length} summary={graph.name} onContextMenu={menuHandler(() => addBeatItems(graph))}>
+    <Section id="left:beats" title="Beats" count={graph.nodes.length} summary={graph.name} onContextMenu={menuHandler(() => addBeatItems())}>
       <ul className="sp-beats">
         {graph.nodes.map((node) => {
           const active = selection?.kind === "node" && selection.id === node.id;
@@ -31,7 +31,7 @@ function BeatsOutline() {
               key={node.id}
               className={active ? "is-active" : ""}
               onContextMenu={menuHandler(() => [
-                ...addBeatItems(graph),
+                ...addBeatItems(),
                 "separator",
                 {
                   label: "Rename",
@@ -40,7 +40,7 @@ function BeatsOutline() {
                     focusRename(node.id);
                   },
                 },
-                ...(node.type === "start" ? [] : [{ label: "Delete", danger: true, onSelect: () => deleteNodes([node.id]) }]),
+                { label: "Delete", danger: true, onSelect: () => deleteNodes([node.id]) },
               ])}
             >
               <button type="button" className="sp-beat" onClick={() => select({ kind: "node", id: node.id })}>

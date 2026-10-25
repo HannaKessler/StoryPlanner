@@ -1,6 +1,6 @@
 import { describeCondition, evaluateCondition } from "./conditions";
 import { applyEffects, defaultValues, describeEffect } from "./effects";
-import { findEntryNode } from "./graphOps";
+import { startNodes } from "./graphOps";
 import type { GraphDocument, ProjectDocument, Scalar, StoryNode } from "./types";
 
 export interface PlayFrame {
@@ -13,6 +13,12 @@ export interface PlayState {
   values: Record<string, Scalar>;
   /** Titles of beats entered, in order. */
   log: string[];
+  /**
+   * When set, play is waiting for a start beat in this graph. One start is
+   * entered immediately. Several starts wait here. None waits here too, so the
+   * player can see that the graph has no start.
+   */
+  choosingGraphId: string | null;
 }
 
 export interface PlayAction {
@@ -31,14 +37,39 @@ export function createPlayState(
   project: ProjectDocument,
   graphs: Record<string, GraphDocument>,
 ): PlayState {
-  const root = graphs[project.rootGraphId];
-  const entry = root ? findEntryNode(root) : null;
   const values = defaultValues(project.variables);
-  if (!root || !entry) return { frames: [], values, log: [] };
+  const root = graphs[project.rootGraphId];
+  if (!root) return { frames: [], values, log: [], choosingGraphId: null };
+  return enterGraph({ frames: [], values, log: [], choosingGraphId: null }, root);
+}
+
+/** Enters the only start, or waits so the player can choose among several. */
+function enterGraph(state: PlayState, graph: GraphDocument): PlayState {
+  const starts = startNodes(graph);
+  if (starts.length !== 1) return { ...state, choosingGraphId: graph.id };
+  const entry = starts[0];
   return {
-    frames: [{ graphId: root.id, nodeId: entry.id }],
-    values,
-    log: [entry.title || "Untitled"],
+    ...state,
+    frames: [...state.frames, { graphId: graph.id, nodeId: entry.id }],
+    log: [...state.log, entry.title || "Untitled"],
+    choosingGraphId: null,
+  };
+}
+
+export function chooseStart(
+  state: PlayState,
+  graphs: Record<string, GraphDocument>,
+  nodeId: string,
+): PlayState {
+  if (!state.choosingGraphId) return state;
+  const graph = graphs[state.choosingGraphId];
+  const node = graph?.nodes.find((item) => item.id === nodeId && item.type === "start");
+  if (!graph || !node) return state;
+  return {
+    ...state,
+    frames: [...state.frames, { graphId: graph.id, nodeId: node.id }],
+    log: [...state.log, node.title || "Untitled"],
+    choosingGraphId: null,
   };
 }
 
@@ -125,13 +156,8 @@ export function performAction(
 
   if (fresh.kind === "enter" && node.subgraphId) {
     const child = graphs[node.subgraphId];
-    const entry = child ? findEntryNode(child) : null;
-    if (!child || !entry) return state;
-    return {
-      ...state,
-      frames: [...state.frames, { graphId: child.id, nodeId: entry.id }],
-      log: [...state.log, entry.title || "Untitled"],
-    };
+    if (!child) return state;
+    return enterGraph(state, child);
   }
 
   if (fresh.kind === "return") {
@@ -149,6 +175,7 @@ export function performAction(
       frames,
       values: applyEffects(state.values, edge.effects, project.variables),
       log: [...state.log, target.title || "Untitled"],
+      choosingGraphId: null,
     };
   }
 

@@ -28,7 +28,7 @@ import {
   slugify,
   type ProjectFs,
 } from "../domain/project";
-import { createPlayState, performAction, setPlayValue, type PlayAction, type PlayState } from "../domain/play";
+import { chooseStart, createPlayState, performAction, setPlayValue, type PlayAction, type PlayState } from "../domain/play";
 import { exportScreenplay } from "../domain/screenplay";
 import { stringifyDoc } from "../domain/schema";
 import { exportVoiceSheets } from "../domain/voices";
@@ -72,6 +72,7 @@ interface ProjectStore {
   projectPath: string | null;
   dirty: boolean;
   screen: Screen;
+  canvasMode: "graph" | "locations";
   currentGraphId: string | null;
   selection: Selection;
   exportOpen: boolean;
@@ -86,6 +87,7 @@ interface ProjectStore {
   init: () => void;
   dismissBanner: () => void;
   setScreen: (screen: Screen) => void;
+  setCanvasMode: (mode: "graph" | "locations") => void;
   setExportOpen: (open: boolean) => void;
   createNamedProject: (name: string) => Promise<void>;
   openFromDialog: () => Promise<void>;
@@ -137,6 +139,8 @@ interface ProjectStore {
   ensureCharacterCategory: () => string | null;
 
   restartPlay: () => void;
+  beginPlay: (nodeId: string) => void;
+  cancelStartChoice: () => void;
   performPlay: (action: PlayAction) => void;
   updatePlayValue: (variableId: string, value: Scalar) => void;
   exportText: (kind: ExportKind) => string;
@@ -224,6 +228,7 @@ function cleared(): Partial<ProjectStore> {
     projectPath: null,
     dirty: false,
     screen: "graph",
+    canvasMode: "graph",
     currentGraphId: null,
     selection: null,
     exportOpen: false,
@@ -239,6 +244,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   projectPath: null,
   dirty: false,
   screen: "graph",
+  canvasMode: "graph",
   currentGraphId: null,
   selection: null,
   exportOpen: false,
@@ -266,6 +272,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
         ? createPlayState(state.project, state.graphs)
         : state.play;
     set({ screen, play, exportOpen: false });
+  },
+
+  setCanvasMode(canvasMode) {
+    set({ canvasMode });
   },
 
   setExportOpen(open) {
@@ -435,10 +445,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const state = get();
     const graph = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
     if (!graph) return;
-    if (type === "start" && graph.nodes.some((node) => node.type === "start")) {
-      set({ banner: { tone: "error", text: "This graph already has a start." } });
-      return;
-    }
     const maxX = graph.nodes.reduce((max, node) => Math.max(max, node.position.x), 0);
     const node = createNode(type, { position: position ?? { x: maxX + 280, y: 140 + (graph.nodes.length % 4) * 48 } });
     withGraph((current) => ({ ...current, nodes: [...current.nodes, node] }));
@@ -491,7 +497,6 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const state = get();
     const graph = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
     if (!graph || !graph.nodes.some((node) => node.id === sourceId)) return;
-    if (type === "start" && graph.nodes.some((node) => node.type === "start")) return;
     const node = createNode(type, { position });
     const edge = createEdge(sourceId, node.id);
     withGraph((current) => ({ ...current, nodes: [...current.nodes, node], edges: [...current.edges, edge] }));
@@ -795,6 +800,18 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const state = get();
     if (!state.project) return;
     set({ play: createPlayState(state.project, state.graphs) });
+  },
+
+  beginPlay(nodeId) {
+    const state = get();
+    if (!state.play) return;
+    set({ play: chooseStart(state.play, state.graphs, nodeId) });
+  },
+
+  cancelStartChoice() {
+    const play = get().play;
+    if (!play?.choosingGraphId || play.frames.length === 0) return;
+    set({ play: { ...play, choosingGraphId: null } });
   },
 
   performPlay(action) {

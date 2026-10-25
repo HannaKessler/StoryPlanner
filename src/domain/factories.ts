@@ -40,6 +40,7 @@ export function createNode(type: StoryNodeType, partial: Partial<StoryNode> = {}
     summary: partial.summary ?? "",
     sceneNotes: partial.sceneNotes ?? "",
     subgraphId: partial.subgraphId ?? null,
+    tagIds: partial.tagIds ?? [],
     lines: partial.lines ?? [],
   };
 }
@@ -101,6 +102,7 @@ export function createCategory(partial: Partial<TagCategory> = {}): TagCategory 
     id: partial.id ?? createId(),
     name: partial.name ?? "New category",
     isCharacters: partial.isCharacters ?? false,
+    isLocations: partial.isLocations ?? false,
     description: partial.description ?? "",
     tags: partial.tags ?? [],
   };

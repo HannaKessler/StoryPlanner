@@ -177,10 +177,16 @@ function parseNode(value: unknown, path: string): StoryNode {
     summary: optionalString(value, "summary", path),
     sceneNotes: optionalString(value, "sceneNotes", path),
     subgraphId: typeof subgraph === "string" ? subgraph : null,
+    tagIds: parseTagIds(value.tagIds, child(path, "tagIds")),
     lines: asArray(value.lines ?? [], child(path, "lines")).map((item, index) =>
       parseLine(item, child(child(path, "lines"), index)),
     ),
   };
+}
+
+function parseTagIds(value: unknown, path: string): string[] {
+  if (value === undefined || value === null) return [];
+  return asArray(value, path).map((item, index) => asNonEmpty(item, child(path, index)));
 }
 
 function parseEdge(value: unknown, path: string): StoryEdge {
@@ -268,6 +274,10 @@ function parseCategory(value: unknown, path: string): TagCategory {
     name: asString(value.name, child(path, "name")),
     isCharacters: asBoolean(value.isCharacters, child(path, "isCharacters")),
     description: optionalString(value, "description", path),
+    isLocations:
+      "isLocations" in value && value.isLocations !== undefined
+        ? asBoolean(value.isLocations, child(path, "isLocations"))
+        : false,
     tags: asArray(value.tags ?? [], child(path, "tags")).map((item, index) =>
       parseTag(item, child(child(path, "tags"), index)),
     ),

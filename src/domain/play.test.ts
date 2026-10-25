@@ -1,9 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { availableActions, createPlayState, performAction, setPlayValue } from "./play";
+import { availableActions, chooseStart, createPlayState, performAction, setPlayValue } from "./play";
 import { buildSample } from "./sample";
 import type { PlayAction, PlayState } from "./play";
 
 const { project, graphs } = buildSample();
+
+function openPlay(): PlayState {
+  const state = createPlayState(project, graphs);
+  expect(state.choosingGraphId).toBe(project.rootGraphId);
+  return chooseStart(state, graphs, "node_root_start");
+}
 
 function take(state: PlayState, label: string): PlayState {
   const action = availableActions(state, project, graphs).find((item) => item.label === label && item.enabled);
@@ -19,7 +25,7 @@ function labels(state: PlayState, enabledOnly = false): string[] {
 
 describe("play-through", () => {
   it("disables the token transition until hasToken is set, and spends gold on a bribe", () => {
-    let state = createPlayState(project, graphs);
+    let state = openPlay();
     state = take(state, "Approach the gate");
     expect(labels(state)).toContain("Step in");
     expect(labels(state, true)).toContain("Leave");
@@ -52,7 +58,7 @@ describe("play-through", () => {
   });
 
   it("does not follow a transition whose condition fails", () => {
-    let state = createPlayState(project, graphs);
+    let state = openPlay();
     state = take(state, "Approach the gate");
     state = take(state, "Step in");
     state = take(state, "At the gate");
@@ -66,7 +72,7 @@ describe("play-through", () => {
 
 describe("transition actions", () => {
   it("describes the target, the condition, and the effects of each outgoing transition", () => {
-    let state = createPlayState(project, graphs);
+    let state = openPlay();
     state = take(state, "Approach the gate");
     state = take(state, "Step in");
     state = take(state, "At the gate");
@@ -75,5 +81,42 @@ describe("transition actions", () => {
     expect(coin?.target).toBe("The bribe");
     expect(coin?.condition).toContain("gold ≥ 1");
     expect(coin?.effects).toContain("subtract 1 from gold");
+  });
+});
+
+describe("choosing a start", () => {
+  it("waits when the root has several starts, then enters the one that was picked", () => {
+    const waiting = createPlayState(project, graphs);
+    expect(waiting.frames).toEqual([]);
+    expect(waiting.choosingGraphId).toBe("graph_root");
+    const hill = chooseStart(waiting, graphs, "node_root_hill");
+    expect(hill.choosingGraphId).toBeNull();
+    expect(hill.log).toEqual(["From the hill"]);
+    const next = take(hill, "Word of the gate");
+    expect(next.log.at(-1)).toBe("Word of the gate");
+    expect(labels(next, true)).toContain("Come up to the gate");
+  });
+
+  it("enters the only start without asking", () => {
+    const approach = graphs.graph_approach;
+    const state = createPlayState(
+      { ...project, rootGraphId: approach.id },
+      graphs,
+    );
+    expect(state.choosingGraphId).toBeNull();
+    expect(state.frames).toEqual([{ graphId: approach.id, nodeId: "node_ap_start" }]);
+  });
+
+  it("stops to warn when a graph has no start", () => {
+    const bare = {
+      ...graphs.graph_root,
+      id: "graph_bare",
+      nodes: graphs.graph_root.nodes.filter((node) => node.type !== "start"),
+      edges: [],
+    };
+    const state = createPlayState({ ...project, rootGraphId: bare.id }, { ...graphs, [bare.id]: bare });
+    expect(state.frames).toEqual([]);
+    expect(state.choosingGraphId).toBe(bare.id);
+    expect(chooseStart(state, { ...graphs, [bare.id]: bare }, "node_root_approach").frames).toEqual([]);
   });
 });

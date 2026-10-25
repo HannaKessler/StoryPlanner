@@ -57,7 +57,8 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
   const child = node.subgraphId ? graphs[node.subgraphId] : undefined;
   const content = node.type === "event" || node.type === "scene" || node.type === "dialogue";
   const outgoing = graph.edges.filter((edge) => edge.source === node.id);
-  const targets = graph.nodes.filter((item) => item.id !== node.id && item.type !== "start");
+  const targets = graph.nodes.filter((item) => item.id !== node.id);
+  const locationTags = project.tagCategories.filter((category) => category.isLocations).flatMap((category) => category.tags);
   const addTransitionItems = (): MenuItem[] =>
     targets.length === 0
       ? [{ label: "Add transition", disabled: true, onSelect: () => undefined }]
@@ -73,12 +74,35 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
             + inner
           </button>
         )}
-        {node.type !== "start" && (
-          <IconButton label="Delete beat" danger onClick={() => deleteNodes([node.id])}>
-            ×
-          </IconButton>
-        )}
+        <IconButton label="Delete beat" danger onClick={() => deleteNodes([node.id])}>
+          ×
+        </IconButton>
       </div>
+
+      {locationTags.length > 0 && (
+        <Section id="insp:location" title="Location">
+          <div className="sp-loc-picks">
+            {locationTags.map((tag) => {
+              const on = node.tagIds.includes(tag.id);
+              return (
+                <button
+                  key={tag.id}
+                  type="button"
+                  className={on ? "sp-chip-btn is-on" : "sp-chip-btn"}
+                  aria-pressed={on}
+                  onClick={() =>
+                    updateNode(node.id, {
+                      tagIds: on ? node.tagIds.filter((id) => id !== tag.id) : [...node.tagIds, tag.id],
+                    })
+                  }
+                >
+                  {tag.name}
+                </button>
+              );
+            })}
+          </div>
+        </Section>
+      )}
 
       {content && child && (
         <div className="sp-inner-row" title="Inner graph">
@@ -92,8 +116,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
         </div>
       )}
 
-      {node.type !== "start" && (
-        <Section id="insp:notes" title="Notes" summary={node.summary || node.sceneNotes}>
+      <Section id="insp:notes" title="Notes" summary={node.summary || node.sceneNotes}>
           <textarea
             className="sp-cell sp-area"
             rows={2}
@@ -113,7 +136,6 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
             />
           )}
         </Section>
-      )}
 
       {node.type === "dialogue" && (
         <Section
@@ -284,9 +306,7 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
             value={edge.target}
             onChange={(event) => event.target.value !== edge.source && updateEdge(edge.id, { target: event.target.value })}
           >
-            {graph.nodes
-              .filter((item) => item.type !== "start")
-              .map((item) => (
+            {graph.nodes.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.title || "Untitled"}
                 </option>

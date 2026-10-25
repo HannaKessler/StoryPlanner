@@ -73,6 +73,15 @@ function CategoryBlock({ category }: { category: TagCategory }) {
         >
           speakers
         </button>
+        <button
+          type="button"
+          className={category.isLocations ? "sp-flag is-on" : "sp-flag"}
+          title="Tags here are places"
+          aria-pressed={category.isLocations}
+          onClick={() => updateCategory(category.id, { isLocations: !category.isLocations })}
+        >
+          locations
+        </button>
         <span className="sp-sec-count">{category.tags.length}</span>
         <IconButton label={`Delete category ${category.name}`} danger onClick={() => deleteCategory(category.id)}>
           ×

@@ -13,8 +13,8 @@ describe("schema", () => {
 
   it("rejects a newer schema version", () => {
     const { project } = buildSample();
-    expect(() => parseProject({ ...project, schemaVersion: 3 })).toThrow(SchemaError);
-    expect(() => parseProject({ ...project, schemaVersion: 3 })).toThrow(/schemaVersion 3/);
+    expect(() => parseProject({ ...project, schemaVersion: 4 })).toThrow(SchemaError);
+    expect(() => parseProject({ ...project, schemaVersion: 4 })).toThrow(/schemaVersion 4/);
   });
 
   it("migrates a version 1 graph: choices and on-enter effects move onto edges", () => {
@@ -65,8 +65,9 @@ describe("schema", () => {
       ],
     };
     const graph = parseGraph(v1);
-    expect(graph.schemaVersion).toBe(2);
+    expect(graph.schemaVersion).toBe(3);
     expect(graph.nodes[0]).not.toHaveProperty("choices");
+    expect(graph.nodes[0]).toMatchObject({ tagIds: [] });
     expect(graph.nodes[1]).not.toHaveProperty("effects");
     expect(graph.edges).toEqual([
       {
@@ -88,7 +89,27 @@ describe("schema", () => {
         ],
       },
     ]);
-    expect(parseProject({ ...buildSample().project, schemaVersion: 1 }).schemaVersion).toBe(2);
+    expect(parseProject({ ...buildSample().project, schemaVersion: 1 }).schemaVersion).toBe(3);
+  });
+
+  it("migrates a version 2 graph: beats gain tag ids and categories gain the locations flag", () => {
+    const { project, graphs } = buildSample();
+    const category = { ...project.tagCategories[1] };
+    delete (category as { isLocations?: boolean }).isLocations;
+    const node = { ...graphs.graph_root.nodes[0] };
+    delete (node as { tagIds?: string[] }).tagIds;
+    const parsedProject = parseProject({ ...project, schemaVersion: 2, tagCategories: [category] });
+    expect(parsedProject.schemaVersion).toBe(3);
+    expect(parsedProject.tagCategories[0].isLocations).toBe(false);
+    const parsedGraph = parseGraph({
+      ...graphs.graph_root,
+      schemaVersion: 2,
+      nodes: [node],
+      edges: [],
+    });
+    expect(parsedGraph.schemaVersion).toBe(3);
+    expect(parsedGraph.nodes[0].tagIds).toEqual([]);
+    expect(parsedGraph.nodes[0].id).toBe(node.id);
   });
 
   it("preserves an unknown variable kind", () => {

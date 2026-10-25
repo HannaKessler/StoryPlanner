@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "graph_inside",
   "name": "Within the walls",
   "parentGraphId": "graph_root",
@@ -7,6 +7,9 @@
   "sceneNotes": "Beyond the gate.",
   "nodes": [
     {
+      "tagIds": [
+        "tag_loc_inside"
+      ],
       "id": "node_in_start",
       "type": "start",
       "position": {
@@ -20,6 +23,9 @@
       "lines": []
     },
     {
+      "tagIds": [
+        "tag_loc_inside"
+      ],
       "id": "node_in_court",
       "type": "dialogue",
       "position": {
@@ -40,6 +46,9 @@
       ]
     },
     {
+      "tagIds": [
+        "tag_loc_inside"
+      ],
       "id": "node_in_end",
       "type": "end",
       "position": {

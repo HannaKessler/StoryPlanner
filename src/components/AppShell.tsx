@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { addableNodeTypes, graphBreadcrumbs } from "../domain/graphOps";
+import { addableNodeTypes, graphBreadcrumbs, graphWarning } from "../domain/graphOps";
 import { NODE_LABEL } from "../domain/labels";
 import { SCHEMA_VERSION } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
@@ -21,6 +21,8 @@ export function AppShell() {
   const pendingClose = useProjectStore((state) => state.pendingClose);
   const exportOpen = useProjectStore((state) => state.exportOpen);
   const busy = useProjectStore((state) => state.busy);
+  const canvasMode = useProjectStore((state) => state.canvasMode);
+  const setCanvasMode = useProjectStore((state) => state.setCanvasMode);
   const setScreen = useProjectStore((state) => state.setScreen);
   const renameProject = useProjectStore((state) => state.renameProject);
   const openGraph = useProjectStore((state) => state.openGraph);
@@ -118,7 +120,15 @@ export function AppShell() {
                 ))}
               </nav>
               <div className="sp-toolbar">
-                {addableNodeTypes(graph).map((type) => (
+                <button
+                  type="button"
+                  className={canvasMode === "locations" ? "sp-chip-btn is-on" : "sp-chip-btn"}
+                  aria-pressed={canvasMode === "locations"}
+                  onClick={() => setCanvasMode(canvasMode === "locations" ? "graph" : "locations")}
+                >
+                  Locations
+                </button>
+                {addableNodeTypes().map((type) => (
                   <button key={type} type="button" className="sp-chip-btn" onClick={() => addNode(type)}>
                     + {NODE_LABEL[type]}
                   </button>
@@ -137,7 +147,13 @@ export function AppShell() {
       <footer className="sp-status">
         <span className="sp-status-path">{path}</span>
         <span>
-          {graph ? `${graph.nodes.length} beats · ${graph.edges.length} transitions (${graph.edges.filter((edge) => edge.condition).length} conditional) · ` : ""}
+          {graph && (
+            <>
+              {`${graph.nodes.length} beats · ${graph.edges.length} transitions (${graph.edges.filter((edge) => edge.condition).length} conditional)`}
+              {graphWarning(graph) && <span className="sp-warn"> · {graphWarning(graph)}</span>}
+              {" · "}
+            </>
+          )}
           {project.variables.length} variables · schema v{SCHEMA_VERSION}
         </span>
       </footer>

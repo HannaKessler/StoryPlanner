@@ -10,12 +10,15 @@ import {
   useEdgesState,
   useNodesState,
   useReactFlow,
+  type Node,
   type NodeChange,
   type EdgeChange,
+  type NodeProps,
 } from "@xyflow/react";
 import { describeCondition } from "../domain/conditions";
 import { parallelOffset } from "../domain/edgeGeometry";
 import { describeEffect } from "../domain/effects";
+import { LOCATION_LANE_WIDTH, locationLaneFrame, locationPlacement } from "../domain/locations";
 import type { GraphDocument, ProjectDocument } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { useContextMenu } from "./ContextMenu";
@@ -23,21 +26,37 @@ import { addBeatItems, connectBeatItems, edgeItems } from "./menuItems";
 import { StoryNodeCard, type StoryFlowNode } from "./StoryNodeCard";
 import { TransitionEdge, type TransitionFlowEdge } from "./TransitionEdge";
 
-const nodeTypes = { story: StoryNodeCard };
+type LaneNode = Node<{ name: string }, "lane">;
+type CanvasNode = StoryFlowNode | LaneNode;
+
+const nodeTypes = { story: StoryNodeCard, lane: LaneLabel };
 const edgeTypes = { transition: TransitionEdge };
 
 export function GraphCanvas() {
   const graph = useProjectStore((state) => (state.currentGraphId ? state.graphs[state.currentGraphId] : null));
   const project = useProjectStore((state) => state.project);
+  const mode = useProjectStore((state) => state.canvasMode);
   if (!graph || !project) return null;
   return (
     <ReactFlowProvider>
-      <CanvasBody key={graph.id} graph={graph} project={project} />
+      <CanvasBody key={`${graph.id}:${mode}`} graph={graph} project={project} mode={mode} />
     </ReactFlowProvider>
   );
 }
 
-function CanvasBody({ graph, project }: { graph: GraphDocument; project: ProjectDocument }) {
+function LaneLabel({ data }: NodeProps<LaneNode>) {
+  return <div className="sp-lane-title">{data.name}</div>;
+}
+
+function CanvasBody({
+  graph,
+  project,
+  mode,
+}: {
+  graph: GraphDocument;
+  project: ProjectDocument;
+  mode: "graph" | "locations";
+}) {
   const selection = useProjectStore((state) => state.selection);
   const select = useProjectStore((state) => state.select);
   const connectNodes = useProjectStore((state) => state.connectNodes);
@@ -47,14 +66,16 @@ function CanvasBody({ graph, project }: { graph: GraphDocument; project: Project
   const { fitView, screenToFlowPosition } = useReactFlow();
   const openMenu = useContextMenu((state) => state.open);
   const closeMenu = useContextMenu((state) => state.close);
+  const arranging = mode === "locations";
 
   const onPaneMenu = (event: ReactMouseEvent | MouseEvent) => {
     event.preventDefault();
+    if (arranging) return;
     const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-    openMenu(event.clientX, event.clientY, addBeatItems(graph, position));
+    openMenu(event.clientX, event.clientY, addBeatItems(position));
   };
 
-  const [nodes, setNodes] = useNodesState(toNodes(graph));
+  const [nodes, setNodes] = useNodesState<CanvasNode>(toNodes(graph, project, mode));
   const [edges, setEdges] = useEdgesState(toEdges(graph, project));
 
   const signature = useMemo(
@@ -64,14 +85,15 @@ function CanvasBody({ graph, project }: { graph: GraphDocument; project: Project
         edges: graph.edges,
         variables: project.variables,
         tags: project.tagCategories,
+        mode,
       }),
-    [graph, project],
+    [graph, project, mode],
   );
 
   useEffect(() => {
     const frame = window.setTimeout(() => fitView({ padding: 0.08, duration: 180 }), 40);
     return () => window.clearTimeout(frame);
-  }, [graph.id, fitView]);
+  }, [graph.id, mode, fitView]);
 
   useEffect(() => {
     const pane = document.querySelector(".sp-canvas .react-flow__renderer");
@@ -87,12 +109,14 @@ function CanvasBody({ graph, project }: { graph: GraphDocument; project: Project
   }, []);
 
   useEffect(() => {
-    setNodes((current) =>
-      toNodes(graph).map((node) => {
+    setNodes((current) => {
+      const next = toNodes(graph, project, mode);
+      if (mode === "locations") return next;
+      return next.map((node) => {
         const previous = current.find((item) => item.id === node.id);
         return previous ? { ...node, position: previous.position } : node;
-      }),
-    );
+      });
+    });
     setEdges(toEdges(graph, project));
     // Signature tracks content other than drag position.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -102,7 +126,7 @@ function CanvasBody({ graph, project }: { graph: GraphDocument; project: Project
     setNodes((current) =>
       current.map((node) => ({
         ...node,
-        selected: selection?.kind === "node" && selection.id === node.id,
+        selected: node.type === "story" && selection?.kind === "node" && selection.id === node.id,
       })),
     );
     setEdges((current) =>
@@ -113,8 +137,9 @@ function CanvasBody({ graph, project }: { graph: GraphDocument; project: Project
     );
   }, [selection, setNodes, setEdges]);
 
-  const onNodesChange = (changes: NodeChange<StoryFlowNode>[]) => {
-    setNodes((current) => applyNodeChanges(changes, current));
+  const onNodesChange = (changes: NodeChange<CanvasNode>[]) => {
+    const next = arranging ? changes.filter((change) => change.type !== "position") : changes;
+    setNodes((current) => applyNodeChanges(next, current));
   };
   const onEdgesChange = (changes: EdgeChange<TransitionFlowEdge>[]) => {
     setEdges((current) => applyEdgeChanges(changes, current));
@@ -130,17 +155,20 @@ function CanvasBody({ graph, project }: { graph: GraphDocument; project: Project
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={(connection) => {
-          if (!connection.source || !connection.target) return;
+          if (!connection.source || !connection.target || connection.source.startsWith("lane:")) return;
           connectNodes(connection.source, connection.target);
         }}
         onConnectEnd={(event, connection) => {
-          if (!connection.fromNode || connection.toNode || droppedOnNode(event)) return;
+          if (arranging || !connection.fromNode || connection.toNode || droppedOnNode(event)) return;
           const point = "changedTouches" in event ? event.changedTouches[0] : event;
           if (!point) return;
           const position = screenToFlowPosition({ x: point.clientX, y: point.clientY });
           openMenu(point.clientX, point.clientY, connectBeatItems(connection.fromNode.id, position));
         }}
-        onNodeClick={(_, node) => select({ kind: "node", id: node.id })}
+        onNodeClick={(_, node) => {
+          if (node.type !== "story") return;
+          select({ kind: "node", id: node.id });
+        }}
         onEdgeClick={(_, edge) => select({ kind: "edge", id: edge.id })}
         onEdgeContextMenu={(event, edge) => {
           event.preventDefault();
@@ -151,9 +179,13 @@ function CanvasBody({ graph, project }: { graph: GraphDocument; project: Project
         onPaneClick={() => select(null)}
         onPaneContextMenu={onPaneMenu}
         onMoveStart={closeMenu}
-        onNodeDragStop={(_, node) => updateNodePosition(node.id, node.position)}
-        onNodesDelete={(deleted) => deleteNodes(deleted.map((node) => node.id))}
+        onNodeDragStop={(_, node) => {
+          if (arranging || node.type !== "story") return;
+          updateNodePosition(node.id, node.position);
+        }}
+        onNodesDelete={(deleted) => deleteNodes(deleted.filter((node) => node.type === "story").map((node) => node.id))}
         onEdgesDelete={(deleted) => deleteEdges(deleted.map((edge) => edge.id))}
+        nodesDraggable={!arranging}
         connectionRadius={90}
         deleteKeyCode={["Backspace", "Delete"]}
         colorMode="dark"
@@ -173,13 +205,36 @@ function droppedOnNode(event: MouseEvent | TouchEvent): boolean {
   return document.elementsFromPoint(point.clientX, point.clientY).some((element) => element.closest(".react-flow__node"));
 }
 
-function toNodes(graph: GraphDocument): StoryFlowNode[] {
-  return graph.nodes.map((story) => ({
+function toNodes(graph: GraphDocument, project: ProjectDocument, mode: "graph" | "locations"): CanvasNode[] {
+  if (mode === "graph") {
+    return graph.nodes.map((story) => ({
+      id: story.id,
+      type: "story",
+      position: story.position,
+      data: { story },
+    }));
+  }
+  const placed = locationPlacement(graph, project);
+  const lanes: LaneNode[] = locationLaneFrame(graph, project).map((lane) => ({
+    id: `lane:${lane.id}`,
+    type: "lane",
+    position: { x: lane.x, y: 0 },
+    data: { name: lane.name },
+    style: { width: LOCATION_LANE_WIDTH, height: lane.height },
+    selectable: false,
+    draggable: false,
+    connectable: false,
+    focusable: false,
+  }));
+  const stories: StoryFlowNode[] = graph.nodes.map((story) => ({
     id: story.id,
     type: "story",
-    position: story.position,
+    position: placed.get(story.id) ?? story.position,
     data: { story },
+    draggable: false,
+    zIndex: 1,
   }));
+  return [...lanes, ...stories];
 }
 
 function toEdges(graph: GraphDocument, project: ProjectDocument): TransitionFlowEdge[] {

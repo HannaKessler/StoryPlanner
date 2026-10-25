@@ -1,7 +1,7 @@
 import { describeCondition } from "./conditions";
 import { describeEffect } from "./effects";
 import { speakerName } from "./format";
-import { findEntryNode } from "./graphOps";
+import { startNodes } from "./graphOps";
 import type { GraphDocument, ProjectDocument, StoryEdge, StoryNode } from "./types";
 
 const TYPE_LABEL: Record<StoryNode["type"], string> = {
@@ -47,11 +47,10 @@ function writeGraph(
   if (graph.sceneNotes.trim()) {
     lines.push(...quote(graph.sceneNotes), "");
   }
-  const entry = findEntryNode(graph);
-  if (entry) writeNode(graph, entry, level, lines, seen, project, graphs);
+  for (const entry of startNodes(graph)) writeNode(graph, entry, level, lines, seen, project, graphs);
   for (const node of graph.nodes) {
     if (!seen.has(key(graph, node))) {
-      lines.push("_Not reachable from the start of this graph._", "");
+      lines.push("_Not reachable from a start of this graph._", "");
       writeNode(graph, node, level, lines, seen, project, graphs);
     }
   }
@@ -73,6 +72,7 @@ function writeNode(
   }
   seen.add(id);
   if (node.type === "start") {
+    lines.push(heading(level, node.title || "Start"), "");
     writeExits(graph, node, level, lines, seen, project, graphs);
     return;
   }

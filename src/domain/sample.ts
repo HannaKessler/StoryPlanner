@@ -24,8 +24,8 @@ function effect(
   return { id, variableId, op, value };
 }
 
-function node(partial: StoryNode): StoryNode {
-  return partial;
+function node(partial: Omit<StoryNode, "tagIds"> & { tagIds?: string[] }): StoryNode {
+  return { tagIds: [], ...partial };
 }
 
 /** The bundled sample story. Fixed ids so the folder on disk can match this builder. */
@@ -110,6 +110,7 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
         id: "cat_characters",
         name: "Characters",
         isCharacters: true,
+        isLocations: false,
         description: "People who speak.",
         tags: [
           { id: "tag_traveler", name: "Traveler", description: "The player character.", color: "#e3a15a" },
@@ -120,6 +121,7 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
         id: "cat_locations",
         name: "Locations",
         isCharacters: false,
+        isLocations: true,
         description: "Places the story can name.",
         tags: [
           { id: "tag_loc_gate", name: "The Lantern Gate", description: "", color: "#9cba92" },
@@ -131,6 +133,7 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
         id: "cat_items",
         name: "Items",
         isCharacters: false,
+        isLocations: false,
         description: "Things a character can carry or mention.",
         tags: [{ id: "tag_item_token", name: "Lantern Token", description: "Older than the lock.", color: "#e3a15a" }],
       },
@@ -195,6 +198,26 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
         subgraphId: null,
         lines: [],
       }),
+      node({
+        id: "node_root_hill",
+        type: "start",
+        position: { x: 40, y: 560 },
+        title: "From the hill",
+        summary: "",
+        sceneNotes: "",
+        subgraphId: null,
+        lines: [],
+      }),
+      node({
+        id: "node_root_word",
+        type: "event",
+        position: { x: 320, y: 540 },
+        title: "Word of the gate",
+        summary: "A traveler on the old road hears that the gate is shut.",
+        sceneNotes: "The lanterns thin out. Someone ahead is walking up.",
+        subgraphId: null,
+        lines: [],
+      }),
     ],
     edges: [
       {
@@ -227,6 +250,22 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
         target: "node_root_turned",
         label: "Leave",
         condition: turnedAway,
+        effects: [],
+      },
+      {
+        id: "edge_root_hill",
+        source: "node_root_hill",
+        target: "node_root_word",
+        label: "",
+        condition: null,
+        effects: [],
+      },
+      {
+        id: "edge_root_word",
+        source: "node_root_word",
+        target: "node_root_approach",
+        label: "Come up to the gate",
+        condition: null,
         effects: [],
       },
     ],
@@ -547,12 +586,38 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
     ],
   };
 
+  const locations: Record<string, string[]> = {
+    node_root_start: ["tag_loc_gate"],
+    node_root_approach: ["tag_loc_gate"],
+    node_root_inside: ["tag_loc_inside"],
+    node_root_road: ["tag_loc_road"],
+    node_root_turned: ["tag_loc_gate", "tag_loc_road"],
+    node_root_hill: ["tag_loc_road"],
+    node_root_word: ["tag_loc_road"],
+    node_ap_start: ["tag_loc_gate"],
+    node_ap_gate: ["tag_loc_gate"],
+    node_ap_token: ["tag_loc_gate"],
+    node_ap_bribe: ["tag_loc_gate"],
+    node_ap_downhill: ["tag_loc_road"],
+    node_ap_cross: ["tag_loc_gate"],
+    node_ap_end_granted: ["tag_loc_inside"],
+    node_ap_end_road: ["tag_loc_road"],
+    node_ap_end_back: ["tag_loc_gate"],
+    node_in_start: ["tag_loc_inside"],
+    node_in_court: ["tag_loc_inside"],
+    node_in_end: ["tag_loc_inside"],
+  };
+  const place = (graph: GraphDocument): GraphDocument => ({
+    ...graph,
+    nodes: graph.nodes.map((item) => ({ ...item, tagIds: locations[item.id] ?? [] })),
+  });
+
   return {
     project,
     graphs: {
-      [root.id]: root,
-      [approach.id]: approach,
-      [inside.id]: inside,
+      [root.id]: place(root),
+      [approach.id]: place(approach),
+      [inside.id]: place(inside),
     },
   };
 }

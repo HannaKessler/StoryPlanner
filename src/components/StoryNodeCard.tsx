@@ -32,7 +32,7 @@ export function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
         if (canOpen) openSubgraph(story.id);
       }}
     >
-      {story.type !== "start" && <Handle type="target" position={Position.Left} id="in" />}
+      <Handle type="target" position={Position.Left} id="in" />
       <header>
         <span>{NODE_LABEL[story.type]}</span>
         {story.subgraphId && <em>Nested</em>}

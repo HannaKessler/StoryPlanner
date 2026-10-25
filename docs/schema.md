@@ -1,6 +1,6 @@
 # StoryPlanner project schema
 
-Version **2**. Every project file, graph file, and bundled export carries `schemaVersion`. This app writes version 2 and still reads version 1 (see [Version 1 files](#version-1-files)). A higher number means the file was written by a newer StoryPlanner; do not guess at fields you do not know.
+Version **3**. Every project file, graph file, and bundled export carries `schemaVersion`. This app writes version 3 and still reads versions 1 and 2 (see [Older files](#older-files)). A higher number means the file was written by a newer StoryPlanner; do not guess at fields you do not know.
 
 The story model works like a state machine (think of Unity’s Animator). **Nodes are states**: events, scenes, and dialogue that hold content. **Edges are transitions**: all branching lives on them. Each transition has its own condition on global variables and its own variable effects. Any node can own an inner graph, which works like a sub-state machine. Nodes never contain choices.
 
@@ -26,7 +26,7 @@ There is no depth limit. A node points at an inner graph with `subgraphId`. That
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "proj_lantern_gate",
   "name": "The Lantern Gate",
   "createdAt": "2026-01-15T18:00:00.000Z",
@@ -39,7 +39,7 @@ There is no depth limit. A node points at an inner graph with `subgraphId`. That
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| schemaVersion | number | `2` |
+| schemaVersion | number | `3` |
 | id | string | Stable project id |
 | name | string | Display name |
 | createdAt, updatedAt | string | ISO-8601 timestamps |
@@ -81,6 +81,7 @@ There are no enums and no nested types.
   "id": "cat_characters",
   "name": "Characters",
   "isCharacters": true,
+  "isLocations": false,
   "description": "People who speak.",
   "tags": [
     { "id": "tag_traveler", "name": "Traveler", "description": "", "color": "#e3a15a" }
@@ -88,7 +89,11 @@ There are no enums and no nested types.
 }
 ```
 
-`isCharacters` marks a category whose tags may be chosen as dialogue speakers. A project may mark more than one category. Tags are not global ids across categories; a speaker stores the tag id.
+`isCharacters` marks a category whose tags may be chosen as dialogue speakers. `isLocations` marks a category whose tags are places. A project may mark more than one category for either role. Tags are not global ids across categories; a speaker or a beat stores the tag id.
+
+```json
+{ "id": "cat_locations", "name": "Locations", "isCharacters": false, "isLocations": true, "description": "", "tags": [] }
+```
 
 `color` is a display hint (`#rrggbb`).
 
@@ -96,7 +101,7 @@ There are no enums and no nested types.
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "graph_approach",
   "name": "At the gate",
   "parentGraphId": "graph_root",
@@ -120,6 +125,7 @@ The root graph uses `null` for both parent fields. `sceneNotes` on a graph cover
   "summary": "",
   "sceneNotes": "The gatekeeper does not open the shutter at first.",
   "subgraphId": null,
+  "tagIds": ["tag_loc_gate"],
   "lines": []
 }
 ```
@@ -128,13 +134,17 @@ The root graph uses `null` for both parent fields. `sceneNotes` on a graph cover
 
 | Type | Role |
 | --- | --- |
-| start | Entry of this graph. Play begins here. One per graph is the normal case |
+| start | An entry of this graph. A graph may have several, and may have none. Play begins at one of them |
 | event | A high-level beat. Often owns a subgraph |
 | scene | A place and time, with scene notes. May own a subgraph |
 | dialogue | Ordered spoken lines |
 | end | Stops this branch |
 
-`position` is the editor canvas point in pixels. Add-ons can ignore it.
+Start is an ordinary beat. It can be added, deleted, and connected like any other type. A file with no start node, or with several, is valid. The editor warns when the graph currently open has none.
+
+`position` is the editor’s graph-view point in pixels. Other views, including the location columns, must not write it. Add-ons can ignore it.
+
+`tagIds` lists tags on the beat. Location tags are the ones whose category has `isLocations: true`. A beat may carry more than one. The location view draws the beat once, in the column of the earliest of those tags in project order (category order, then tag order). Tags that are not places stay on the beat and do not make a column.
 
 `subgraphId` is another graph id, or `null`. Opening that graph is how a writer drills in. Any node may own one. Nesting is unlimited.
 
@@ -189,9 +199,9 @@ A player choice is a labelled transition. The label is the text of the option, t
 
 ### Moving through a graph
 
-- Play starts at the root graph’s entry node. That is the `start` node, or else the first node with no incoming edge.
+- Play starts at a `start` node of the root graph. One start is entered immediately. Several starts wait until one is chosen. No start means play does not begin; that is a warning, not an invalid file.
 - From the current node, every outgoing edge whose condition passes can be followed. Following it runs its `effects`, then enters `target`.
-- If the current node has a `subgraphId`, play can enter that graph at its entry node. From inside, play can return to the parent node and continue with the parent’s outgoing transitions. Returning runs no effects.
+- If the current node has a `subgraphId`, play can enter that graph at one of its `start` nodes, choosing when there is more than one. From inside, play can return to the parent node and continue with the parent’s outgoing transitions. Returning runs no effects.
 - An `end` node, or a node with no open transition, ends that branch.
 
 ## Conditions
@@ -240,7 +250,7 @@ Export → Bundled JSON writes one document:
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "kind": "storyplanner.bundle",
   "exportedAt": "2026-04-01T00:00:00.000Z",
   "project": {},
@@ -256,7 +266,7 @@ Play-through state (current beat, live variable values, the path taken) is runti
 
 Derived exports in this version are Markdown:
 
-- **Screenplay** walks from each graph’s start, writes scene notes as block quotes, and spells each transition’s condition and effects in words. The first visit to a beat is written in full. Later visits say `→ Continues at **Title**.`
+- **Screenplay** walks from each of a graph’s start nodes, writes scene notes as block quotes, and spells each transition’s condition and effects in words. The first visit to a beat is written in full. Later visits say `→ Continues at **Title**.` A beat that no start reaches is marked not reachable.
 - **Voice sheets** list, per character category (`isCharacters`), only that character’s lines. Each line is preceded by the italic line or lines it directly answers. The previous line in the same node is the single answer. The first line of a node answers the last spoken line of each way in, and a line inside a nested graph can answer the last line before that graph was entered. When the transition into the node has a label, the sheet names it after the cue. Scene notes are included above the line.
 
 ## Adding a variable kind later
@@ -265,12 +275,23 @@ Derived exports in this version are Markdown:
 2. Teach the editor and the evaluator the new kind.
 3. Leave `schemaVersion` as it is if no existing field changes meaning. Bump it when a consumer would misread old files.
 
-## Version 1 files
+## Older files
 
-Version 1 kept player choices (`choices`) and on-enter `effects` on nodes, and edges had a `choiceId`. Version 2 moved all of that onto edges. StoryPlanner migrates a version 1 graph when it loads it, and writes version 2 on the next save:
+### Version 2
+
+Version 2 is the state-machine file described above, without `tagIds` on nodes and without `isLocations` on categories. StoryPlanner fills those in on load and writes version 3 on the next save:
+
+- A node with no `tagIds` gets `[]`.
+- A category with no `isLocations` gets `false`.
+
+Start nodes already in the file stay as they are. Several starts are allowed; nothing in the file is rewritten to enforce a single start.
+
+### Version 1
+
+Version 1 kept player choices (`choices`) and on-enter `effects` on nodes, and edges had a `choiceId`. Version 2 moved all of that onto edges. StoryPlanner migrates a version 1 graph when it loads it, applies the version 2 defaults above, and writes version 3 on the next save:
 
 - An edge whose `choiceId` names a choice on its source node takes the choice’s label (unless the edge had its own), the choice’s condition joined with the edge’s condition by `and`, and the choice’s effects.
 - A node’s on-enter effects are appended to every incoming edge in the same graph. Their ids are prefixed with the edge id so they stay unique.
 - A choice with no edge, and on-enter effects of a node with no incoming edge, have nowhere to go and are dropped.
 
-Add-ons only need to read version 2. Re-save older projects in StoryPlanner first.
+Add-ons only need to read version 3. Re-save older projects in StoryPlanner first.

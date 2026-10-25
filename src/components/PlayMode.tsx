@@ -1,4 +1,5 @@
 import { formatValue, speakerName } from "../domain/format";
+import { startNodes } from "../domain/graphOps";
 import { availableActions, playLocation, type PlayAction } from "../domain/play";
 import { useProjectStore } from "../store/projectStore";
 
@@ -11,8 +12,12 @@ export function PlayMode() {
   const performPlay = useProjectStore((state) => state.performPlay);
   const updatePlayValue = useProjectStore((state) => state.updatePlayValue);
   const restartPlay = useProjectStore((state) => state.restartPlay);
+  const beginPlay = useProjectStore((state) => state.beginPlay);
+  const cancelStartChoice = useProjectStore((state) => state.cancelStartChoice);
   if (!project || !play) return null;
-  const location = playLocation(play, graphs);
+  const choosing = play.choosingGraphId ? graphs[play.choosingGraphId] : null;
+  const starts = choosing ? startNodes(choosing) : [];
+  const location = play.choosingGraphId ? null : playLocation(play, graphs);
   const actions = availableActions(play, project, graphs);
   const transitions = actions.filter((action) => action.kind === "transition");
   const enter = actions.find((action) => action.kind === "enter");
@@ -31,7 +36,31 @@ export function PlayMode() {
             Restart
           </button>
         </div>
-        {!location && <p className="sp-empty">Beat missing.</p>}
+        {choosing && (
+          <article className="sp-script">
+            <h2>{choosing.name || "Untitled"}</h2>
+            {starts.length === 0 ? (
+              <p className="sp-empty">This graph has no start.</p>
+            ) : (
+              <div className="sp-play-group">
+                <h3>Start</h3>
+                {starts.map((node) => (
+                  <button key={node.id} type="button" className="sp-play-action is-enter" onClick={() => beginPlay(node.id)}>
+                    <span className="sp-play-action-top">
+                      <strong>{node.title || "Untitled"}</strong>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {play.frames.length > 0 && (
+              <button type="button" className="sp-chip-btn" onClick={cancelStartChoice}>
+                Back
+              </button>
+            )}
+          </article>
+        )}
+        {!choosing && !location && <p className="sp-empty">Beat missing.</p>}
         {location && (
           <article className="sp-script">
             <h2>{location.node.title || "Untitled"}</h2>

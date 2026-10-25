@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "graph_root",
   "name": "The Lantern Gate",
   "parentGraphId": null,
@@ -7,6 +7,9 @@
   "sceneNotes": "A shut gate, two iron lanterns, and a choice about how the night goes.",
   "nodes": [
     {
+      "tagIds": [
+        "tag_loc_gate"
+      ],
       "id": "node_root_start",
       "type": "start",
       "position": {
@@ -20,6 +23,9 @@
       "lines": []
     },
     {
+      "tagIds": [
+        "tag_loc_gate"
+      ],
       "id": "node_root_approach",
       "type": "event",
       "position": {
@@ -33,6 +39,9 @@
       "lines": []
     },
     {
+      "tagIds": [
+        "tag_loc_inside"
+      ],
       "id": "node_root_inside",
       "type": "event",
       "position": {
@@ -46,6 +55,9 @@
       "lines": []
     },
     {
+      "tagIds": [
+        "tag_loc_road"
+      ],
       "id": "node_root_road",
       "type": "event",
       "position": {
@@ -59,6 +71,10 @@
       "lines": []
     },
     {
+      "tagIds": [
+        "tag_loc_gate",
+        "tag_loc_road"
+      ],
       "id": "node_root_turned",
       "type": "end",
       "position": {
@@ -68,6 +84,38 @@
       "title": "Turned away",
       "summary": "The gate stays shut. The night keeps the traveler.",
       "sceneNotes": "Rain, and the road back.",
+      "subgraphId": null,
+      "lines": []
+    },
+    {
+      "tagIds": [
+        "tag_loc_road"
+      ],
+      "id": "node_root_hill",
+      "type": "start",
+      "position": {
+        "x": 40,
+        "y": 560
+      },
+      "title": "From the hill",
+      "summary": "",
+      "sceneNotes": "",
+      "subgraphId": null,
+      "lines": []
+    },
+    {
+      "tagIds": [
+        "tag_loc_road"
+      ],
+      "id": "node_root_word",
+      "type": "event",
+      "position": {
+        "x": 320,
+        "y": 540
+      },
+      "title": "Word of the gate",
+      "summary": "A traveler on the old road hears that the gate is shut.",
+      "sceneNotes": "The lanterns thin out. Someone ahead is walking up.",
       "subgraphId": null,
       "lines": []
     }
@@ -166,6 +214,22 @@
           }
         ]
       },
+      "effects": []
+    },
+    {
+      "id": "edge_root_hill",
+      "source": "node_root_hill",
+      "target": "node_root_word",
+      "label": "",
+      "condition": null,
+      "effects": []
+    },
+    {
+      "id": "edge_root_word",
+      "source": "node_root_word",
+      "target": "node_root_approach",
+      "label": "Come up to the gate",
+      "condition": null,
       "effects": []
     }
   ]

@@ -1,10 +1,19 @@
 import type { GraphDocument, ProjectDocument, StoryEdge, StoryNode, StoryNodeType } from "./types";
 
-/** Beats created from a dragged connection or inserted into an existing one. */
-export const PLACED_BEAT_TYPES: StoryNodeType[] = ["event", "scene", "dialogue", "end"];
+/** Every beat type, including Start. A graph may contain any number of each. */
+export const BEAT_TYPES: StoryNodeType[] = ["start", "event", "scene", "dialogue", "end"];
 
-export function addableNodeTypes(graph: GraphDocument): StoryNodeType[] {
-  return graph.nodes.some((node) => node.type === "start") ? [...PLACED_BEAT_TYPES] : ["start", ...PLACED_BEAT_TYPES];
+export function addableNodeTypes(): StoryNodeType[] {
+  return [...BEAT_TYPES];
+}
+
+export function startNodes(graph: GraphDocument): StoryNode[] {
+  return graph.nodes.filter((node) => node.type === "start");
+}
+
+/** A missing Start is a warning. It does not make the file invalid. */
+export function graphWarning(graph: GraphDocument): string | null {
+  return startNodes(graph).length === 0 ? "This graph has no start." : null;
 }
 
 /**
@@ -37,13 +46,6 @@ export function splitTransition(graph: GraphDocument, edgeId: string, node: Stor
     nodes: [...graph.nodes, placed],
     edges: graph.edges.map((item) => (item.id === edge.id ? { ...item, target: placed.id } : item)).concat(bridge),
   };
-}
-
-export function findEntryNode(graph: GraphDocument): StoryNode | null {
-  const start = graph.nodes.find((node) => node.type === "start");
-  if (start) return start;
-  const targeted = new Set(graph.edges.map((edge) => edge.target));
-  return graph.nodes.find((node) => !targeted.has(node.id)) ?? graph.nodes[0] ?? null;
 }
 
 export function graphBreadcrumbs(
