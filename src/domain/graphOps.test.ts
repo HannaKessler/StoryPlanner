@@ -102,7 +102,7 @@ describe("untitled beats", () => {
     expect(beatLabel(node)).toBe("Event · 123456");
   });
 
-  it("names an untitled inner graph from its parent beat without writing that name", () => {
+  it("names an untitled sub-graph from its parent beat without writing that name", () => {
     const node = createNode("scene", { id: "node_parent_99aabb", title: "" });
     const parent = createGraph({ id: "g", name: "Root", nodes: [node], edges: [] });
     const child = createGraph({

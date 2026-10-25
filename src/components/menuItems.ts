@@ -20,15 +20,15 @@ export function connectBeatItems(sourceId: string, position: { x: number; y: num
   }));
 }
 
-/** Right-click menu for a beat. Creating an inner graph is only this action. */
+/** Right-click menu for a beat. Creating a sub-graph is only this action. */
 export function nodeGraphItems(node: Pick<StoryNode, "id" | "type" | "subgraphId">): MenuItem[] {
   const state = useProjectStore.getState();
   const exists = Boolean(node.subgraphId && state.graphs[node.subgraphId]);
   if (exists) {
-    return [{ label: "Open inner graph", onSelect: () => state.openSubgraph(node.id) }];
+    return [{ label: "Open sub-graph", onSelect: () => state.openSubgraph(node.id) }];
   }
   if (!canOwnInnerGraph(node.type)) return [];
-  return [{ label: "Create inner graph", onSelect: () => state.createSubgraph(node.id) }];
+  return [{ label: "Create sub-graph", onSelect: () => state.createSubgraph(node.id) }];
 }
 
 /** Right-click menu for an existing transition. */

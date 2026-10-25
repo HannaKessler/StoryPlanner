@@ -93,7 +93,7 @@ function writeNode(
   }
   if (node.subgraphId && graphs[node.subgraphId]) {
     const child = graphs[node.subgraphId];
-    lines.push(`*Inner graph: ${child.name.trim() || beatLabel(node, project)}*`, "");
+    lines.push(`*Sub-graph: ${child.name.trim() || beatLabel(node, project)}*`, "");
     writeGraph(child, Math.min(level + 1, 6), lines, seen, project, graphs);
   }
 

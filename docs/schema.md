@@ -2,7 +2,7 @@
 
 Version **3**. Every project file, graph file, and bundled export carries `schemaVersion`. This app writes version 3 and still reads versions 1 and 2 (see [Older files](#older-files)). A higher number means the file was written by a newer StoryPlanner; do not guess at fields you do not know.
 
-The story model works like a state machine (think of Unity’s Animator). **Nodes are states**: events, scenes, and dialogue that hold content. **Edges are transitions**: all branching lives on them. Each transition has its own condition on global variables and its own variable effects. Any node can own an inner graph, which works like a sub-state machine. Nodes never contain choices.
+The story model works like a state machine (think of Unity’s Animator). **Nodes are states**: events, scenes, and dialogue that hold content. **Edges are transitions**: all branching lives on them. Each transition has its own condition on global variables and its own variable effects. Any node can own a sub-graph, which works like a sub-state machine. Nodes never contain choices.
 
 Engine add-ons should treat this document as the contract. Files are UTF-8 JSON. Unknown object keys are dropped when StoryPlanner saves, so do not store private data beside the documented fields. Unknown **variable kinds** are the exception: the `kind` string is open-ended and is preserved.
 
@@ -20,7 +20,7 @@ MyStory/
 
 `project.json` is the project document. Each graph, including the root and every nested graph, is one file under `graphs/`. The file name is `<id>.json`, matching `GraphDocument.id`.
 
-There is no depth limit. A node points at an inner graph with `subgraphId`. That graph points back with `parentGraphId` and `parentNodeId`.
+There is no depth limit. A node points at a sub-graph with `subgraphId`. That graph points back with `parentGraphId` and `parentNodeId`.
 
 ## Project document
 
@@ -139,8 +139,8 @@ The root graph uses `null` for both parent fields. `sceneNotes` on a graph cover
 | Type | Role |
 | --- | --- |
 | start | An entry of this graph. A graph may have several, and may have none. Play begins at one of them |
-| event | A high-level beat. Often owns a subgraph |
-| scene | A place and time, with scene notes. May own a subgraph |
+| event | A high-level beat. Often owns a sub-graph |
+| scene | A place and time, with scene notes. May own a sub-graph |
 | dialogue | Ordered spoken lines |
 | end | Stops this branch |
 

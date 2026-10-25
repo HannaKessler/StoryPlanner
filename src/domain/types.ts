@@ -83,7 +83,7 @@ export interface StoryNode {
   title: string;
   summary: string;
   sceneNotes: string;
-  /** Another graph file, or null when this beat has no inner graph. */
+  /** Another graph file, or null when this beat has no sub-graph. */
   subgraphId: string | null;
   /** Tags on this beat, including location tags. Order does not pick a primary place. */
   tagIds: string[];

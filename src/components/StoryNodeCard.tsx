@@ -24,7 +24,7 @@ export function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
       className={`sp-node sp-type-${story.type}${selected ? " is-selected" : ""}`}
       onDoubleClickCapture={(event) => {
         // Capture runs before the pane's dblclick zoom listener. A node
-        // double-click never zooms. It opens an inner graph only when one exists.
+        // double-click never zooms. It opens a sub-graph only when one exists.
         event.preventDefault();
         event.stopPropagation();
         if (story.subgraphId) openSubgraph(story.id);
@@ -34,7 +34,7 @@ export function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
       <header>
         <span>{NODE_LABEL[story.type]}</span>
         {story.subgraphId && (
-          <span className="sp-node-nest" title="Inner graph">
+          <span className="sp-node-nest" title="Sub-graph">
             ↳
           </span>
         )}

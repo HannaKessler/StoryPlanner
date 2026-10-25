@@ -86,7 +86,7 @@ export function playLocation(
   return { graph, node };
 }
 
-/** Ways forward from the current beat: its inner graph, its outgoing transitions, and the way back up. */
+/** Ways forward from the current beat: its sub-graph, its outgoing transitions, and the way back up. */
 export function availableActions(
   state: PlayState,
   project: ProjectDocument,

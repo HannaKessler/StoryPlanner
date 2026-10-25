@@ -100,12 +100,12 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
       )}
 
       {content && child && (
-        <div className="sp-inner-row" title="Inner graph">
+        <div className="sp-inner-row" title="Sub-graph">
           <span className="sp-inner-name">↳ {child.name.trim() || beatLabel(node, project)}</span>
           <button type="button" className="sp-chip-btn" onClick={() => openSubgraph(node.id)}>
-            Open
+            Open sub-graph
           </button>
-          <IconButton label="Remove inner graph" danger onClick={() => deleteSubgraph(node.id)}>
+          <IconButton label="Remove sub-graph" danger onClick={() => deleteSubgraph(node.id)}>
             ×
           </IconButton>
         </div>

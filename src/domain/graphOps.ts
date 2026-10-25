@@ -8,7 +8,7 @@ export function addableNodeTypes(): StoryNodeType[] {
   return [...BEAT_TYPES];
 }
 
-/** Event, scene, and dialogue can own an inner graph. Start and end do not. */
+/** Event, scene, and dialogue can own a sub-graph. Start and end do not. */
 export function canOwnInnerGraph(type: StoryNodeType): boolean {
   return type === "event" || type === "scene" || type === "dialogue";
 }
