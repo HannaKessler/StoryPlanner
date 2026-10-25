@@ -14,11 +14,12 @@ import {
   type EdgeChange,
 } from "@xyflow/react";
 import { describeCondition } from "../domain/conditions";
+import { parallelOffset } from "../domain/edgeGeometry";
 import { describeEffect } from "../domain/effects";
 import type { GraphDocument, ProjectDocument } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { useContextMenu } from "./ContextMenu";
-import { addBeatItems } from "./menuItems";
+import { addBeatItems, connectBeatItems, edgeItems } from "./menuItems";
 import { StoryNodeCard, type StoryFlowNode } from "./StoryNodeCard";
 import { TransitionEdge, type TransitionFlowEdge } from "./TransitionEdge";
 
@@ -132,8 +133,21 @@ function CanvasBody({ graph, project }: { graph: GraphDocument; project: Project
           if (!connection.source || !connection.target) return;
           connectNodes(connection.source, connection.target);
         }}
+        onConnectEnd={(event, connection) => {
+          if (!connection.fromNode || connection.toNode || droppedOnNode(event)) return;
+          const point = "changedTouches" in event ? event.changedTouches[0] : event;
+          if (!point) return;
+          const position = screenToFlowPosition({ x: point.clientX, y: point.clientY });
+          openMenu(point.clientX, point.clientY, connectBeatItems(connection.fromNode.id, position));
+        }}
         onNodeClick={(_, node) => select({ kind: "node", id: node.id })}
         onEdgeClick={(_, edge) => select({ kind: "edge", id: edge.id })}
+        onEdgeContextMenu={(event, edge) => {
+          event.preventDefault();
+          event.stopPropagation();
+          select({ kind: "edge", id: edge.id });
+          openMenu(event.clientX, event.clientY, edgeItems(edge.id));
+        }}
         onPaneClick={() => select(null)}
         onPaneContextMenu={onPaneMenu}
         onMoveStart={closeMenu}
@@ -151,6 +165,12 @@ function CanvasBody({ graph, project }: { graph: GraphDocument; project: Project
       </ReactFlow>
     </div>
   );
+}
+
+function droppedOnNode(event: MouseEvent | TouchEvent): boolean {
+  const point = "changedTouches" in event ? event.changedTouches[0] : event;
+  if (!point) return false;
+  return document.elementsFromPoint(point.clientX, point.clientY).some((element) => element.closest(".react-flow__node"));
 }
 
 function toNodes(graph: GraphDocument): StoryFlowNode[] {
@@ -176,6 +196,7 @@ function toEdges(graph: GraphDocument, project: ProjectDocument): TransitionFlow
         label: edge.label,
         condition: edge.condition ? describeCondition(edge.condition, project) : "",
         effects: edge.effects.map((effect) => describeEffect(effect, project)).join(", "),
+        offset: parallelOffset(graph.edges, edge.id),
       },
       markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color },
       style: { stroke: color, strokeWidth: 1.6 },

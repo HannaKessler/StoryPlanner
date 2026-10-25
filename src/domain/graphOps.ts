@@ -1,8 +1,42 @@
-import type { GraphDocument, ProjectDocument, StoryNode, StoryNodeType } from "./types";
+import type { GraphDocument, ProjectDocument, StoryEdge, StoryNode, StoryNodeType } from "./types";
+
+/** Beats created from a dragged connection or inserted into an existing one. */
+export const PLACED_BEAT_TYPES: StoryNodeType[] = ["event", "scene", "dialogue", "end"];
 
 export function addableNodeTypes(graph: GraphDocument): StoryNodeType[] {
-  const types: StoryNodeType[] = ["event", "scene", "dialogue", "end"];
-  return graph.nodes.some((node) => node.type === "start") ? types : ["start", ...types];
+  return graph.nodes.some((node) => node.type === "start") ? [...PLACED_BEAT_TYPES] : ["start", ...PLACED_BEAT_TYPES];
+}
+
+/**
+ * Splits A→B into A→new→B. The original edge keeps its label, conditions and
+ * effects and becomes the first leg. The new edge is the plain second leg.
+ */
+export function splitTransition(graph: GraphDocument, edgeId: string, node: StoryNode, nextEdge: StoryEdge): GraphDocument | null {
+  const edge = graph.edges.find((item) => item.id === edgeId);
+  if (!edge) return null;
+  const source = graph.nodes.find((item) => item.id === edge.source);
+  const target = graph.nodes.find((item) => item.id === edge.target);
+  if (!source || !target) return null;
+  const placed: StoryNode = {
+    ...node,
+    position: {
+      x: (source.position.x + target.position.x) / 2,
+      y: (source.position.y + target.position.y) / 2,
+    },
+  };
+  const bridge: StoryEdge = {
+    ...nextEdge,
+    source: placed.id,
+    target: edge.target,
+    label: "",
+    condition: null,
+    effects: [],
+  };
+  return {
+    ...graph,
+    nodes: [...graph.nodes, placed],
+    edges: graph.edges.map((item) => (item.id === edge.id ? { ...item, target: placed.id } : item)).concat(bridge),
+  };
 }
 
 export function findEntryNode(graph: GraphDocument): StoryNode | null {

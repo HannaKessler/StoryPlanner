@@ -19,7 +19,7 @@ import {
   createVariable,
   moveItem,
 } from "../domain/factories";
-import { descendantGraphIds } from "../domain/graphOps";
+import { descendantGraphIds, splitTransition } from "../domain/graphOps";
 import {
   bundleProject,
   createNewProject,
@@ -108,6 +108,9 @@ interface ProjectStore {
   deleteNodes: (nodeIds: string[]) => void;
   deleteEdges: (edgeIds: string[]) => void;
   connectNodes: (source: string, target: string) => void;
+  addConnectedNode: (sourceId: string, type: StoryNodeType, position: { x: number; y: number }) => void;
+  addParallelTransition: (edgeId: string) => void;
+  insertBeatOnEdge: (edgeId: string, type: StoryNodeType) => void;
   updateEdge: (edgeId: string, patch: Partial<StoryEdge>) => void;
   moveEdge: (edgeId: string, direction: -1 | 1) => void;
   openSubgraph: (nodeId: string) => void;
@@ -482,6 +485,50 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const edge = createEdge(source, target);
     withGraph((graph) => ({ ...graph, edges: [...graph.edges, edge] }));
     set({ selection: { kind: "edge", id: edge.id } });
+  },
+
+  addConnectedNode(sourceId, type, position) {
+    const state = get();
+    const graph = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
+    if (!graph || !graph.nodes.some((node) => node.id === sourceId)) return;
+    if (type === "start" && graph.nodes.some((node) => node.type === "start")) return;
+    const node = createNode(type, { position });
+    const edge = createEdge(sourceId, node.id);
+    withGraph((current) => ({ ...current, nodes: [...current.nodes, node], edges: [...current.edges, edge] }));
+    set({ selection: { kind: "node", id: node.id } });
+  },
+
+  addParallelTransition(edgeId) {
+    const state = get();
+    const graph = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
+    const edge = graph?.edges.find((item) => item.id === edgeId);
+    if (!edge) return;
+    const created = createEdge(edge.source, edge.target);
+    withGraph((current) => {
+      const index = current.edges.findIndex((item) => item.id === edgeId);
+      if (index < 0) return current;
+      const edges = current.edges.slice();
+      edges.splice(index + 1, 0, created);
+      return { ...current, edges };
+    });
+    set({ selection: { kind: "edge", id: created.id } });
+  },
+
+  insertBeatOnEdge(edgeId, type) {
+    const state = get();
+    if (!state.currentGraphId) return;
+    const graph = state.graphs[state.currentGraphId];
+    if (!graph) return;
+    const edge = graph.edges.find((item) => item.id === edgeId);
+    if (!edge) return;
+    const node = createNode(type);
+    const next = splitTransition(graph, edgeId, node, createEdge(node.id, edge.target));
+    if (!next) return;
+    set({
+      graphs: { ...state.graphs, [state.currentGraphId]: next },
+      selection: { kind: "node", id: node.id },
+      dirty: true,
+    });
   },
 
   updateEdge(edgeId, patch) {

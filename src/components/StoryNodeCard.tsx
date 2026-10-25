@@ -16,6 +16,10 @@ export function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
     ? `${speakerName(project ?? emptyProject(), first.speakerTagId)}: ${first.text}`
     : story.summary;
 
+  const hasOutgoing = useProjectStore((state) => {
+    const current = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
+    return current?.edges.some((edge) => edge.source === story.id) ?? false;
+  });
   const canOpen = story.type === "event" || story.type === "scene" || story.type === "dialogue";
   return (
     <article
@@ -50,8 +54,10 @@ export function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
           </button>
         )}
       </footer>
-      {story.type !== "end" && (
+      {story.type !== "end" ? (
         <Handle type="source" position={Position.Right} id="out" className="sp-handle-out" />
+      ) : (
+        hasOutgoing && <Handle type="source" position={Position.Right} id="out" className="sp-handle-out" isConnectable={false} />
       )}
     </article>
   );
