@@ -127,7 +127,7 @@ function CanvasBody({ graph, project }: { graph: GraphDocument; project: Project
   };
 
   return (
-    <div className="sp-canvas" ref={canvasRef} onContextMenu={(event) => event.preventDefault()}>
+    <div className="sp-canvas" ref={canvasRef}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
