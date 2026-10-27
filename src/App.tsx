@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { inTauri, onWindowCloseRequested, setWindowTitle } from "./desktop/tauri";
 import { AppShell } from "./components/AppShell";
 import { ContextMenu, focusRename, useContextMenu } from "./components/ContextMenu";
+import { Popover } from "./components/Popover";
 import { StartScreen } from "./components/StartScreen";
 import { useProjectStore } from "./store/projectStore";
 
@@ -26,7 +27,7 @@ export function App() {
       if (key === "escape") {
         // Menus and dialogs close themselves. Otherwise Escape leaves a text field, then clears the selection.
         if (useContextMenu.getState().menu || state.confirm || state.pendingClose || state.exportOpen) return;
-        if (document.querySelector(".sp-modal")) return;
+        if (document.querySelector(".sp-modal, .sp-popover")) return;
         if (editingText(event.target)) {
           (event.target as HTMLElement).blur();
           return;
@@ -129,6 +130,7 @@ export function App() {
   return (
     <>
       {project ? <AppShell /> : <StartScreen />}
+      <Popover />
       <ContextMenu />
     </>
   );

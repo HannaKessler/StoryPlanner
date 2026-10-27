@@ -270,7 +270,7 @@ function CanvasBody({
   useEffect(() => {
     // Delete and Backspace go through the store, which confirms when sub-graphs would go too.
     const onKey = (event: KeyboardEvent) => {
-      if (typingTarget(event.target) || document.querySelector(".sp-modal, .sp-context")) return;
+      if (typingTarget(event.target) || document.querySelector(".sp-modal, .sp-context, .sp-popover")) return;
       const state = useProjectStore.getState();
       if (state.confirm || state.pendingClose || state.exportOpen) return;
       const mod = event.ctrlKey || event.metaKey;
@@ -391,13 +391,13 @@ function CanvasBody({
           }
           if (node.type !== "story") return;
           select({ kind: "node", id: node.id });
-          openMenu(event.clientX, event.clientY, beatItems(node.data.story));
+          openMenu(event.clientX, event.clientY, beatItems(node.data.story, { x: event.clientX, y: event.clientY }));
         }}
         onEdgeContextMenu={(event, edge) => {
           event.preventDefault();
           event.stopPropagation();
           select({ kind: "edge", id: edge.id });
-          openMenu(event.clientX, event.clientY, edgeItems(edge.id));
+          openMenu(event.clientX, event.clientY, edgeItems(edge.id, { x: event.clientX, y: event.clientY }));
         }}
         onPaneClick={() => select(null)}
         onPaneContextMenu={onPaneMenu}

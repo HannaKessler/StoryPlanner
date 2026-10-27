@@ -1,11 +1,14 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { memo } from "react";
+import { memo, type MouseEvent as ReactMouseEvent } from "react";
+import { assigned, unassignPatch } from "../domain/assign";
 import { describeEffect } from "../domain/effects";
 import { entityName, speakerName } from "../domain/format";
 import { beatLabel } from "../domain/labels";
 import type { NodeInvolvement } from "../domain/involved";
-import type { DialogueLine, ProjectDocument, StoryNode } from "../domain/types";
+import type { DialogueLine, EntityKind, ProjectDocument, StoryNode } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
+import { openMenuBelow } from "./ContextMenu";
+import { assignItems } from "./menuItems";
 
 export type StoryNodeData = Record<string, unknown> & {
   story: StoryNode;
@@ -42,9 +45,9 @@ export const StoryNodeCard = memo(function StoryNodeCard({ data, selected }: Nod
           </span>
         )}
       </header>
-      {project && <RefLine ids={all?.locationIds ?? []} own={own?.locationIds ?? []} project={project} from={from} />}
-      {project && <RefLine ids={all?.characterIds ?? []} own={own?.characterIds ?? []} project={project} from={from} kind="who" />}
-      {project && <RefLine ids={all?.itemIds ?? []} own={own?.itemIds ?? []} project={project} from={from} kind="item" />}
+      {project && <RefLine ids={all?.locationIds ?? []} own={own?.locationIds ?? []} project={project} from={from} node={story} entity="location" />}
+      {project && <RefLine ids={all?.characterIds ?? []} own={own?.characterIds ?? []} project={project} from={from} node={story} entity="character" kind="who" />}
+      {project && <RefLine ids={all?.itemIds ?? []} own={own?.itemIds ?? []} project={project} from={from} node={story} entity="item" kind="item" />}
       {summary && <p>{summary}</p>}
       {story.lines.length > 0 && (
         <ul className="sp-node-lines">
@@ -60,6 +63,20 @@ export const StoryNodeCard = memo(function StoryNodeCard({ data, selected }: Nod
           ))}
         </ul>
       )}
+      <button
+        type="button"
+        className="sp-node-add nodrag"
+        aria-label="Add to event"
+        title="Add character, item or location"
+        onClick={(event) => {
+          event.stopPropagation();
+          useProjectStore.getState().select({ kind: "node", id: story.id });
+          const rect = event.currentTarget.getBoundingClientRect();
+          openMenuBelow(event.currentTarget, assignItems(story.id, { x: rect.left, y: rect.bottom + 2 }).slice(0, 3));
+        }}
+      >
+        +
+      </button>
       <Handle type="source" position={Position.Right} id="out" className="sp-handle-out" />
     </article>
   );
@@ -70,12 +87,16 @@ function RefLine({
   own,
   project,
   from,
+  node,
+  entity,
   kind,
 }: {
   ids: string[];
   own: string[];
   project: ProjectDocument;
   from: string;
+  node: StoryNode;
+  entity: EntityKind;
   kind?: "who" | "item";
 }) {
   if (ids.length === 0) return null;
@@ -85,6 +106,19 @@ function RefLine({
       {ids.map((id) => (
         <span key={id} className={ownSet.has(id) ? "sp-ref" : "sp-ref is-inherited"} title={ownSet.has(id) ? undefined : from}>
           {entityName(project, id)}
+          {assigned(node, entity, id) && (
+            <button
+              type="button"
+              className="sp-ref-x nodrag"
+              aria-label={`Remove ${entityName(project, id)}`}
+              onClick={(event: ReactMouseEvent) => {
+                event.stopPropagation();
+                useProjectStore.getState().updateNode(node.id, unassignPatch(node, entity, id));
+              }}
+            >
+              ×
+            </button>
+          )}
         </span>
       ))}
     </p>

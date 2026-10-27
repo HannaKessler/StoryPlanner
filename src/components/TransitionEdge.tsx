@@ -41,7 +41,7 @@ export function TransitionEdge({
     event.preventDefault();
     event.stopPropagation();
     select({ kind: "edge", id });
-    openMenu(event.clientX, event.clientY, edgeItems(id));
+    openMenu(event.clientX, event.clientY, edgeItems(id, { x: event.clientX, y: event.clientY }));
   };
   return (
     <>

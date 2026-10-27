@@ -587,3 +587,30 @@ form.sp-speaker { display: flex; }
 /* Summary and scene notes read as one block. */
 .sp-write-summary + .sp-write-label { margin-top: 6px; }
 .sp-write .sp-write-prose { background: rgba(255, 255, 255, 0.03); }
+
+.sp-popover {
+  position: fixed;
+  z-index: 35;
+  min-width: 220px;
+  max-width: min(520px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--bg-elev);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.3);
+  font-size: var(--fs-sm);
+}
+.sp-popover.is-entity { min-width: 200px; padding: 6px; }
+.sp-popover .sp-chip-btn { align-self: flex-start; }
+.sp-node .sp-ref-x { display: none; margin-left: 3px; padding: 0; border: 0; background: transparent; color: var(--text-faint); font-size: var(--fs-xs); line-height: 1; cursor: pointer; }
+.sp-node .sp-ref-x:hover { color: var(--danger, #d77); }
+.sp-node:hover .sp-ref-x { display: inline; }
+.sp-node-add { display: none; position: absolute; right: 6px; bottom: 4px; padding: 0 5px; border: 1px solid var(--line); border-radius: 3px; background: var(--bg-elev); color: var(--text-dim); font-size: var(--fs-xs); line-height: 1.4; cursor: pointer; }
+.sp-node-add:hover { color: var(--text); }
+.sp-node:hover .sp-node-add { display: block; }
+.sp-node { position: relative; }

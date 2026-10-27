@@ -129,7 +129,7 @@ function BeatsOutline() {
               onKeyDown={(event) => onKey(event, row, index)}
               onContextMenu={(event) => {
                 pick(row);
-                menuHandler(() => beatItems(row.node))(event);
+                menuHandler(() => beatItems(row.node, { x: event.clientX, y: event.clientY }))(event);
               }}
             >
               <span
