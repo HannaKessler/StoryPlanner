@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { graphName } from "../domain/graphOps";
 import { entityLabel } from "../domain/names";
 import { describeCondition } from "../domain/conditions";
@@ -9,11 +9,11 @@ import { beatLabel, shortBeatLabel } from "../domain/labels";
 import type { GraphDocument, ProjectDocument, StoryEdge, StoryEntity } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { ConditionBuilder } from "./ConditionBuilder";
-import { DialogueEditor } from "./DialogueEditor";
+import { DialogueEditor, focusLine } from "./DialogueEditor";
 import { EffectsEditor } from "./EffectsEditor";
 import { focusRename, menuHandler, type MenuItem } from "./ContextMenu";
 import { conditionAddItems } from "./menuItems";
-import { IconButton, Row, Section } from "./Panel";
+import { AutoTextarea, IconButton, Row, Section } from "./Panel";
 
 export function Inspector() {
   const selection = useProjectStore((state) => state.selection);
@@ -25,7 +25,12 @@ export function Inspector() {
   } else if (selection?.kind === "node" && graph.nodes.some((item) => item.id === selection.id)) {
     body = <NodeInspector key={selection.id} graph={graph} nodeId={selection.id} />;
   }
-  return <aside className="sp-inspector sp-panel">{body}</aside>;
+  // The scroll area is inside the aside, so a head button placed after the fields stays pinned.
+  return (
+    <aside className="sp-inspector">
+      <div className="sp-insp-scroll sp-panel">{body}</div>
+    </aside>
+  );
 }
 
 function GraphInspector({ graph }: { graph: GraphDocument }) {
@@ -74,6 +79,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
   const addNodeEffect = useProjectStore((state) => state.addNodeEffect);
   const updateNodeEffect = useProjectStore((state) => state.updateNodeEffect);
   const deleteNodeEffect = useProjectStore((state) => state.deleteNodeEffect);
+  const moveNodeEffect = useProjectStore((state) => state.moveNodeEffect);
   const currentGraphId = useProjectStore((state) => state.currentGraphId);
   const node = graph.nodes.find((item) => item.id === nodeId);
   const involved = useMemo(() => indexInvolved(graphs), [graphs]);
@@ -92,10 +98,22 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
     <>
       <div className="sp-insp-head">
         <span className="sp-kicker">Beat</span>
-        <input className="sp-head-input" aria-label="Title" placeholder="Title" data-rename={node.id} value={node.title} onChange={(event) => updateNode(node.id, { title: event.target.value })} />
-        <IconButton label="Delete beat" danger onClick={() => requestDeleteNodes([node.id])}>
-          ×
-        </IconButton>
+        <AutoTextarea
+          className="sp-head-input sp-head-area"
+          aria-label="Title"
+          placeholder="Title"
+          data-rename={node.id}
+          minRows={1}
+          maxRows={3}
+          value={node.title}
+          onChange={(event) => updateNode(node.id, { title: event.target.value.replace(/\s*\n\s*/g, " ") })}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") {
+              event.preventDefault();
+              event.currentTarget.blur();
+            }
+          }}
+        />
       </div>
 
       <Section id="insp:location" title="Location">
@@ -185,6 +203,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
           onAdd={() => addNodeEffect(node.id)}
           onUpdate={(effectId, patch) => updateNodeEffect(node.id, effectId, patch)}
           onDelete={(effectId) => deleteNodeEffect(node.id, effectId)}
+          onMove={(effectId, direction) => moveNodeEffect(node.id, effectId, direction)}
         />
       </Section>
 
@@ -193,9 +212,9 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
           id="insp:lines"
           title="Lines"
           count={node.lines.length}
-          onContextMenu={menuHandler(() => [{ label: "Add line", onSelect: () => addLine(node.id) }])}
+          onContextMenu={menuHandler(() => [{ label: "Add line", onSelect: () => focusLine(addLine(node.id)) }])}
           actions={
-            <button type="button" className="sp-chip-btn" onClick={() => addLine(node.id)}>
+            <button type="button" className="sp-chip-btn" onClick={() => focusLine(addLine(node.id))}>
               + line
             </button>
           }
@@ -230,6 +249,11 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
         </Section>
       )}
 
+      <span className="sp-insp-pin">
+        <IconButton label="Delete beat" danger onClick={() => requestDeleteNodes([node.id])}>
+          ×
+        </IconButton>
+      </span>
     </>
   );
 }
@@ -365,7 +389,20 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
   const updateEdge = useProjectStore((state) => state.updateEdge);
   const deleteEdges = useProjectStore((state) => state.deleteEdges);
   const edge = graph.edges.find((item) => item.id === edgeId);
+  const [refused, setRefused] = useState<"source" | "target" | null>(null);
   if (!edge || !project) return null;
+  /** A self-loop, or a pair that already has a transition, is refused and the select is marked. */
+  const change = (side: "source" | "target", value: string) => {
+    const source = side === "source" ? value : edge.source;
+    const target = side === "target" ? value : edge.target;
+    const taken = graph.edges.some((item) => item.id !== edge.id && item.source === source && item.target === target);
+    if (source === target || taken) {
+      setRefused(side);
+      return;
+    }
+    setRefused(null);
+    updateEdge(edge.id, { [side]: value });
+  };
 
   return (
     <>
@@ -379,17 +416,15 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
           value={edge.label}
           onChange={(event) => updateEdge(edge.id, { label: event.target.value })}
         />
-        <IconButton label="Delete transition" danger onClick={() => deleteEdges([edge.id])}>
-          ×
-        </IconButton>
       </div>
       <Row label="From">
         <span className="sp-row-pair">
           <select
-            className="sp-cell"
+            className={refused === "source" ? "sp-cell is-dup" : "sp-cell"}
             aria-label="From beat"
+            aria-invalid={refused === "source" || undefined}
             value={edge.source}
-            onChange={(event) => event.target.value !== edge.target && updateEdge(edge.id, { source: event.target.value })}
+            onChange={(event) => change("source", event.target.value)}
           >
             {graph.nodes
               .map((item) => (
@@ -403,10 +438,11 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
       <Row label="To">
         <span className="sp-row-pair">
           <select
-            className="sp-cell"
+            className={refused === "target" ? "sp-cell is-dup" : "sp-cell"}
             aria-label="To beat"
+            aria-invalid={refused === "target" || undefined}
             value={edge.target}
-            onChange={(event) => event.target.value !== edge.source && updateEdge(edge.id, { target: event.target.value })}
+            onChange={(event) => change("target", event.target.value)}
           >
             {graph.nodes.map((item) => (
                 <option key={item.id} value={item.id}>
@@ -426,6 +462,11 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
       >
         <ConditionBuilder value={edge.condition} onChange={(condition) => updateEdge(edge.id, { condition })} />
       </Section>
+      <span className="sp-insp-pin">
+        <IconButton label="Delete transition" danger onClick={() => deleteEdges([edge.id])}>
+          ×
+        </IconButton>
+      </span>
     </>
   );
 }

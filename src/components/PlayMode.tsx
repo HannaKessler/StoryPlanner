@@ -6,6 +6,7 @@ import { entryNodes } from "../domain/graphOps";
 import { availableActions, playLocation, suggestedNodes, type PlayAction } from "../domain/play";
 import type { EntityKind, VariableValue } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
+import { NumberField } from "./Panel";
 
 const KIND_SHORT: Record<string, string> = {
   boolean: "bool",
@@ -141,12 +142,11 @@ export function PlayMode() {
                       <option value="false">false</option>
                     </select>
                   ) : variable.kind === "value" ? (
-                    <input
+                    <NumberField
                       className="sp-cell sp-cell-value"
-                      type="number"
-                      aria-label={variable.name}
+                      label={variable.name}
                       value={typeof value === "number" ? value : 0}
-                      onChange={(event) => updatePlayValue(variable.id, Number(event.target.value))}
+                      onCommit={(next) => updatePlayValue(variable.id, next)}
                     />
                   ) : variable.kind === "inventory" ? (
                     <InventoryValue

@@ -3,7 +3,13 @@ import { entityLabel } from "../domain/names";
 import type { DialogueLine } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { menuHandler } from "./ContextMenu";
-import { IconButton } from "./Panel";
+import { AutoTextarea, IconButton } from "./Panel";
+
+/** Focuses the text of a dialogue line once it is drawn. */
+export function focusLine(lineId: string | null) {
+  if (!lineId) return;
+  window.setTimeout(() => document.querySelector<HTMLTextAreaElement>(`[data-line="${CSS.escape(lineId)}"]`)?.focus(), 30);
+}
 
 export function DialogueEditor({ nodeId, lines }: { nodeId: string; lines: DialogueLine[] }) {
   const updateLine = useProjectStore((state) => state.updateLine);
@@ -19,21 +25,36 @@ export function DialogueEditor({ nodeId, lines }: { nodeId: string; lines: Dialo
           key={line.id}
           className="sp-line"
           onContextMenu={menuHandler(() => [
-            { label: "Add line", onSelect: () => addLine(nodeId) },
+            { label: "Add line", onSelect: () => focusLine(addLine(nodeId, line.id)) },
             "separator",
             { label: "Delete line", danger: true, onSelect: () => deleteLine(nodeId, line.id) },
           ])}
         >
-          <div className="sp-line-top">
-            <span className="sp-line-no">{index + 1}</span>
-            <SpeakerPicker value={line.speakerId} onChange={(speakerId) => updateLine(nodeId, line.id, { speakerId })} />
-            <input
-              className="sp-cell sp-line-dir"
-              aria-label="Line direction"
-              placeholder="(direction)"
-              value={line.direction}
-              onChange={(event) => updateLine(nodeId, line.id, { direction: event.target.value })}
-            />
+          <span className="sp-line-no">{index + 1}</span>
+          <SpeakerPicker value={line.speakerId} onChange={(speakerId) => updateLine(nodeId, line.id, { speakerId })} />
+          <input
+            className="sp-cell sp-line-dir"
+            aria-label="Line direction"
+            placeholder="(direction)"
+            value={line.direction}
+            onChange={(event) => updateLine(nodeId, line.id, { direction: event.target.value })}
+          />
+          <AutoTextarea
+            className="sp-cell sp-area sp-story-input sp-line-text"
+            minRows={1}
+            maxRows={12}
+            aria-label="Line text"
+            data-line={line.id}
+            value={line.text}
+            onChange={(event) => updateLine(nodeId, line.id, { text: event.target.value })}
+            onKeyDown={(event) => {
+              // Enter starts the next line with the same speaker. Shift+Enter keeps a line break.
+              if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+              event.preventDefault();
+              focusLine(addLine(nodeId, line.id));
+            }}
+          />
+          <span className="sp-line-tools">
             <IconButton label="Move line up" disabled={index === 0} onClick={() => moveLine(nodeId, line.id, -1)}>
               ↑
             </IconButton>
@@ -43,15 +64,7 @@ export function DialogueEditor({ nodeId, lines }: { nodeId: string; lines: Dialo
             <IconButton label="Delete line" danger onClick={() => deleteLine(nodeId, line.id)}>
               ×
             </IconButton>
-          </div>
-          <textarea
-            className="sp-cell sp-area sp-story-input"
-            rows={2}
-            aria-label="Line text"
-            placeholder="What they say"
-            value={line.text}
-            onChange={(event) => updateLine(nodeId, line.id, { text: event.target.value })}
-          />
+          </span>
         </li>
       ))}
     </ol>

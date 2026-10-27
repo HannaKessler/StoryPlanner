@@ -7,7 +7,7 @@ import { KNOWN_VARIABLE_KINDS } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { focusRename, menuHandler, openMenuBelow, type MenuItem } from "./ContextMenu";
 import { isDuplicateName, uniqueName } from "../domain/names";
-import { IconButton, Section } from "./Panel";
+import { IconButton, NumberField, Section } from "./Panel";
 
 const KIND_SHORT: Record<string, string> = {
   boolean: "bool",
@@ -119,12 +119,11 @@ function VariableRow({ variable, project }: { variable: VariableDef; project: Pr
           </select>
         )}
         {variable.kind === "value" && (
-          <input
+          <NumberField
             className="sp-cell sp-cell-value"
-            type="number"
-            aria-label="Default value"
+            label="Default value"
             value={typeof variable.defaultValue === "number" ? variable.defaultValue : 0}
-            onChange={(event) => updateVariable(variable.id, { defaultValue: Number(event.target.value) })}
+            onCommit={(defaultValue) => updateVariable(variable.id, { defaultValue })}
           />
         )}
         {entityKind && variable.kind !== "inventory" && (

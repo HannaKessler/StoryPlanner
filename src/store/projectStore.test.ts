@@ -382,3 +382,33 @@ describe("sub-graph names", () => {
     expect(child.name).toBe("");
   });
 });
+
+describe("lines and effects", () => {
+  it("adds a line after another with the same speaker", async () => {
+    await openFresh();
+    store().addNode({ x: 0, y: 0 });
+    const id = rootGraph().nodes.at(-1)!.id;
+    const first = store().addLine(id)!;
+    store().updateLine(id, first, { speakerId: null });
+    const last = store().addLine(id)!;
+    store().updateLine(id, last, { speakerId: "hero" });
+    const middle = store().addLine(id, first)!;
+    const lines = rootGraph().nodes.find((node) => node.id === id)!.lines;
+    expect(lines.map((line) => line.id)).toEqual([first, middle, last]);
+    expect(lines[1].speakerId).toBeNull();
+    const after = store().addLine(id)!;
+    expect(rootGraph().nodes.find((node) => node.id === id)!.lines.find((line) => line.id === after)?.speakerId).toBe("hero");
+  });
+
+  it("reorders effects", async () => {
+    await openFresh();
+    store().addVariable("boolean");
+    store().addNode({ x: 0, y: 0 });
+    const id = rootGraph().nodes.at(-1)!.id;
+    store().addNodeEffect(id);
+    store().addNodeEffect(id);
+    const [a, b] = rootGraph().nodes.at(-1)!.effects.map((effect) => effect.id);
+    store().moveNodeEffect(id, b, -1);
+    expect(rootGraph().nodes.at(-1)!.effects.map((effect) => effect.id)).toEqual([b, a]);
+  });
+});

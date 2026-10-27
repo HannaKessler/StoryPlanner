@@ -174,7 +174,8 @@ interface ProjectStore {
   createSubgraph: (nodeId: string) => void;
   deleteSubgraph: (nodeId: string) => void;
 
-  addLine: (nodeId: string) => void;
+  /** Adds a line after `afterLineId`, or at the end. Returns the new line id. */
+  addLine: (nodeId: string, afterLineId?: string) => string | null;
   updateLine: (nodeId: string, lineId: string, patch: Partial<DialogueLine>) => void;
   deleteLine: (nodeId: string, lineId: string) => void;
   moveLine: (nodeId: string, lineId: string, direction: -1 | 1) => void;
@@ -182,6 +183,7 @@ interface ProjectStore {
   addNodeEffect: (nodeId: string) => void;
   updateNodeEffect: (nodeId: string, effectId: string, patch: Partial<Effect>) => void;
   deleteNodeEffect: (nodeId: string, effectId: string) => void;
+  moveNodeEffect: (nodeId: string, effectId: string, direction: -1 | 1) => void;
 
   addVariable: (kind: string) => string | null;
   updateVariable: (variableId: string, patch: Partial<VariableDef>) => void;
@@ -1048,9 +1050,21 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
     });
   },
 
-  addLine(nodeId) {
-    const speaker = get().project?.characters[0]?.id ?? null;
-    withNode(nodeId, (node) => ({ ...node, lines: [...node.lines, createLine({ speakerId: speaker })] }));
+  addLine(nodeId, afterLineId) {
+    const graph = get().currentGraphId ? get().graphs[get().currentGraphId!] : undefined;
+    const node = graph?.nodes.find((item) => item.id === nodeId);
+    if (!node) return null;
+    const index = afterLineId ? node.lines.findIndex((line) => line.id === afterLineId) : node.lines.length - 1;
+    const previous = index >= 0 ? node.lines[index] : undefined;
+    // A new line keeps the speaker of the line before it.
+    const speaker = previous ? previous.speakerId : (get().project?.characters[0]?.id ?? null);
+    const line = createLine({ speakerId: speaker });
+    withNode(nodeId, (current) => {
+      const lines = current.lines.slice();
+      lines.splice(index + 1, 0, line);
+      return { ...current, lines };
+    });
+    return line.id;
   },
 
   updateLine(nodeId, lineId, patch) {
@@ -1086,6 +1100,13 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
 
   deleteNodeEffect(nodeId, effectId) {
     withNode(nodeId, (node) => ({ ...node, effects: node.effects.filter((effect) => effect.id !== effectId) }));
+  },
+
+  moveNodeEffect(nodeId, effectId, direction) {
+    withNode(nodeId, (node) => {
+      const index = node.effects.findIndex((effect) => effect.id === effectId);
+      return { ...node, effects: moveItem(node.effects, index, direction) };
+    });
   },
 
   addVariable(kind) {

@@ -2,31 +2,42 @@ import { describeEffect, opsForVariable } from "../domain/effects";
 import type { Effect, EffectOp, Scalar } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { menuHandler } from "./ContextMenu";
-import { IconButton } from "./Panel";
+import { IconButton, NumberField } from "./Panel";
 import { EntitySelect } from "./EntitySelect";
 import type { EntityKind } from "../domain/types";
 
 const OP_LABEL: Record<EffectOp, string> = { set: "set", add: "add", remove: "remove", toggle: "toggle", clear: "clear" };
+
+/** Subtract is shown as its own choice and stored as `add` with a negative amount. */
+type ShownOp = EffectOp | "subtract";
+
+function shownOp(effect: Effect): ShownOp {
+  return effect.op === "add" && typeof effect.value === "number" && effect.value < 0 ? "subtract" : effect.op;
+}
 
 export function EffectsEditor({
   effects,
   onAdd,
   onUpdate,
   onDelete,
+  onMove,
 }: {
   effects: Effect[];
   onAdd: () => void;
   onUpdate: (effectId: string, patch: Partial<Effect>) => void;
   onDelete: (effectId: string) => void;
+  onMove: (effectId: string, direction: -1 | 1) => void;
 }) {
   const project = useProjectStore((state) => state.project);
   if (!project) return null;
   if (effects.length === 0) return null;
   return (
     <div className="sp-effects">
-      {effects.map((effect) => {
+      {effects.map((effect, index) => {
         const variable = project.variables.find((item) => item.id === effect.variableId);
-        const ops = opsForVariable(variable?.kind);
+        const ops: ShownOp[] = opsForVariable(variable?.kind);
+        if (variable?.kind === "value") ops.splice(ops.indexOf("add") + 1, 0, "subtract");
+        const op = shownOp(effect);
         return (
           <div
             key={effect.id}
@@ -41,12 +52,18 @@ export function EffectsEditor({
             <select
               className="sp-cell"
               aria-label="Operation"
-              value={effect.op}
-              onChange={(event) => onUpdate(effect.id, { op: event.target.value as EffectOp })}
+              value={op}
+              onChange={(event) => {
+                const next = event.target.value as ShownOp;
+                const amount = typeof effect.value === "number" ? Math.abs(effect.value) : 1;
+                if (next === "subtract") onUpdate(effect.id, { op: "add", value: -(amount || 1) });
+                else if (next === "add") onUpdate(effect.id, { op: "add", value: amount || 1 });
+                else onUpdate(effect.id, { op: next });
+              }}
             >
-              {ops.map((op) => (
-                <option key={op} value={op}>
-                  {OP_LABEL[op]}
+              {ops.map((item) => (
+                <option key={item} value={item}>
+                  {item === "subtract" ? "subtract" : OP_LABEL[item]}
                 </option>
               ))}
             </select>
@@ -75,15 +92,23 @@ export function EffectsEditor({
               <EffectValue
                 kind={variable?.kind}
                 op={effect.op}
-                value={effect.value}
-                onChange={(value) => onUpdate(effect.id, { value })}
+                value={op === "subtract" && typeof effect.value === "number" ? -effect.value : effect.value}
+                onChange={(value) => onUpdate(effect.id, { value: op === "subtract" && typeof value === "number" ? -Math.abs(value) : value })}
               />
             ) : (
               <span />
             )}
-            <IconButton label="Remove effect" danger onClick={() => onDelete(effect.id)}>
-              ×
-            </IconButton>
+            <span className="sp-line-tools">
+              <IconButton label="Move effect up" disabled={index === 0} onClick={() => onMove(effect.id, -1)}>
+                ↑
+              </IconButton>
+              <IconButton label="Move effect down" disabled={index === effects.length - 1} onClick={() => onMove(effect.id, 1)}>
+                ↓
+              </IconButton>
+              <IconButton label="Delete effect" danger onClick={() => onDelete(effect.id)}>
+                ×
+              </IconButton>
+            </span>
           </div>
         );
       })}
@@ -112,13 +137,7 @@ function EffectValue({
   }
   if (kind === "value" || (op === "add" && kind !== "inventory" && kind !== "character" && kind !== "item" && kind !== "location")) {
     return (
-      <input
-        className="sp-cell"
-        type="number"
-        aria-label="Amount"
-        value={typeof value === "number" ? value : 0}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
+      <NumberField label="Amount" value={typeof value === "number" ? value : 0} onCommit={onChange} />
     );
   }
   const entityKind: EntityKind | null =

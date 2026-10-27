@@ -1,4 +1,4 @@
-import { useState, type MouseEvent, type ReactNode } from "react";
+import { forwardRef, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode, type TextareaHTMLAttributes } from "react";
 
 const openState = new Map<string, boolean>();
 
@@ -84,3 +84,77 @@ export function IconButton({
     </button>
   );
 }
+
+/**
+ * A number input that accepts an empty field or a lone "-" while typing.
+ * The value is committed on blur or Enter; text that is not a number reverts.
+ */
+export function NumberField({
+  value,
+  onCommit,
+  className = "sp-cell",
+  label,
+}: {
+  value: number;
+  onCommit: (value: number) => void;
+  className?: string;
+  label: string;
+}) {
+  const [text, setText] = useState<string | null>(null);
+  const commit = () => {
+    if (text === null) return;
+    const parsed = Number(text);
+    if (text.trim() !== "" && text.trim() !== "-" && Number.isFinite(parsed) && parsed !== value) onCommit(parsed);
+    setText(null);
+  };
+  return (
+    <input
+      className={className}
+      inputMode="decimal"
+      aria-label={label}
+      value={text ?? String(value)}
+      onChange={(event) => {
+        if (/^-?\d*\.?\d*$/.test(event.target.value)) setText(event.target.value);
+      }}
+      onBlur={commit}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") commit();
+        if (event.key === "Escape") setText(null);
+      }}
+    />
+  );
+}
+
+/** A textarea that grows with its text, between `minRows` and `maxRows`. */
+export const AutoTextarea = forwardRef<
+  HTMLTextAreaElement,
+  TextareaHTMLAttributes<HTMLTextAreaElement> & { minRows?: number; maxRows?: number }
+>(function AutoTextarea({ minRows = 1, maxRows = 20, value, style, ...rest }, forwarded) {
+  const inner = useRef<HTMLTextAreaElement | null>(null);
+  useLayoutEffect(() => {
+    const element = inner.current;
+    if (!element) return;
+    const css = getComputedStyle(element);
+    const line = parseFloat(css.lineHeight) || 18;
+    const padding = parseFloat(css.paddingTop) + parseFloat(css.paddingBottom);
+    const border = parseFloat(css.borderTopWidth) + parseFloat(css.borderBottomWidth);
+    element.style.height = "auto";
+    const content = element.scrollHeight - padding;
+    const rows = Math.min(Math.max(content, line * minRows), line * maxRows);
+    element.style.height = `${Math.ceil(rows + padding + border)}px`;
+    element.style.overflowY = content > line * maxRows ? "auto" : "hidden";
+  }, [value, minRows, maxRows]);
+  return (
+    <textarea
+      {...rest}
+      rows={minRows}
+      value={value}
+      style={{ resize: "none", ...style }}
+      ref={(element) => {
+        inner.current = element;
+        if (typeof forwarded === "function") forwarded(element);
+        else if (forwarded) forwarded.current = element;
+      }}
+    />
+  );
+});

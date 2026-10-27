@@ -3,7 +3,7 @@ import type { CompareOp, Condition, EntityKind, ProjectDocument, Scalar } from "
 import { useProjectStore } from "../store/projectStore";
 import { menuHandler, type MenuItem } from "./ContextMenu";
 import { EntitySelect } from "./EntitySelect";
-import { IconButton } from "./Panel";
+import { IconButton, NumberField } from "./Panel";
 
 type Rule = Extract<Condition, { type: "compare" } | { type: "has" }>;
 
@@ -226,13 +226,7 @@ function ValueInput({
   }
   if (kind === "value") {
     return (
-      <input
-        className="sp-cell"
-        type="number"
-        aria-label="Value"
-        value={typeof value === "number" ? value : 0}
-        onChange={(event) => onChange(Number(event.target.value))}
-      />
+      <NumberField label="Value" value={typeof value === "number" ? value : 0} onCommit={onChange} />
     );
   }
   const entityKind: EntityKind | null = kind === "character" || kind === "item" || kind === "location" ? kind : null;
