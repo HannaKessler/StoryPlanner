@@ -13,14 +13,18 @@ const CARD_W = 230;
 const STACK_GAP = 16;
 const BOX_GAP = 72;
 const MIN_W = PAD + CARD_W + PAD;
-const MIN_H = TITLE + 96;
+/** Room for one card and somewhere to drop another. */
+const MIN_H = TITLE + 150;
+/** Space kept under the lowest card so a beat can be dropped in. */
+const DROP_ROOM = 56;
 
 export type MeasuredSizes = Record<string, { width: number; height: number }>;
 
 /** Height the location layout reserves for a card before it has been measured. */
 function cardHeight(node: StoryNode | undefined, extraRows = 0): number {
   if (!node) return 72;
-  let body = node.title.trim() ? 18 : 0;
+  // Untitled cards show their fallback name, so every card has a title row.
+  let body = 18;
   body += extraRows * 16;
   if (node.summary.trim()) body += Math.max(1, Math.ceil(node.summary.trim().length / 30)) * 16;
   if (node.sceneNotes.trim()) body += Math.max(1, Math.ceil(node.sceneNotes.trim().length / 30)) * 16;
@@ -29,7 +33,7 @@ function cardHeight(node: StoryNode | undefined, extraRows = 0): number {
     body += Math.max(1, Math.ceil(chars / 30)) * 16;
   }
   if (node.effects.length > 0) body += node.effects.length * 14;
-  return Math.max(40, 16 + body);
+  return Math.max(52, 16 + body);
 }
 
 export interface LocationFrameNode {
@@ -130,7 +134,7 @@ export function locationFrames(
     let contentHeight = MIN_H;
     for (const [id, position] of placed) {
       contentWidth = Math.max(contentWidth, position.x + widthOf(id) + PAD);
-      contentHeight = Math.max(contentHeight, position.y + heightOf(id) + PAD);
+      contentHeight = Math.max(contentHeight, position.y + heightOf(id) + DROP_ROOM);
     }
     return { group, placed, contentWidth, contentHeight, saved: saved.get(group.id) };
   });

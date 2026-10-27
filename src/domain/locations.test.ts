@@ -85,3 +85,18 @@ describe("location boxes", () => {
     expect(clampInBox({ x: -20, y: 2 }).y).toBeGreaterThan(2);
   });
 });
+
+describe("roomy boxes", () => {
+  it("gives a box with one empty beat room for a card and a drop below it", () => {
+    const { project, graphs } = buildSample();
+    const root = graphs[project.rootGraphId];
+    const blank = createNode({ id: "blank", position: { x: 0, y: 0 } });
+    const graph = { ...root, nodes: [...root.nodes, blank], locationBoxes: [] };
+    const frames = locationFrames(graph, project, { ...graphs, [graph.id]: graph }, { blank: { width: 230, height: 52 } });
+    const unplaced = frames.find((frame) => frame.nodes.some((node) => node.id === "blank"))!;
+    const slot = unplaced.nodes.find((node) => node.id === "blank")!;
+    expect(unplaced.size.width).toBeGreaterThanOrEqual(262);
+    expect(unplaced.size.height).toBeGreaterThanOrEqual(slot.position.y + 52 + 56);
+    expect(unplaced.size.height).toBeGreaterThanOrEqual(186);
+  });
+});

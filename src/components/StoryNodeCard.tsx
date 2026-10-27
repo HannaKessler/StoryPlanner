@@ -3,6 +3,7 @@ import { memo } from "react";
 import { describeEffect } from "../domain/effects";
 import { entityName, speakerName } from "../domain/format";
 import { graphName } from "../domain/graphOps";
+import { beatLabel } from "../domain/labels";
 import type { NodeInvolvement } from "../domain/involved";
 import type { DialogueLine, ProjectDocument, StoryNode } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
@@ -38,16 +39,14 @@ export const StoryNodeCard = memo(function StoryNodeCard({ data, selected }: Nod
       }}
     >
       <Handle type="target" position={Position.Left} id="in" />
-      {(story.subgraphId || title) && (
-        <header>
-          {title ? <h3>{title}</h3> : <span />}
-          {story.subgraphId && (
-            <span className="sp-node-nest" title="Sub-graph">
-              ↳
-            </span>
-          )}
-        </header>
-      )}
+      <header>
+        {title ? <h3>{title}</h3> : <h3 className="sp-unnamed">{project ? beatLabel(story, project) : "Beat"}</h3>}
+        {story.subgraphId && (
+          <span className="sp-node-nest" title="Sub-graph">
+            ↳
+          </span>
+        )}
+      </header>
       {project && <RefLine ids={all?.locationIds ?? []} own={own?.locationIds ?? []} project={project} from={from} />}
       {project && <RefLine ids={all?.characterIds ?? []} own={own?.characterIds ?? []} project={project} from={from} kind="who" />}
       {project && <RefLine ids={all?.itemIds ?? []} own={own?.itemIds ?? []} project={project} from={from} kind="item" />}

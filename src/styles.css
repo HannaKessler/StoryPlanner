@@ -438,6 +438,7 @@ form.sp-speaker { display: flex; }
 
 .sp-node {
   width: 230px;
+  min-height: 52px;
   background: #241f1a;
   border: 1px solid var(--line-strong);
   border-radius: 12px;
