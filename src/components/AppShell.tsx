@@ -160,7 +160,7 @@ export function AppShell() {
         <span>
           {graph && (
             <>
-              {`${plural(graph.nodes.length, "beat")} · ${plural(graph.edges.length, "transition")} (${graph.edges.filter((edge) => edge.condition).length} conditional)`}
+              {`${plural(graph.nodes.length, "event")} · ${plural(graph.edges.length, "transition")} (${graph.edges.filter((edge) => edge.condition).length} conditional)`}
               {" · "}
             </>
           )}

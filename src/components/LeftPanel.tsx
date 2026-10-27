@@ -175,7 +175,7 @@ function RenameField({ initial, placeholder, onDone }: { initial: string; placeh
   return (
     <input
       className="sp-cell sp-outline-input"
-      aria-label="Beat title"
+      aria-label="Event title"
       autoFocus
       value={value}
       placeholder={placeholder}

@@ -16,7 +16,7 @@ export function exportScreenplay(
   const lines: string[] = [
     `# ${project.name || "Untitled story"}`,
     "",
-    "Branching screenplay. Each beat is written in full the first time it appears. Later visits point back to it with an arrow. Scene notes are block quotes. Transitions show their conditions and variable changes in words, not code.",
+    "Branching screenplay. Each event is written in full the first time it appears. Later visits point back to it with an arrow. Scene notes are block quotes. Transitions show their conditions and variable changes in words, not code.",
     "",
   ];
   const seen = new Set<string>();
@@ -122,7 +122,7 @@ function writeTransition(
   lines: string[],
   project: ProjectDocument,
 ) {
-  const title = target ? beatLabel(target, project) : "Missing beat";
+  const title = target ? beatLabel(target, project) : "Missing event";
   const heading = edge.label ? `${edge.label} → ${title}` : `→ ${title}`;
   lines.push(`**${heading}**`);
   if (edge.condition) lines.push(`*When ${describeCondition(edge.condition, project)}.*`);

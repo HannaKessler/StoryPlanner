@@ -18,7 +18,7 @@ export const StoryNodeCard = memo(function StoryNodeCard({ data, selected }: Nod
   const story = data.story;
   const project = useProjectStore((state) => state.project);
   const openSubgraph = useProjectStore((state) => state.openSubgraph);
-  const from = `From children of ${project ? beatLabel(story, project) : "this beat"}`;
+  const from = `From children of ${project ? beatLabel(story, project) : "this event"}`;
   const title = story.title.trim();
   const summary = story.summary.trim();
   const own = data.involvement?.own;
@@ -35,7 +35,7 @@ export const StoryNodeCard = memo(function StoryNodeCard({ data, selected }: Nod
     >
       <Handle type="target" position={Position.Left} id="in" />
       <header>
-        {title ? <h3>{title}</h3> : <h3 className="sp-unnamed">{project ? beatLabel(story, project) : "Beat"}</h3>}
+        {title ? <h3>{title}</h3> : <h3 className="sp-unnamed">{project ? beatLabel(story, project) : "Event"}</h3>}
         {story.subgraphId && (
           <span className="sp-node-nest" title="Has children">
             ↳

@@ -207,7 +207,7 @@ function Logic({ project, graph, node }: { project: ProjectDocument; graph: Grap
                   value={edge.label}
                   onChange={(event) => updateEdge(edge.id, { label: event.target.value })}
                 />
-                <span className="sp-faint">→ {target ? beatLabel(target, project) : "Missing beat"}</span>
+                <span className="sp-faint">→ {target ? beatLabel(target, project) : "Missing event"}</span>
                 <IconButton label="Delete transition" danger onClick={() => deleteEdges([edge.id])}>
                   ×
                 </IconButton>

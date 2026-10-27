@@ -25,7 +25,7 @@ export function addBeatInView() {
 export function addBeatItems(position?: Point, partial?: Partial<Pick<StoryNode, "locationId" | "locationPosition">>): MenuItem[] {
   return [
     {
-      label: "Add beat",
+      label: "Add event",
       onSelect: () => (position || partial ? useProjectStore.getState().addNode(position, partial) : addBeatInView()),
     },
   ];
@@ -62,7 +62,7 @@ export function edgeItems(edgeId: string): MenuItem[] {
   const reverseExists = Boolean(edge && graph?.edges.some((item) => item.source === edge.target && item.target === edge.source));
   return [
     { label: "Add reverse transition", disabled: reverseExists, onSelect: () => state.addReverseTransition(edgeId) },
-    { label: "Insert beat", onSelect: () => state.insertBeatOnEdge(edgeId) },
+    { label: "Insert event", onSelect: () => state.insertBeatOnEdge(edgeId) },
     "separator",
     { label: "Delete", danger: true, onSelect: () => state.deleteEdges([edgeId]) },
   ];

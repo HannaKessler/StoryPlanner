@@ -184,7 +184,7 @@ export function availableActions(
   for (const edge of graph.edges) {
     if (edge.source !== node.id) continue;
     const target = graph.nodes.find((item) => item.id === edge.target);
-    const targetTitle = target ? beatLabel(target, project) : "Missing beat";
+    const targetTitle = target ? beatLabel(target, project) : "Missing event";
     actions.push({
       id: `edge:${edge.id}`,
       kind: "transition",
@@ -204,7 +204,7 @@ export function availableActions(
       id: "return",
       kind: "return",
       label: "Return",
-      target: parentNode ? beatLabel(parentNode, project) : "Parent beat",
+      target: parentNode ? beatLabel(parentNode, project) : "Parent event",
       condition: "",
       failed: "",
       enabled: true,

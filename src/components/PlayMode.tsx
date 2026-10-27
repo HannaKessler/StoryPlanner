@@ -96,7 +96,7 @@ export function PlayMode() {
             )}
           </article>
         )}
-        {!choosing && !location && <p className="sp-empty">Beat missing.</p>}
+        {!choosing && !location && <p className="sp-empty">Event missing.</p>}
         {location && (
           <article className="sp-script">
             <h2>{beatLabel(location.node, project)}</h2>

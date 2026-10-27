@@ -142,7 +142,7 @@ function CanvasBody({
     const keep = drawnPositions(box.id);
     openMenu(event.clientX, event.clientY, [
       {
-        label: "Add beat",
+        label: "Add event",
         onSelect: () => {
           saveLocationLayout({ nodePositions: keep });
           useProjectStore.getState().addNode(undefined, {

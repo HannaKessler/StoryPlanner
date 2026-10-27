@@ -99,7 +99,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
   return (
     <>
       <div className="sp-insp-head">
-        <span className="sp-kicker">Beat</span>
+        <span className="sp-kicker">Event</span>
         <AutoTextarea
           className="sp-head-input sp-head-area"
           aria-label="Title"
@@ -246,7 +246,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
       )}
 
       <span className="sp-insp-pin">
-        <IconButton label="Delete beat" danger onClick={() => requestDeleteNodes([node.id])}>
+        <IconButton label="Delete event" danger onClick={() => requestDeleteNodes([node.id])}>
           ×
         </IconButton>
       </span>
@@ -277,7 +277,7 @@ function TransitionList({
     <ul className="sp-trans-list">
       {edges.map((edge, index) => {
         const other = graph.nodes.find((item) => item.id === edge[side]);
-        const otherTitle = other ? beatLabel(other, project) : "Missing beat";
+        const otherTitle = other ? beatLabel(other, project) : "Missing event";
         const logic = transitionLogic(edge, project);
         return (
           <li
@@ -466,7 +466,7 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
         <span className="sp-row-pair">
           <select
             className={refused === "source" ? "sp-cell is-dup" : "sp-cell"}
-            aria-label="From beat"
+            aria-label="From event"
             aria-invalid={refused === "source" || undefined}
             value={edge.source}
             onChange={(event) => change("source", event.target.value)}
@@ -484,7 +484,7 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
         <span className="sp-row-pair">
           <select
             className={refused === "target" ? "sp-cell is-dup" : "sp-cell"}
-            aria-label="To beat"
+            aria-label="To event"
             aria-invalid={refused === "target" || undefined}
             value={edge.target}
             onChange={(event) => change("target", event.target.value)}
