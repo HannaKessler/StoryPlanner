@@ -163,6 +163,8 @@ interface ProjectStore {
   renameProject: (name: string) => void;
   openGraph: (graphId: string) => void;
   select: (selection: Selection) => void;
+  /** Opens the graph that holds a beat and selects it. */
+  selectBeat: (graphId: string, nodeId: string) => void;
   updateGraphMeta: (patch: Partial<Pick<GraphDocument, "name" | "sceneNotes">>) => void;
   updateNode: (nodeId: string, patch: Partial<StoryNode>) => void;
   updateNodePosition: (nodeId: string, position: { x: number; y: number }) => void;
@@ -882,6 +884,12 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
 
   select(selection) {
     set({ selection });
+  },
+
+  selectBeat(graphId, nodeId) {
+    const graph = get().graphs[graphId];
+    if (!graph?.nodes.some((node) => node.id === nodeId)) return;
+    set({ currentGraphId: graphId, selection: { kind: "node", id: nodeId }, screen: "graph" });
   },
 
   updateGraphMeta(patch) {

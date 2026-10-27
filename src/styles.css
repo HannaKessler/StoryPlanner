@@ -304,6 +304,11 @@ input.sp-cell[type="number"]::-webkit-inner-spin-button, input.sp-cell[type="num
 .sp-beats { list-style: none; margin: 0; padding: 0; }
 .sp-beats li { display: flex; align-items: center; border-radius: 4px; }
 .sp-beats li.is-active { background: var(--bg-elev-2); }
+.sp-outline li { gap: 2px; min-height: 24px; padding-right: 4px; cursor: pointer; color: var(--text-dim); font-size: var(--fs-sm); }
+.sp-outline li:hover { color: var(--text); background: var(--bg-elev-2); }
+.sp-outline li.is-active { color: var(--text); }
+.sp-outline-toggle { width: 14px; flex: none; text-align: center; color: var(--text-faint); }
+.sp-outline-input { flex: 1; min-width: 0; height: 22px; }
 .sp-beat {
   flex: 1;
   min-width: 0;
