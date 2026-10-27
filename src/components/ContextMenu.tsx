@@ -2,7 +2,9 @@ import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent as ReactM
 import { create } from "zustand";
 import { keepsNativeContextMenu } from "../contextMenu";
 
-export type MenuItem = { label: string; onSelect: () => void; danger?: boolean; disabled?: boolean } | "separator";
+export type MenuItem =
+  | { label: string; onSelect: () => void; danger?: boolean; disabled?: boolean; hint?: string }
+  | "separator";
 
 type MenuState = {
   menu: { x: number; y: number; items: MenuItem[] } | null;
@@ -66,7 +68,36 @@ export function ContextMenu() {
 
   useEffect(() => {
     if (!menu) return;
-    const onKey = (event: KeyboardEvent) => event.key === "Escape" && close();
+    // The menu takes focus, and gives it back to where it was when it closes.
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const frame = window.requestAnimationFrame(() => {
+      ref.current?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      if (previous && document.contains(previous) && !ref.current?.contains(previous)) previous.focus({ preventScroll: true });
+    };
+  }, [menu]);
+
+  useEffect(() => {
+    if (!menu) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close();
+        return;
+      }
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp" && event.key !== "Home" && event.key !== "End") return;
+      const buttons = [...(ref.current?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ?? [])];
+      if (buttons.length === 0) return;
+      event.preventDefault();
+      const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+      let next = 0;
+      if (event.key === "End") next = buttons.length - 1;
+      else if (event.key === "ArrowDown") next = index < 0 ? 0 : (index + 1) % buttons.length;
+      else if (event.key === "ArrowUp") next = index <= 0 ? buttons.length - 1 : index - 1;
+      buttons[next].focus();
+    };
     const onDown = (event: MouseEvent) => {
       if (!ref.current?.contains(event.target as Node)) close();
     };
@@ -100,7 +131,7 @@ export function ContextMenu() {
     >
       {menu.items.map((item, index) =>
         item === "separator" ? (
-          <hr key={`sep-${index}`} />
+          <hr key={`sep-${index}`} role="separator" />
         ) : (
           <button
             key={`${item.label}-${index}`}
@@ -113,7 +144,8 @@ export function ContextMenu() {
               item.onSelect();
             }}
           >
-            {item.label}
+            <span>{item.label}</span>
+            {item.hint && <kbd>{item.hint}</kbd>}
           </button>
         ),
       )}

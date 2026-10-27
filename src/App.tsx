@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { inTauri, onWindowCloseRequested, setWindowTitle } from "./desktop/tauri";
 import { AppShell } from "./components/AppShell";
-import { ContextMenu, useContextMenu } from "./components/ContextMenu";
+import { ContextMenu, focusRename, useContextMenu } from "./components/ContextMenu";
 import { StartScreen } from "./components/StartScreen";
 import { useProjectStore } from "./store/projectStore";
 
@@ -26,7 +26,7 @@ export function App() {
       if (key === "escape") {
         // Menus and dialogs close themselves. Otherwise Escape leaves a text field, then clears the selection.
         if (useContextMenu.getState().menu || state.confirm || state.pendingClose || state.exportOpen) return;
-        if (document.querySelector(".sp-menu-pop, .sp-modal")) return;
+        if (document.querySelector(".sp-modal")) return;
         if (editingText(event.target)) {
           (event.target as HTMLElement).blur();
           return;
@@ -44,7 +44,19 @@ export function App() {
         event.preventDefault();
         return;
       }
-      if (!mod || event.altKey || !state.project || editingText(event.target)) return;
+      // Typing in a field, or a dialog or menu being open, leaves the shortcuts below alone.
+      const typing = editingText(event.target) || Boolean(document.querySelector(".sp-modal, .sp-context"));
+      if (state.project && !typing && !mod && !event.altKey && key === "f2" && state.selection && state.screen === "graph") {
+        event.preventDefault();
+        focusRename(state.selection.id);
+        return;
+      }
+      if (state.project && !typing && mod && !event.altKey && key === "d" && state.selection?.kind === "node" && state.screen === "graph") {
+        event.preventDefault();
+        state.duplicateNode(state.selection.id);
+        return;
+      }
+      if (!mod || event.altKey || !state.project || typing) return;
       if (key === "z" && !event.shiftKey) {
         event.preventDefault();
         state.undo();

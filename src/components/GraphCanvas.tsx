@@ -100,7 +100,7 @@ function CanvasBody({
   const requestDeleteNodes = useProjectStore((state) => state.requestDeleteNodes);
   const restoreTick = useProjectStore((state) => state.restoreTick);
   const appliedTick = useRef(restoreTick);
-  const { fitView, screenToFlowPosition, getNodes, getEdges, getViewport, setCenter } = useReactFlow();
+  const { fitView, screenToFlowPosition, getNodes, getEdges, getViewport, setCenter, zoomIn, zoomOut } = useReactFlow();
   const openMenu = useContextMenu((state) => state.open);
   const closeMenu = useContextMenu((state) => state.close);
   const arranging = mode === "locations";
@@ -262,23 +262,55 @@ function CanvasBody({
   useEffect(() => {
     // Delete and Backspace go through the store, which confirms when sub-graphs would go too.
     const onKey = (event: KeyboardEvent) => {
-      if (event.key !== "Delete" && event.key !== "Backspace") return;
-      if (event.ctrlKey || event.metaKey || event.altKey || typingTarget(event.target)) return;
+      if (typingTarget(event.target) || document.querySelector(".sp-modal, .sp-context")) return;
       const state = useProjectStore.getState();
       if (state.confirm || state.pendingClose || state.exportOpen) return;
+      const mod = event.ctrlKey || event.metaKey;
+      const graphNow = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
+      const goUp = () => {
+        if (!graphNow?.parentGraphId || !state.graphs[graphNow.parentGraphId]) return false;
+        state.openGraph(graphNow.parentGraphId);
+        if (graphNow.parentNodeId) state.select({ kind: "node", id: graphNow.parentNodeId });
+        return true;
+      };
+      if (!mod && !event.altKey && (event.key === "+" || event.key === "=")) {
+        event.preventDefault();
+        void zoomIn({ duration: 120 });
+        return;
+      }
+      if (!mod && !event.altKey && (event.key === "-" || event.key === "_")) {
+        event.preventDefault();
+        void zoomOut({ duration: 120 });
+        return;
+      }
+      if (mod && event.key === "0") {
+        event.preventDefault();
+        void fitView({ padding: 0.08, duration: 180 });
+        return;
+      }
+      if (event.altKey && event.key === "ArrowLeft") {
+        if (goUp()) event.preventDefault();
+        return;
+      }
+      if (event.key !== "Delete" && event.key !== "Backspace") return;
+      if (mod || event.altKey) return;
       const nodeIds = getNodes()
         .filter((node) => node.selected && node.type === "story")
         .map((node) => node.id);
       const edgeIds = getEdges()
         .filter((edge) => edge.selected)
         .map((edge) => edge.id);
-      if (nodeIds.length === 0 && edgeIds.length === 0) return;
+      if (nodeIds.length === 0 && edgeIds.length === 0) {
+        // With nothing selected, Backspace goes up one sub-graph level.
+        if (event.key === "Backspace" && goUp()) event.preventDefault();
+        return;
+      }
       event.preventDefault();
       requestDeleteNodes(nodeIds, edgeIds);
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [getNodes, getEdges, requestDeleteNodes]);
+  }, [getNodes, getEdges, requestDeleteNodes, zoomIn, zoomOut, fitView]);
 
   const onNodesChange = (changes: NodeChange<CanvasNode>[]) => {
     setNodes((current) => applyNodeChanges(changes, current));

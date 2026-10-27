@@ -99,7 +99,7 @@ h1 { font-family: var(--font-story); font-size: 52px; line-height: 1.05; font-we
   border-bottom: 1px solid var(--line);
 }
 .sp-topbar { justify-content: space-between; }
-.sp-brand, .sp-modes, .sp-menu { display: flex; align-items: center; gap: 6px; }
+.sp-brand, .sp-modes { display: flex; align-items: center; gap: 6px; }
 .sp-brand .sp-btn-quiet { padding: 3px 8px; font-size: 13px; border-color: transparent; }
 .sp-brand .sp-btn-quiet:hover { background: var(--bg-elev-2); }
 .sp-title-input {
@@ -122,35 +122,6 @@ h1 { font-family: var(--font-story); font-size: 52px; line-height: 1.05; font-we
   font-size: 13px;
 }
 .sp-modes button.is-active { color: var(--text); font-weight: 650; }
-.sp-menu { position: relative; }
-.sp-menu-back { position: fixed; inset: 0; background: transparent; border: 0; z-index: 20; }
-.sp-menu-pop {
-  position: absolute;
-  top: 30px;
-  left: 0;
-  z-index: 21;
-  background: var(--bg-elev);
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  min-width: 190px;
-  padding: 4px;
-  box-shadow: var(--shadow);
-  display: flex;
-  flex-direction: column;
-}
-.sp-menu-pop button {
-  background: transparent;
-  border: 0;
-  text-align: left;
-  padding: 5px 8px;
-  border-radius: 5px;
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-}
-.sp-menu-pop button:hover:not(:disabled) { background: var(--bg-elev-2); }
-.sp-menu-pop button:disabled { opacity: 0.45; cursor: default; }
-.sp-menu-pop kbd { color: var(--text-faint); font-family: inherit; }
 .sp-status { border-bottom: 0; border-top: 1px solid var(--line); color: var(--text-faint); font-size: 11px; justify-content: space-between; }
 .sp-warn { color: var(--danger); }
 .sp-status-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -319,10 +290,11 @@ input.sp-cell[type="number"]::-webkit-inner-spin-button, input.sp-cell[type="num
   border-radius: 4px;
   font-size: 12.5px;
 }
-.sp-context button { background: transparent; border: 0; border-radius: 3px; padding: 3px 8px; text-align: left; font-size: 12.5px; line-height: 18px; color: var(--text-dim); white-space: nowrap; }
+.sp-context button { display: flex; justify-content: space-between; gap: 18px; background: transparent; border: 0; border-radius: 3px; padding: 3px 8px; text-align: left; font-size: 12.5px; line-height: 18px; color: var(--text-dim); white-space: nowrap; }
 .sp-context button:hover:not(:disabled), .sp-context button:focus-visible { background: var(--bg-elev-2); color: var(--text); outline: none; }
 .sp-context button:disabled { opacity: 0.4; cursor: default; }
 .sp-context button.is-danger:hover:not(:disabled) { color: var(--danger); }
+.sp-context kbd { font-family: inherit; color: var(--text-faint); }
 .sp-context hr { border: 0; border-top: 1px solid var(--line); margin: 3px 2px; }
 .sp-canvas .react-flow { background: var(--bg-sunken); }
 

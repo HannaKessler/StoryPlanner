@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { graphBreadcrumbs } from "../domain/graphOps";
 import { plural } from "../domain/labels";
 import { libraryKind } from "../domain/format";
@@ -8,6 +7,7 @@ import { ExportDialog } from "./ExportDialog";
 import { GraphCanvas } from "./GraphCanvas";
 import { Inspector } from "./Inspector";
 import { LeftPanel } from "./LeftPanel";
+import { openMenuBelow, type MenuItem } from "./ContextMenu";
 import { Modal } from "./Modal";
 import { addBeatInView } from "./menuItems";
 import { PlayMode } from "./PlayMode";
@@ -28,21 +28,11 @@ export function AppShell() {
   const setScreen = useProjectStore((state) => state.setScreen);
   const renameProject = useProjectStore((state) => state.renameProject);
   const openGraph = useProjectStore((state) => state.openGraph);
-  const save = useProjectStore((state) => state.save);
-  const requestClose = useProjectStore((state) => state.requestClose);
   const setExportOpen = useProjectStore((state) => state.setExportOpen);
   const dismissBanner = useProjectStore((state) => state.dismissBanner);
   const canUndo = useProjectStore((state) => state.past.length > 0);
   const canRedo = useProjectStore((state) => state.future.length > 0);
   const confirm = useProjectStore((state) => state.confirm);
-  const [menu, setMenu] = useState(false);
-
-  useEffect(() => {
-    if (!menu) return;
-    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setMenu(false);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [menu]);
 
   if (!project || !currentGraphId) return null;
   const graph = graphs[currentGraphId];
@@ -52,39 +42,14 @@ export function AppShell() {
     <div className="sp-app">
       <header className="sp-topbar">
         <div className="sp-brand">
-          <div className="sp-menu">
-            <button type="button" className="sp-btn sp-btn-quiet" onClick={() => setMenu((open) => !open)}>
-              File
-            </button>
-            {menu && (
-              <>
-                <button type="button" className="sp-menu-back" aria-label="Close menu" onClick={() => setMenu(false)} />
-                <div className="sp-menu-pop" role="menu">
-                  <button type="button" onClick={() => { setMenu(false); requestClose("new"); }}>
-                    New project
-                  </button>
-                  <button type="button" onClick={() => { setMenu(false); requestClose("open"); }}>
-                    Open project
-                  </button>
-                  <button type="button" onClick={() => { setMenu(false); void save(); }}>
-                    Save <kbd>Ctrl+S</kbd>
-                  </button>
-                  <button type="button" disabled={!canUndo} onClick={() => { setMenu(false); useProjectStore.getState().undo(); }}>
-                    Undo <kbd>Ctrl+Z</kbd>
-                  </button>
-                  <button type="button" disabled={!canRedo} onClick={() => { setMenu(false); useProjectStore.getState().redo(); }}>
-                    Redo <kbd>Ctrl+Y</kbd>
-                  </button>
-                  <button type="button" onClick={() => { setMenu(false); setExportOpen(true); }}>
-                    Export…
-                  </button>
-                  <button type="button" onClick={() => { setMenu(false); requestClose(null); }}>
-                    Close project
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          <button
+            type="button"
+            className="sp-btn sp-btn-quiet"
+            aria-haspopup="menu"
+            onClick={(event) => openMenuBelow(event.currentTarget, fileItems(canUndo, canRedo))}
+          >
+            File
+          </button>
           <input
             className="sp-title-input"
             aria-label="Project name"
@@ -208,4 +173,19 @@ export function AppShell() {
       )}
     </div>
   );
+}
+
+function fileItems(canUndo: boolean, canRedo: boolean): MenuItem[] {
+  const state = useProjectStore.getState();
+  return [
+    { label: "New project", onSelect: () => state.requestClose("new") },
+    { label: "Open project", onSelect: () => state.requestClose("open") },
+    "separator",
+    { label: "Save", hint: "Ctrl+S", onSelect: () => void state.save() },
+    { label: "Undo", hint: "Ctrl+Z", disabled: !canUndo, onSelect: () => state.undo() },
+    { label: "Redo", hint: "Ctrl+Y", disabled: !canRedo, onSelect: () => state.redo() },
+    "separator",
+    { label: "Export…", onSelect: () => state.setExportOpen(true) },
+    { label: "Close project", onSelect: () => state.requestClose(null) },
+  ];
 }
