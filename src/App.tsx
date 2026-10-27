@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { inTauri, setWindowTitle } from "./desktop/tauri";
+import { inTauri, onWindowCloseRequested, setWindowTitle } from "./desktop/tauri";
 import { AppShell } from "./components/AppShell";
 import { ContextMenu } from "./components/ContextMenu";
 import { StartScreen } from "./components/StartScreen";
@@ -8,14 +8,15 @@ import { useProjectStore } from "./store/projectStore";
 export function App() {
   const project = useProjectStore((state) => state.project);
   const init = useProjectStore((state) => state.init);
+  const dirty = useProjectStore((state) => state.dirty);
 
   useEffect(() => {
     init();
   }, [init]);
 
   useEffect(() => {
-    void setWindowTitle(project ? `StoryPlanner — ${project.name}` : "StoryPlanner");
-  }, [project?.name]);
+    void setWindowTitle(project ? `StoryPlanner — ${dirty ? "• " : ""}${project.name}` : "StoryPlanner");
+  }, [project?.name, dirty]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -43,6 +44,25 @@ export function App() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  useEffect(() => {
+    if (inTauri()) {
+      // The window close button goes through the unsaved-changes prompt.
+      return onWindowCloseRequested(() => {
+        const state = useProjectStore.getState();
+        if (!state.project || !state.dirty) return false;
+        state.requestClose("quit");
+        return true;
+      });
+    }
+    const onUnload = (event: BeforeUnloadEvent) => {
+      if (!useProjectStore.getState().dirty) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onUnload);
+    return () => window.removeEventListener("beforeunload", onUnload);
   }, []);
 
   return (

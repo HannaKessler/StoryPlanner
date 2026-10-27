@@ -72,6 +72,26 @@ export async function setWindowTitle(title: string): Promise<void> {
   await getCurrentWindow().setTitle(title);
 }
 
+/**
+ * Calls `handler` when the user closes the window. When it returns true the
+ * close is cancelled. Returns a cleanup function.
+ */
+export function onWindowCloseRequested(handler: () => boolean): () => void {
+  let unlisten: (() => void) | null = null;
+  let disposed = false;
+  void import("@tauri-apps/api/window").then(async ({ getCurrentWindow }) => {
+    const stop = await getCurrentWindow().onCloseRequested((event) => {
+      if (handler()) event.preventDefault();
+    });
+    if (disposed) stop();
+    else unlisten = stop;
+  });
+  return () => {
+    disposed = true;
+    unlisten?.();
+  };
+}
+
 export function errorMessage(error: unknown): string {
   if (typeof error === "string") return error;
   if (error instanceof Error && error.message) return error.message;
