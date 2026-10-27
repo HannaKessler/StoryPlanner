@@ -102,7 +102,7 @@ h1 { font-family: var(--font-story); font-size: 52px; line-height: 1.05; font-we
   border-bottom: 1px solid var(--line);
 }
 .sp-topbar { justify-content: space-between; }
-.sp-brand, .sp-modes { display: flex; align-items: center; gap: 6px; }
+.sp-brand { display: flex; align-items: center; gap: 6px; }
 .sp-brand .sp-btn-quiet { padding: 3px 8px; font-size: var(--fs-sm); border-color: transparent; }
 .sp-brand .sp-btn-quiet:hover { background: var(--bg-elev-2); }
 .sp-title-input {
@@ -116,15 +116,6 @@ h1 { font-family: var(--font-story); font-size: 52px; line-height: 1.05; font-we
 }
 .sp-title-input:focus { border-color: var(--line); background: var(--bg-elev); }
 .sp-dirty { color: var(--text-faint); font-size: var(--fs-xs); }
-.sp-modes button {
-  background: transparent;
-  border: 0;
-  color: var(--text-dim);
-  border-radius: 999px;
-  padding: 3px 11px;
-  font-size: var(--fs-sm);
-}
-.sp-modes button.is-active { color: var(--text); font-weight: 650; }
 .sp-status { border-bottom: 0; border-top: 1px solid var(--line); color: var(--text-faint); font-size: var(--fs-xs); justify-content: space-between; }
 
 .sp-status-path { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

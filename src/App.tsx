@@ -58,6 +58,11 @@ export function App() {
         return;
       }
       const modal = Boolean(document.querySelector(".sp-modal, .sp-context"));
+      if (state.project && !modal && mod && !event.altKey && !event.shiftKey && key === "e") {
+        event.preventDefault();
+        state.setExportOpen(true);
+        return;
+      }
       if (state.project && !modal && mod && !event.altKey && !event.shiftKey && (key === "1" || key === "2")) {
         event.preventDefault();
         state.setEditMode(key === "1" ? "structure" : "write");

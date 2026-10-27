@@ -27,10 +27,8 @@ export function AppShell() {
   const canvasMode = useProjectStore((state) => state.canvasMode);
   const resumeIntent = useProjectStore((state) => state.resumeIntent);
   const setCanvasMode = useProjectStore((state) => state.setCanvasMode);
-  const setScreen = useProjectStore((state) => state.setScreen);
   const renameProject = useProjectStore((state) => state.renameProject);
   const openGraph = useProjectStore((state) => state.openGraph);
-  const setExportOpen = useProjectStore((state) => state.setExportOpen);
   const dismissBanner = useProjectStore((state) => state.dismissBanner);
   const canUndo = useProjectStore((state) => state.past.length > 0);
   const canRedo = useProjectStore((state) => state.future.length > 0);
@@ -80,27 +78,6 @@ export function AppShell() {
             );
           })}
         </div>
-        <nav className="sp-modes" aria-label="Sections">
-          {(
-            [
-              ["graph", "Graph"],
-              ["play", "Play"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className={screen === id ? "is-active" : ""}
-              aria-current={screen === id ? "page" : undefined}
-              onClick={() => setScreen(id)}
-            >
-              {label}
-            </button>
-          ))}
-          <button type="button" onClick={() => setExportOpen(true)}>
-            Export
-          </button>
-        </nav>
       </header>
       <div className="sp-main">
         {banner && (
@@ -169,6 +146,7 @@ export function AppShell() {
             )}
           </>
         )}
+        {/* Play mode is hidden for now. Nothing switches to it, but it stays easy to bring back. */}
         {screen === "play" && <PlayMode />}
         {(screen === "characters" || screen === "items" || screen === "locations") && (
           <div className="sp-workspace">
@@ -233,7 +211,7 @@ function fileItems(canUndo: boolean, canRedo: boolean): MenuItem[] {
     { label: "Undo", hint: "Ctrl+Z", disabled: !canUndo, onSelect: () => state.undo() },
     { label: "Redo", hint: "Ctrl+Y", disabled: !canRedo, onSelect: () => state.redo() },
     "separator",
-    { label: "Export…", onSelect: () => state.setExportOpen(true) },
+    { label: "Export…", hint: "Ctrl+E", onSelect: () => state.setExportOpen(true) },
     { label: "Close project", onSelect: () => state.requestClose(null) },
   ];
 }
