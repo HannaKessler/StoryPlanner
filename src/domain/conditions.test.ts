@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { appendCondition, describeCondition, evaluateCondition } from "./conditions";
+import { appendCondition, describeCondition, emptyRule, evaluateCondition, ruleForVariable } from "./conditions";
+import { createVariable } from "./factories";
 import { applyEffect, applyEffects } from "./effects";
 import { buildSample } from "./sample";
 import type { Condition, Effect } from "./types";
@@ -140,6 +141,39 @@ describe("appendCondition", () => {
       op: "and",
       children: [{ type: "not", child: rule }, extra],
     });
+  });
+});
+
+describe("new rules", () => {
+  it("start with no variable and never pass", () => {
+    const rule = emptyRule();
+    expect(rule).toEqual({ type: "compare", variableId: "", op: "eq", value: null });
+    expect(evaluateCondition(rule, values(), variables)).toBe(false);
+  });
+
+  it("take a value that suits the chosen variable", () => {
+    expect(ruleForVariable(createVariable("boolean", { id: "b" }))).toMatchObject({ type: "compare", value: true });
+    expect(ruleForVariable(createVariable("value", { id: "v" }))).toMatchObject({ type: "compare", value: 0 });
+    for (const kind of ["character", "item", "location"]) {
+      expect(ruleForVariable(createVariable(kind, { id: kind }))).toMatchObject({ type: "compare", value: null });
+    }
+  });
+
+  it("use has only for inventories", () => {
+    expect(ruleForVariable(createVariable("inventory", { id: "inv" }))).toEqual({ type: "has", variableId: "inv", entityId: "" });
+    const has: Condition = { type: "has", variableId: "inv", entityId: "x" };
+    expect(ruleForVariable(createVariable("item", { id: "it" }), has)).toMatchObject({ type: "compare", variableId: "it" });
+  });
+
+  it("keep a comparison the new kind allows", () => {
+    const rule: Condition = { type: "compare", variableId: "a", op: "gte", value: 3 };
+    expect(ruleForVariable(createVariable("value", { id: "v" }), rule)).toMatchObject({ op: "gte", value: 0 });
+    expect(ruleForVariable(createVariable("boolean", { id: "b" }), rule)).toMatchObject({ op: "eq", value: true });
+  });
+
+  it("appending a second rule wraps the first", () => {
+    const first = ruleForVariable(createVariable("boolean", { id: "b" }));
+    expect(appendCondition(first, emptyRule())).toEqual({ type: "group", op: "and", children: [first, emptyRule()] });
   });
 });
 

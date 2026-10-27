@@ -1,4 +1,4 @@
-import { entityName, formatValue, variableById } from "./format";
+import { defaultForKind, entityName, formatValue, variableById } from "./format";
 import type { CompareOp, Condition, ProjectDocument, VariableDef, VariableValue } from "./types";
 
 const OP_LABEL: Record<CompareOp, string> = {
@@ -91,6 +91,7 @@ function describeNode(condition: Condition, project: ProjectDocument): string {
     return `${label} (${condition.children.map((child) => describeNode(child, project)).join("; ")})`;
   }
   if (condition.type === "not") return `not (${describeNode(condition.child, project)})`;
+  if (!condition.variableId) return "no variable";
   if (condition.type === "has") {
     const variable = variableById(project, condition.variableId);
     const name = variable?.name || "missing variable";
@@ -102,8 +103,33 @@ function describeNode(condition: Condition, project: ProjectDocument): string {
   return `${name} ${OP_LABEL[condition.op]} ${value}`;
 }
 
-export function defaultCompare(variableId = ""): Condition {
-  return { type: "compare", variableId, op: "eq", value: true };
+/** A new rule with no variable chosen. */
+export function emptyRule(): Condition {
+  return { type: "compare", variableId: "", op: "eq", value: null };
+}
+
+/**
+ * A rule for a chosen variable. Inventories become `has` rules; every other
+ * kind becomes a comparison whose value suits the kind.
+ */
+export function ruleForVariable(
+  variable: VariableDef | undefined,
+  previous?: Extract<Condition, { type: "compare" } | { type: "has" }>,
+): Condition {
+  if (!variable) return emptyRule();
+  if (variable.kind === "inventory") {
+    const entityId = previous?.type === "has" ? previous.entityId : "";
+    return { type: "has", variableId: variable.id, entityId };
+  }
+  const allowed = opsForKind(variable.kind);
+  const op = previous?.type === "compare" && allowed.includes(previous.op) ? previous.op : allowed[0];
+  return { type: "compare", variableId: variable.id, op, value: defaultForKind(variable.kind) };
+}
+
+/** Kept for callers that start a rule on a known variable. */
+export function defaultCompare(variableId = "", variables: VariableDef[] = []): Condition {
+  if (!variableId) return emptyRule();
+  return ruleForVariable(variables.find((item) => item.id === variableId));
 }
 
 /** Adds a child at the root. A rule or NOT root is wrapped in an ALL group first. */

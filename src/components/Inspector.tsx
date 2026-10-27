@@ -400,7 +400,7 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
         title="Conditions"
         summary={describeCondition(edge.condition, project)}
         onContextMenu={menuHandler(() =>
-          conditionAddItems(edge.condition, project.variables[0]?.id ?? "", (condition) => updateEdge(edge.id, { condition })),
+          conditionAddItems(edge.condition, project.variables.length > 0, (condition) => updateEdge(edge.id, { condition })),
         )}
       >
         <ConditionBuilder value={edge.condition} onChange={(condition) => updateEdge(edge.id, { condition })} />

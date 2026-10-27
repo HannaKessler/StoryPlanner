@@ -1,10 +1,14 @@
-import { defaultCompare, opLabel, opsForKind } from "../domain/conditions";
-import type { CompareOp, Condition, Scalar } from "../domain/types";
+import { appendCondition, emptyRule, opLabel, opsForKind, ruleForVariable } from "../domain/conditions";
+import type { CompareOp, Condition, EntityKind, ProjectDocument, Scalar } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
-import { menuHandler } from "./ContextMenu";
-import { IconButton } from "./Panel";
+import { menuHandler, type MenuItem } from "./ContextMenu";
 import { EntitySelect } from "./EntitySelect";
-import type { EntityKind } from "../domain/types";
+import { IconButton } from "./Panel";
+
+type Rule = Extract<Condition, { type: "compare" } | { type: "has" }>;
+
+const allGroup = (): Condition => ({ type: "group", op: "and", children: [] });
+const anyGroup = (): Condition => ({ type: "group", op: "or", children: [] });
 
 export function ConditionBuilder({
   value,
@@ -15,38 +19,46 @@ export function ConditionBuilder({
 }) {
   const project = useProjectStore((state) => state.project);
   if (!project) return null;
-  const firstVariable = project.variables[0]?.id ?? "";
+  const noVariables = project.variables.length === 0;
   return (
     <div className="sp-cond">
-      {value ? (
-        <ConditionNode value={value} onChange={onChange} />
-      ) : (
-        <div className="sp-cond-tools">
-          <button type="button" className="sp-chip-btn" disabled={!firstVariable} onClick={() => onChange(defaultCompare(firstVariable))}>
-            + rule
-          </button>
-          <button type="button" className="sp-chip-btn" onClick={() => onChange({ type: "group", op: "and", children: [] })}>
-            + all of
-          </button>
-          <button type="button" className="sp-chip-btn" onClick={() => onChange({ type: "group", op: "or", children: [] })}>
-            + any of
-          </button>
-        </div>
-      )}
+      <div className="sp-cond-tools">
+        <button type="button" className="sp-chip-btn" disabled={noVariables} onClick={() => onChange(appendCondition(value, emptyRule()))}>
+          + rule
+        </button>
+        <button type="button" className="sp-chip-btn" onClick={() => onChange(appendCondition(value, allGroup()))}>
+          + all of
+        </button>
+        <button type="button" className="sp-chip-btn" onClick={() => onChange(appendCondition(value, anyGroup()))}>
+          + any of
+        </button>
+      </div>
+      {value && <ConditionNode value={value} onChange={onChange} root />}
     </div>
   );
+}
+
+function groupAddItems(value: Extract<Condition, { type: "group" }>, onChange: (next: Condition) => void, noVariables: boolean): MenuItem[] {
+  const add = (child: Condition) => onChange({ ...value, children: [...value.children, child] });
+  return [
+    { label: "Add rule", disabled: noVariables, onSelect: () => add(emptyRule()) },
+    { label: "Add all of", onSelect: () => add(allGroup()) },
+    { label: "Add any of", onSelect: () => add(anyGroup()) },
+  ];
 }
 
 function ConditionNode({
   value,
   onChange,
+  root = false,
 }: {
   value: Condition;
   onChange: (next: Condition | null) => void;
+  root?: boolean;
 }) {
   const project = useProjectStore((state) => state.project);
   if (!project) return null;
-  const firstVariable = project.variables[0]?.id ?? "";
+  const noVariables = project.variables.length === 0;
 
   if (value.type === "not") {
     return (
@@ -61,10 +73,10 @@ function ConditionNode({
         <div className="sp-cond-head">
           <span className="sp-cond-op">NOT</span>
           <span className="sp-grow" />
-          <button type="button" className="sp-chip-btn" onClick={() => onChange(value.child)} title="Remove the NOT and keep what is inside">
+          <button type="button" className="sp-chip-btn" onClick={() => onChange(value.child)}>
             unwrap
           </button>
-          <IconButton label="Remove" danger onClick={() => onChange(null)}>
+          <IconButton label="Delete" danger onClick={() => onChange(null)}>
             ×
           </IconButton>
         </div>
@@ -85,19 +97,7 @@ function ConditionNode({
         className={`sp-cond-group is-${value.op}`}
         title={value.children.length === 0 ? (value.op === "and" ? "Empty: always passes" : "Empty: never passes") : undefined}
         onContextMenu={menuHandler(() => [
-          {
-            label: "Add rule",
-            disabled: !firstVariable,
-            onSelect: () => onChange({ ...value, children: [...value.children, defaultCompare(firstVariable)] }),
-          },
-          {
-            label: "Add group",
-            onSelect: () =>
-              onChange({
-                ...value,
-                children: [...value.children, { type: "group", op: value.op === "and" ? "or" : "and", children: [] }],
-              }),
-          },
+          ...groupAddItems(value, onChange, noVariables),
           { label: "Wrap in NOT", onSelect: () => onChange({ type: "not", child: value }) },
           "separator",
           { label: "Delete group", danger: true, onSelect: () => onChange(null) },
@@ -114,30 +114,29 @@ function ConditionNode({
             <option value="or">ANY of</option>
           </select>
           <span className="sp-grow" />
-          <button
-            type="button"
-            className="sp-chip-btn"
-            disabled={!firstVariable}
-            onClick={() => onChange({ ...value, children: [...value.children, defaultCompare(firstVariable)] })}
-          >
-            + rule
-          </button>
-          <button
-            type="button"
-            className="sp-chip-btn"
-            onClick={() =>
-              onChange({
-                ...value,
-                children: [...value.children, { type: "group", op: value.op === "and" ? "or" : "and", children: [] }],
-              })
-            }
-          >
-            + group
-          </button>
+          {!root && (
+            <>
+              <button
+                type="button"
+                className="sp-chip-btn"
+                disabled={noVariables}
+                onClick={() => onChange({ ...value, children: [...value.children, emptyRule()] })}
+              >
+                + rule
+              </button>
+              <button
+                type="button"
+                className="sp-chip-btn"
+                onClick={() => onChange({ ...value, children: [...value.children, value.op === "and" ? anyGroup() : allGroup()] })}
+              >
+                + {value.op === "and" ? "any of" : "all of"}
+              </button>
+            </>
+          )}
           <button type="button" className="sp-chip-btn" title="Wrap in NOT" onClick={() => onChange({ type: "not", child: value })}>
             not
           </button>
-          <IconButton label="Remove group" danger onClick={() => onChange(null)}>
+          <IconButton label="Delete group" danger onClick={() => onChange(null)}>
             ×
           </IconButton>
         </div>
@@ -148,40 +147,12 @@ function ConditionNode({
     );
   }
 
-  if (value.type === "has") {
-    return (
-      <div
-        className="sp-cond-rule"
-        onContextMenu={menuHandler(() => [
-          { label: "Wrap in NOT", onSelect: () => onChange({ type: "not", child: value }) },
-          "separator",
-          { label: "Delete rule", danger: true, onSelect: () => onChange(null) },
-        ])}
-      >
-        <select
-          className="sp-cell"
-          aria-label="Variable"
-          value={value.variableId}
-          onChange={(event) => onChange({ ...value, variableId: event.target.value })}
-        >
-          <option value="">variable…</option>
-          {project.variables.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
-        <span className="sp-cond-op">has</span>
-        <EntitySelect kind="item" value={value.entityId || null} onChange={(entityId) => onChange({ ...value, entityId: entityId ?? "" })} allowEmpty />
-        <IconButton label="Remove rule" danger onClick={() => onChange(null)}>
-          ×
-        </IconButton>
-      </div>
-    );
-  }
+  return <RuleRow value={value} onChange={onChange} project={project} />;
+}
 
+function RuleRow({ value, onChange, project }: { value: Rule; onChange: (next: Condition | null) => void; project: ProjectDocument }) {
   const variable = project.variables.find((item) => item.id === value.variableId);
-  const ops = opsForKind(variable?.kind);
+  const pickVariable = (id: string) => onChange(ruleForVariable(project.variables.find((item) => item.id === id), value));
   return (
     <div
       className="sp-cond-rule"
@@ -195,20 +166,7 @@ function ConditionNode({
         className="sp-cell"
         aria-label="Variable"
         value={value.variableId}
-        onChange={(event) => {
-          const nextVariable = project.variables.find((item) => item.id === event.target.value);
-          if (nextVariable?.kind === "inventory") {
-            onChange({ type: "has", variableId: nextVariable.id, entityId: "" });
-            return;
-          }
-          const allowed = opsForKind(nextVariable?.kind);
-          onChange({
-            ...value,
-            variableId: event.target.value,
-            op: allowed.includes(value.op) ? value.op : allowed[0],
-            value: defaultFor(nextVariable?.kind),
-          });
-        }}
+        onChange={(event) => pickVariable(event.target.value)}
       >
         <option value="">variable…</option>
         {project.variables.map((item) => (
@@ -217,22 +175,32 @@ function ConditionNode({
           </option>
         ))}
       </select>
-      <select className="sp-cell" aria-label="Comparison" value={value.op} onChange={(event) => onChange({ ...value, op: event.target.value as CompareOp })}>
-        {ops.map((op) => (
-          <option key={op} value={op}>
-            {opLabel(op)}
-          </option>
-        ))}
-      </select>
-      <ValueInput
-        kind={variable?.kind}
-        value={value.value}
-        onChange={(next) => onChange({ ...value, value: next })}
-      />
+      {!value.variableId ? (
+        <>
+          <span />
+          <span />
+        </>
+      ) : value.type === "has" ? (
+        <>
+          <span className="sp-cond-op">has</span>
+          <EntitySelect kind="item" value={value.entityId || null} onChange={(entityId) => onChange({ ...value, entityId: entityId ?? "" })} allowEmpty />
+        </>
+      ) : (
+        <>
+          <select className="sp-cell" aria-label="Comparison" value={value.op} onChange={(event) => onChange({ ...value, op: event.target.value as CompareOp })}>
+            {opsForKind(variable?.kind).map((op) => (
+              <option key={op} value={op}>
+                {opLabel(op)}
+              </option>
+            ))}
+          </select>
+          <ValueInput kind={variable?.kind} value={value.value} onChange={(next) => onChange({ ...value, value: next })} />
+        </>
+      )}
       <IconButton label="Wrap in NOT" onClick={() => onChange({ type: "not", child: value })}>
         ¬
       </IconButton>
-      <IconButton label="Remove rule" danger onClick={() => onChange(null)}>
+      <IconButton label="Delete rule" danger onClick={() => onChange(null)}>
         ×
       </IconButton>
     </div>
@@ -274,10 +242,4 @@ function ValueInput({
   return (
     <input className="sp-cell" aria-label="Value" value={value === null || value === undefined ? "" : String(value)} onChange={(event) => onChange(event.target.value)} />
   );
-}
-
-function defaultFor(kind: string | undefined): Scalar {
-  if (kind === "boolean") return true;
-  if (kind === "value") return 0;
-  return null;
 }

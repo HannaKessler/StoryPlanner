@@ -1,4 +1,4 @@
-import { appendCondition, defaultCompare } from "../domain/conditions";
+import { appendCondition, emptyRule } from "../domain/conditions";
 import type { Condition, StoryNode } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import type { MenuItem } from "./ContextMenu";
@@ -33,37 +33,15 @@ export function edgeItems(edgeId: string): MenuItem[] {
   ];
 }
 
-/** Section menu: one Add entry per kind of condition. Choosing an entry inserts it. */
+/** Section menu for conditions. Choosing an entry inserts it; a single rule root is wrapped in an ALL group. */
 export function conditionAddItems(
   value: Condition | null,
-  variableId: string,
+  hasVariables: boolean,
   onChange: (next: Condition) => void,
 ): MenuItem[] {
-  const addRule: MenuItem = {
-    label: "Add rule",
-    disabled: !variableId,
-    onSelect: () => onChange(appendCondition(value, defaultCompare(variableId))),
-  };
-  const addHas: MenuItem = {
-    label: "Add contains",
-    disabled: !variableId,
-    onSelect: () => onChange(appendCondition(value, { type: "has", variableId, entityId: "" })),
-  };
-  if (!value) {
-    return [
-      addRule,
-      addHas,
-      { label: "Add ALL group", onSelect: () => onChange({ type: "group", op: "and", children: [] }) },
-      { label: "Add ANY group", onSelect: () => onChange({ type: "group", op: "or", children: [] }) },
-    ];
-  }
-  const groupOp = value.type === "group" && value.op === "and" ? "or" : "and";
   return [
-    addRule,
-    addHas,
-    {
-      label: "Add group",
-      onSelect: () => onChange(appendCondition(value, { type: "group", op: groupOp, children: [] })),
-    },
+    { label: "Add rule", disabled: !hasVariables, onSelect: () => onChange(appendCondition(value, emptyRule())) },
+    { label: "Add all of", onSelect: () => onChange(appendCondition(value, { type: "group", op: "and", children: [] })) },
+    { label: "Add any of", onSelect: () => onChange(appendCondition(value, { type: "group", op: "or", children: [] })) },
   ];
 }
