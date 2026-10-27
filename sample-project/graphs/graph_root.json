@@ -1,0 +1,244 @@
+{
+  "schemaVersion": 4,
+  "id": "graph_root",
+  "name": "The Lantern Gate",
+  "parentGraphId": null,
+  "parentNodeId": null,
+  "sceneNotes": "A shut gate, two iron lanterns, and a choice about how the night goes.",
+  "locationBoxes": [],
+  "nodes": [
+    {
+      "id": "node_root_start",
+      "type": "beat",
+      "position": {
+        "x": 40,
+        "y": 240
+      },
+      "title": "Start",
+      "summary": "",
+      "sceneNotes": "",
+      "subgraphId": null,
+      "locationId": "tag_loc_gate",
+      "characterIds": [],
+      "itemIds": [],
+      "locationPosition": null,
+      "lines": [],
+      "effects": []
+    },
+    {
+      "id": "node_root_approach",
+      "type": "beat",
+      "position": {
+        "x": 320,
+        "y": 200
+      },
+      "title": "Approach the gate",
+      "summary": "The traveler reaches the shut gate and has to talk their way onward.",
+      "sceneNotes": "Night rain on the east road. Two iron lanterns burn beside the gate.",
+      "subgraphId": "graph_approach",
+      "locationId": "tag_loc_gate",
+      "characterIds": [],
+      "itemIds": [],
+      "locationPosition": null,
+      "lines": [],
+      "effects": []
+    },
+    {
+      "id": "node_root_inside",
+      "type": "beat",
+      "position": {
+        "x": 760,
+        "y": 40
+      },
+      "title": "Inside the walls",
+      "summary": "The gate closes behind the traveler.",
+      "sceneNotes": "Wet stone and a quieter dark.",
+      "subgraphId": "graph_inside",
+      "locationId": "tag_loc_inside",
+      "characterIds": [],
+      "itemIds": [],
+      "locationPosition": null,
+      "lines": [],
+      "effects": []
+    },
+    {
+      "id": "node_root_road",
+      "type": "beat",
+      "position": {
+        "x": 760,
+        "y": 250
+      },
+      "title": "The old road",
+      "summary": "The traveler leaves the gate and follows the lanterns downhill.",
+      "sceneNotes": "The stones are slick and the lanterns thin out.",
+      "subgraphId": null,
+      "locationId": "tag_loc_road",
+      "characterIds": [],
+      "itemIds": [],
+      "locationPosition": null,
+      "lines": [],
+      "effects": []
+    },
+    {
+      "id": "node_root_turned",
+      "type": "beat",
+      "position": {
+        "x": 760,
+        "y": 460
+      },
+      "title": "Turned away",
+      "summary": "The gate stays shut. The night keeps the traveler.",
+      "sceneNotes": "Rain, and the road back.\nThe Old Road",
+      "subgraphId": null,
+      "locationId": "tag_loc_gate",
+      "characterIds": [],
+      "itemIds": [],
+      "locationPosition": null,
+      "lines": [],
+      "effects": []
+    },
+    {
+      "id": "node_root_hill",
+      "type": "beat",
+      "position": {
+        "x": 40,
+        "y": 560
+      },
+      "title": "From the hill",
+      "summary": "",
+      "sceneNotes": "",
+      "subgraphId": null,
+      "locationId": "tag_loc_road",
+      "characterIds": [],
+      "itemIds": [],
+      "locationPosition": null,
+      "lines": [],
+      "effects": []
+    },
+    {
+      "id": "node_root_word",
+      "type": "beat",
+      "position": {
+        "x": 320,
+        "y": 540
+      },
+      "title": "Word of the gate",
+      "summary": "A traveler on the old road hears that the gate is shut.",
+      "sceneNotes": "The lanterns thin out. Someone ahead is walking up.",
+      "subgraphId": null,
+      "locationId": "tag_loc_road",
+      "characterIds": [],
+      "itemIds": [],
+      "locationPosition": null,
+      "lines": [],
+      "effects": []
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_root_start",
+      "source": "node_root_start",
+      "target": "node_root_approach",
+      "label": "",
+      "condition": null
+    },
+    {
+      "id": "edge_root_inside",
+      "source": "node_root_approach",
+      "target": "node_root_inside",
+      "label": "Enter the walls",
+      "condition": {
+        "type": "group",
+        "op": "or",
+        "children": [
+          {
+            "type": "compare",
+            "variableId": "var_convinced",
+            "op": "eq",
+            "value": true
+          },
+          {
+            "type": "compare",
+            "variableId": "var_gold",
+            "op": "lt",
+            "value": 5
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge_root_road",
+      "source": "node_root_approach",
+      "target": "node_root_road",
+      "label": "Take the old road",
+      "condition": {
+        "type": "group",
+        "op": "and",
+        "children": [
+          {
+            "type": "compare",
+            "variableId": "var_asked_road",
+            "op": "eq",
+            "value": true
+          },
+          {
+            "type": "compare",
+            "variableId": "var_location",
+            "op": "eq",
+            "value": "tag_loc_road"
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge_root_turned",
+      "source": "node_root_approach",
+      "target": "node_root_turned",
+      "label": "Leave",
+      "condition": {
+        "type": "group",
+        "op": "and",
+        "children": [
+          {
+            "type": "not",
+            "child": {
+              "type": "compare",
+              "variableId": "var_convinced",
+              "op": "eq",
+              "value": true
+            }
+          },
+          {
+            "type": "compare",
+            "variableId": "var_gold",
+            "op": "gte",
+            "value": 5
+          },
+          {
+            "type": "not",
+            "child": {
+              "type": "compare",
+              "variableId": "var_asked_road",
+              "op": "eq",
+              "value": true
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "edge_root_hill",
+      "source": "node_root_hill",
+      "target": "node_root_word",
+      "label": "",
+      "condition": null
+    },
+    {
+      "id": "edge_root_word",
+      "source": "node_root_word",
+      "target": "node_root_approach",
+      "label": "Come up to the gate",
+      "condition": null
+    }
+  ]
+}

@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 4,
+  "id": "proj_lantern_gate",
+  "name": "The Lantern Gate",
+  "createdAt": "2026-01-15T18:00:00.000Z",
+  "updatedAt": "2026-01-15T18:00:00.000Z",
+  "rootGraphId": "graph_root",
+  "variables": [
+    {
+      "id": "var_has_token",
+      "name": "hasToken",
+      "kind": "boolean",
+      "description": "The traveler is carrying a lantern token.",
+      "defaultValue": false
+    },
+    {
+      "id": "var_convinced",
+      "name": "convinced",
+      "kind": "boolean",
+      "description": "The gatekeeper is willing to open the gate.",
+      "defaultValue": false
+    },
+    {
+      "id": "var_asked_road",
+      "name": "askedRoad",
+      "kind": "boolean",
+      "description": "The traveler asked about the old road.",
+      "defaultValue": false
+    },
+    {
+      "id": "var_gold",
+      "name": "gold",
+      "kind": "value",
+      "description": "Coins in the traveler's purse.",
+      "defaultValue": 5
+    },
+    {
+      "id": "var_location",
+      "name": "location",
+      "kind": "location",
+      "description": "Where the traveler is headed.",
+      "defaultValue": "tag_loc_gate"
+    }
+  ],
+  "characters": [
+    {
+      "id": "tag_traveler",
+      "name": "Traveler",
+      "notes": "The player character.",
+      "images": [],
+      "fields": [
+        {
+          "key": "color",
+          "value": "#e3a15a"
+        }
+      ]
+    },
+    {
+      "id": "tag_gatekeeper",
+      "name": "Gatekeeper",
+      "notes": "Keeps the night gate.",
+      "images": [],
+      "fields": [
+        {
+          "key": "color",
+          "value": "#8eb4c8"
+        }
+      ]
+    }
+  ],
+  "items": [
+    {
+      "id": "tag_item_token",
+      "name": "Lantern Token",
+      "notes": "Older than the lock.",
+      "images": [],
+      "fields": [
+        {
+          "key": "color",
+          "value": "#e3a15a"
+        }
+      ]
+    }
+  ],
+  "locations": [
+    {
+      "id": "tag_loc_gate",
+      "name": "The Lantern Gate",
+      "notes": "",
+      "images": [],
+      "fields": [
+        {
+          "key": "color",
+          "value": "#9cba92"
+        }
+      ]
+    },
+    {
+      "id": "tag_loc_road",
+      "name": "The Old Road",
+      "notes": "",
+      "images": [],
+      "fields": [
+        {
+          "key": "color",
+          "value": "#b7a4d6"
+        }
+      ]
+    },
+    {
+      "id": "tag_loc_inside",
+      "name": "Inside the Walls",
+      "notes": "",
+      "images": [],
+      "fields": [
+        {
+          "key": "color",
+          "value": "#d4897a"
+        }
+      ]
+    }
+  ]
+}
