@@ -50,7 +50,7 @@ export function VariablesPanel() {
 
 function VariableRow({ variable, project }: { variable: VariableDef; project: ProjectDocument }) {
   const updateVariable = useProjectStore((state) => state.updateVariable);
-  const deleteVariable = useProjectStore((state) => state.deleteVariable);
+  const requestDeleteVariable = useProjectStore((state) => state.requestDeleteVariable);
   const [expanded, setExpanded] = useState(false);
   const known = (["boolean", "value", "character", "item", "location", "inventory"] as string[]).includes(variable.kind);
   const entityKind: EntityKind | null =
@@ -67,7 +67,7 @@ function VariableRow({ variable, project }: { variable: VariableDef; project: Pr
         ...addVariableItems(),
         "separator",
         { label: "Rename", onSelect: () => focusRename(variable.id) },
-        { label: "Delete", danger: true, onSelect: () => deleteVariable(variable.id) },
+        { label: "Delete", danger: true, onSelect: () => requestDeleteVariable(variable.id) },
       ])}
     >
       <div className="sp-var-main">
@@ -144,7 +144,7 @@ function VariableRow({ variable, project }: { variable: VariableDef; project: Pr
           </select>
         )}
         {!known && <span className="sp-cell sp-cell-value sp-faint">{String(variable.defaultValue ?? "unset")}</span>}
-        <IconButton label={`Delete ${variable.name}`} danger onClick={() => deleteVariable(variable.id)}>
+        <IconButton label={`Delete ${variable.name}`} danger onClick={() => requestDeleteVariable(variable.id)}>
           ×
         </IconButton>
       </div>

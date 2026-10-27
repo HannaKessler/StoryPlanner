@@ -22,6 +22,14 @@ import {
 import { entitiesOf, withEntities } from "../domain/format";
 import { descendantGraphIds, splitTransition } from "../domain/graphOps";
 import {
+  countEntityRefs,
+  countVariableRefs,
+  deleteEntity as deleteEntityEverywhere,
+  deleteVariable as deleteVariableEverywhere,
+  referencedImages,
+  sanitizeReferences,
+} from "../domain/references";
+import {
   bundleProject,
   createNewProject,
   loadProject,
@@ -60,8 +68,27 @@ export interface RecentProject {
 
 export type Selection = { kind: "node" | "edge"; id: string } | null;
 export type Screen = "graph" | "play" | "characters" | "items" | "locations";
-export type ResumeIntent = "new" | "open" | null;
+/** What to do once the project has closed. `quit` closes the window. */
+export type ResumeIntent = "new" | "open" | "quit" | null;
 export type ExportKind = "bundle" | "screenplay" | "voices";
+
+/** A project state that undo and redo can return to. */
+export interface Snapshot {
+  project: ProjectDocument;
+  graphs: Record<string, GraphDocument>;
+  revision: number;
+}
+
+export interface ConfirmRequest {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+}
+
+export const HISTORY_LIMIT = 200;
+/** Edits to the same text field closer together than this become one undo step. */
+export const COALESCE_MS = 600;
 
 export interface Banner {
   tone: "info" | "error";
@@ -73,6 +100,15 @@ interface ProjectStore {
   graphs: Record<string, GraphDocument>;
   projectPath: string | null;
   dirty: boolean;
+  /** Identifies the current content. Every edit gets a new value. */
+  revision: number;
+  /** Revision last written to disk. */
+  savedRevision: number;
+  past: Snapshot[];
+  future: Snapshot[];
+  /** Bumped by undo and redo so the canvas also restores positions. */
+  restoreTick: number;
+  confirm: ConfirmRequest | null;
   screen: Screen;
   canvasMode: "graph" | "locations";
   currentGraphId: string | null;
@@ -101,6 +137,13 @@ interface ProjectStore {
   cancelClose: () => void;
   discardAndClose: () => void;
   saveAndClose: () => Promise<void>;
+  undo: () => void;
+  redo: () => void;
+  resolveConfirm: (confirmed: boolean) => void;
+  requestDeleteNodes: (nodeIds: string[], edgeIds?: string[]) => void;
+  requestDeleteSubgraph: (nodeId: string) => void;
+  requestDeleteVariable: (variableId: string) => void;
+  requestDeleteEntity: (kind: EntityKind, entityId: string) => void;
 
   renameProject: (name: string) => void;
   openGraph: (graphId: string) => void;
@@ -110,7 +153,7 @@ interface ProjectStore {
   updateNodePosition: (nodeId: string, position: { x: number; y: number }) => void;
   saveLocationLayout: (patch: { box?: LocationBox; nodePositions?: Record<string, { x: number; y: number }> }) => void;
   addNode: (position?: { x: number; y: number }) => void;
-  deleteNodes: (nodeIds: string[]) => void;
+  deleteNodes: (nodeIds: string[], edgeIds?: string[]) => void;
   deleteEdges: (edgeIds: string[]) => void;
   connectNodes: (source: string, target: string) => void;
   addConnectedNode: (sourceId: string, position: { x: number; y: number }) => void;
@@ -150,8 +193,15 @@ interface ProjectStore {
 }
 
 let filesystem: ProjectFs | null = null;
+let saveInFlight: Promise<boolean> | null = null;
+
+/** Tests and previews supply their own file system. */
+export function setProjectFs(next: ProjectFs | null) {
+  filesystem = next;
+}
 
 function fs(): ProjectFs {
+  if (filesystem) return filesystem;
   if (!inTauri()) {
     throw new Error("Project folders need the StoryPlanner desktop window. Run npm run tauri dev.");
   }
@@ -182,6 +232,151 @@ function readRecents(): RecentProject[] {
   } catch {
     return [];
   }
+}
+
+let revisionCounter = 0;
+
+function nextRevision(): number {
+  revisionCounter += 1;
+  return revisionCounter;
+}
+
+/** Key of the text field the next edit types into. Consumed by the next state change. */
+let pendingTypingKey: string | null = null;
+let lastTyping: { key: string; at: number } | null = null;
+
+/** Marks the next edit as typing so quick keystrokes in one field share an undo step. */
+function typing(prefix: string, patch: object) {
+  const values = Object.values(patch);
+  if (values.length === 0 || !values.every((value) => typeof value === "string")) return;
+  pendingTypingKey = `${prefix}:${Object.keys(patch).sort().join(",")}`;
+}
+
+type StoreState = ProjectStore;
+type StatePatch = Partial<StoreState>;
+
+/**
+ * Runs on every state change. An edit to the project or its graphs gets a
+ * new revision and pushes the previous content onto the undo stack. Changes
+ * that set `revision` themselves (open, close, save, undo) are left alone.
+ */
+function trackHistory(prev: StoreState, patch: StatePatch): StatePatch {
+  const key = pendingTypingKey;
+  pendingTypingKey = null;
+  if ("revision" in patch) {
+    lastTyping = null;
+    return patch;
+  }
+  const changed =
+    ("project" in patch && patch.project !== prev.project) || ("graphs" in patch && patch.graphs !== prev.graphs);
+  if (!changed || !prev.project) {
+    if ("dirty" in patch) {
+      const { dirty: _ignored, ...rest } = patch;
+      return rest;
+    }
+    return patch;
+  }
+  const now = Date.now();
+  const coalesce = key !== null && lastTyping?.key === key && now - lastTyping.at < COALESCE_MS && prev.past.length > 0;
+  lastTyping = key ? { key, at: now } : null;
+  const revision = nextRevision();
+  const next: StatePatch = { ...patch, revision, dirty: revision !== prev.savedRevision, future: [] };
+  if (!coalesce) {
+    next.past = [...prev.past, { project: prev.project, graphs: prev.graphs, revision: prev.revision }].slice(-HISTORY_LIMIT);
+  }
+  return next;
+}
+
+/** Content just read from or written to disk. History starts empty. */
+function freshContent(project: ProjectDocument, graphs: Record<string, GraphDocument>, clean = true): StatePatch {
+  const revision = nextRevision();
+  return {
+    project,
+    graphs,
+    revision,
+    savedRevision: clean ? revision : -1,
+    dirty: !clean,
+    past: [],
+    future: [],
+  };
+}
+
+/** Image files this session knows are on disk, and those the saved project uses. */
+let diskImages = new Set<string>();
+let savedImages = new Set<string>();
+
+function resetImages(project: ProjectDocument | null) {
+  savedImages = project ? referencedImages(project) : new Set();
+  diskImages = new Set(savedImages);
+}
+
+function safeAsset(path: string): boolean {
+  return Boolean(path) && !path.includes("..") && path.startsWith("assets/");
+}
+
+async function removeFiles(root: string, paths: Iterable<string>) {
+  for (const path of paths) {
+    if (!safeAsset(path)) continue;
+    try {
+      await fs().remove(joinPath(root, path));
+    } catch {
+      // A file that cannot be removed stays on disk. Nothing points at it.
+    }
+  }
+}
+
+/** After a save, removes images that neither the saved project, the live one, nor undo history uses. */
+async function pruneImages(root: string, saved: ProjectDocument) {
+  const state = useProjectStore.getState();
+  const keep = referencedImages(saved);
+  const projects = [state.project, ...state.past.map((item) => item.project), ...state.future.map((item) => item.project)];
+  for (const project of projects) {
+    if (!project) continue;
+    for (const path of referencedImages(project)) keep.add(path);
+  }
+  const stale = [...diskImages].filter((path) => !keep.has(path));
+  diskImages = new Set([...diskImages].filter((path) => keep.has(path)));
+  savedImages = referencedImages(saved);
+  await removeFiles(root, stale);
+}
+
+/** On discard, removes images copied in since the last save. */
+async function discardImages(root: string | null) {
+  const added = [...diskImages].filter((path) => !savedImages.has(path));
+  diskImages = new Set(savedImages);
+  if (root && added.length > 0) await removeFiles(root, added);
+}
+
+async function closeWindow() {
+  if (!inTauri()) return;
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  await getCurrentWindow().destroy();
+}
+
+function validSelection(selection: Selection, graph: GraphDocument | undefined): Selection {
+  if (!selection || !graph) return null;
+  if (selection.kind === "node") return graph.nodes.some((node) => node.id === selection.id) ? selection : null;
+  return graph.edges.some((edge) => edge.id === selection.id) ? selection : null;
+}
+
+function plural(count: number, word: string): string {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
+function restore(state: StoreState, target: Snapshot): StatePatch {
+  lastTyping = null;
+  const currentGraphId =
+    state.currentGraphId && target.graphs[state.currentGraphId] ? state.currentGraphId : target.project.rootGraphId;
+  return {
+    project: target.project,
+    graphs: target.graphs,
+    revision: target.revision,
+    dirty: target.revision !== state.savedRevision,
+    currentGraphId,
+    selection: validSelection(state.selection, target.graphs[currentGraphId]),
+    restoreTick: state.restoreTick + 1,
+    play: state.screen === "play" ? createPlayState(target.project, target.graphs) : null,
+  };
 }
 
 function withGraph(update: (graph: GraphDocument) => GraphDocument) {
@@ -230,6 +425,11 @@ function cleared(): Partial<ProjectStore> {
     graphs: {},
     projectPath: null,
     dirty: false,
+    revision: nextRevision(),
+    savedRevision: 0,
+    past: [],
+    future: [],
+    confirm: null,
     screen: "graph",
     canvasMode: "graph",
     currentGraphId: null,
@@ -241,11 +441,25 @@ function cleared(): Partial<ProjectStore> {
   };
 }
 
-export const useProjectStore = create<ProjectStore>((set, get) => ({
+export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
+  const baseSet = api.setState;
+  const set = ((partial: StatePatch | ((state: StoreState) => StatePatch), replace?: boolean) => {
+    const prev = api.getState();
+    const patch = typeof partial === "function" ? partial(prev) : partial;
+    (baseSet as (patch: StatePatch, replace?: boolean) => void)(trackHistory(prev, patch), replace);
+  }) as typeof api.setState;
+  api.setState = set;
+  return {
   project: null,
   graphs: {},
   projectPath: null,
   dirty: false,
+  revision: 0,
+  savedRevision: 0,
+  past: [],
+  future: [],
+  restoreTick: 0,
+  confirm: null,
   screen: "graph",
   canvasMode: "graph",
   currentGraphId: null,
@@ -298,11 +512,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       }
       const created = createNewProject(trimmed);
       const saved = await saveProject(files, folder, created.project, created.graphs);
+      resetImages(saved);
       set({
-        project: saved,
-        graphs: created.graphs,
+        ...freshContent(saved, created.graphs),
         projectPath: folder,
-        dirty: false,
         screen: "graph",
         currentGraphId: saved.rootGraphId,
         selection: null,
@@ -334,11 +547,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ busy: true, banner: null });
     try {
       const loaded = await loadProject(fs(), folder);
+      // References to deleted entities or variables are dropped. The project is then unsaved.
+      const clean = sanitizeReferences(loaded.project, loaded.graphs);
+      resetImages(loaded.project);
       set({
-        project: loaded.project,
-        graphs: loaded.graphs,
+        ...freshContent(clean.project, clean.graphs, clean.count === 0),
         projectPath: folder,
-        dirty: false,
         screen: "graph",
         currentGraphId: loaded.project.rootGraphId,
         selection: null,
@@ -368,29 +582,51 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     }
   },
 
-  async save() {
-    const state = get();
-    if (!state.project || !state.projectPath) return false;
-    set({ busy: true });
-    try {
-      const saved = await saveProject(fs(), state.projectPath, state.project, state.graphs);
-      set({
-        project: saved,
-        dirty: false,
-        recents: remember(state.projectPath, saved.name, get().recents),
-        banner: null,
-      });
-      return true;
-    } catch (error) {
-      set({ banner: { tone: "error", text: errorMessage(error) } });
-      return false;
-    } finally {
-      set({ busy: false });
-    }
+  save() {
+    // One save at a time. A second request while writing gets the running save.
+    if (saveInFlight) return saveInFlight;
+    const run = (async () => {
+      const state = get();
+      if (!state.project || !state.projectPath) return false;
+      const snapshot = { project: state.project, graphs: state.graphs, revision: state.revision, path: state.projectPath };
+      set({ busy: true });
+      try {
+        const saved = await saveProject(fs(), snapshot.path, snapshot.project, snapshot.graphs);
+        const now = get();
+        if (now.projectPath !== snapshot.path || now.project?.id !== snapshot.project.id) return true;
+        const unchanged = now.revision === snapshot.revision;
+        // Edits made while writing stay in place and stay unsaved.
+        set({
+          ...(unchanged ? { project: saved, revision: snapshot.revision } : {}),
+          savedRevision: snapshot.revision,
+          dirty: now.revision !== snapshot.revision,
+          recents: remember(snapshot.path, saved.name, get().recents),
+          banner: null,
+        });
+        await pruneImages(snapshot.path, saved);
+        return true;
+      } catch (error) {
+        set({ banner: { tone: "error", text: errorMessage(error) } });
+        return false;
+      } finally {
+        set({ busy: false });
+      }
+    })();
+    saveInFlight = run;
+    void run.finally(() => {
+      if (saveInFlight === run) saveInFlight = null;
+    });
+    return run;
   },
 
   closeProject() {
+    resetImages(null);
+    lastTyping = null;
     set((state) => ({ ...cleared(), recents: state.recents, resumeIntent: state.resumeIntent, ready: true }));
+    if (get().resumeIntent === "quit") {
+      set({ resumeIntent: null });
+      void closeWindow();
+    }
   },
 
   requestClose(intent = null) {
@@ -411,15 +647,139 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   discardAndClose() {
-    get().closeProject();
+    const root = get().projectPath;
+    set({ pendingClose: false });
+    void discardImages(root).finally(() => get().closeProject());
   },
 
   async saveAndClose() {
-    const ok = await get().save();
-    if (ok) get().closeProject();
+    // Edits typed during a save make it dirty again, so save until clean.
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      const ok = await get().save();
+      if (!ok) return;
+      if (!get().dirty) {
+        get().closeProject();
+        return;
+      }
+    }
+  },
+
+  undo() {
+    const state = get();
+    const target = state.past[state.past.length - 1];
+    if (!target || !state.project) return;
+    set({
+      ...restore(state, target),
+      past: state.past.slice(0, -1),
+      future: [...state.future, { project: state.project, graphs: state.graphs, revision: state.revision }],
+    });
+  },
+
+  redo() {
+    const state = get();
+    const target = state.future[state.future.length - 1];
+    if (!target || !state.project) return;
+    set({
+      ...restore(state, target),
+      future: state.future.slice(0, -1),
+      past: [...state.past, { project: state.project, graphs: state.graphs, revision: state.revision }].slice(-HISTORY_LIMIT),
+    });
+  },
+
+  resolveConfirm(confirmed) {
+    const request = get().confirm;
+    set({ confirm: null });
+    if (confirmed) request?.onConfirm();
+  },
+
+  requestDeleteNodes(nodeIds, edgeIds = []) {
+    const state = get();
+    const graph = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
+    if (!graph) return;
+    const run = () => {
+      if (nodeIds.length > 0) get().deleteNodes(nodeIds, edgeIds);
+      else if (edgeIds.length > 0) get().deleteEdges(edgeIds);
+    };
+    const remove = new Set(nodeIds);
+    let nested = 0;
+    for (const node of graph.nodes) {
+      if (!remove.has(node.id) || !node.subgraphId) continue;
+      for (const id of descendantGraphIds(state.graphs, node.subgraphId)) nested += state.graphs[id]?.nodes.length ?? 0;
+    }
+    const hasSubgraph = graph.nodes.some((node) => remove.has(node.id) && node.subgraphId && state.graphs[node.subgraphId]);
+    if (!hasSubgraph) {
+      run();
+      return;
+    }
+    set({
+      confirm: {
+        title: nodeIds.length === 1 ? "Delete beat" : `Delete ${plural(nodeIds.length, "beat")}`,
+        message: `Also deletes ${plural(nested, "nested beat")}.`,
+        confirmLabel: "Delete",
+        onConfirm: run,
+      },
+    });
+  },
+
+  requestDeleteSubgraph(nodeId) {
+    const state = get();
+    const graph = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
+    const node = graph?.nodes.find((item) => item.id === nodeId);
+    if (!node?.subgraphId) return;
+    let nested = 0;
+    for (const id of descendantGraphIds(state.graphs, node.subgraphId)) nested += state.graphs[id]?.nodes.length ?? 0;
+    set({
+      confirm: {
+        title: "Remove sub-graph",
+        message: `Deletes ${plural(nested, "beat")}.`,
+        confirmLabel: "Remove",
+        onConfirm: () => get().deleteSubgraph(nodeId),
+      },
+    });
+  },
+
+  requestDeleteVariable(variableId) {
+    const state = get();
+    if (!state.project) return;
+    const variable = state.project.variables.find((item) => item.id === variableId);
+    const uses = countVariableRefs(state.project, state.graphs, variableId);
+    if (!variable) return;
+    if (uses === 0) {
+      get().deleteVariable(variableId);
+      return;
+    }
+    set({
+      confirm: {
+        title: `Delete ${variable.name || "variable"}`,
+        message: `Used in ${plural(uses, "place")}.`,
+        confirmLabel: "Delete",
+        onConfirm: () => get().deleteVariable(variableId),
+      },
+    });
+  },
+
+  requestDeleteEntity(kind, entityId) {
+    const state = get();
+    if (!state.project) return;
+    const entity = entitiesOf(state.project, kind).find((item) => item.id === entityId);
+    if (!entity) return;
+    const uses = countEntityRefs(state.project, state.graphs, entityId);
+    if (uses === 0) {
+      get().deleteEntity(kind, entityId);
+      return;
+    }
+    set({
+      confirm: {
+        title: `Delete ${entity.name || kind}`,
+        message: `Used in ${plural(uses, "place")}.`,
+        confirmLabel: "Delete",
+        onConfirm: () => get().deleteEntity(kind, entityId),
+      },
+    });
   },
 
   renameProject(name) {
+    typing("project", { name });
     set((state) => (state.project ? { project: { ...state.project, name }, dirty: true } : {}));
   },
 
@@ -433,15 +793,20 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   updateGraphMeta(patch) {
+    typing(`graph:${get().currentGraphId}`, patch);
     withGraph((graph) => ({ ...graph, ...patch }));
   },
 
   updateNode(nodeId, patch) {
+    typing(`node:${nodeId}`, patch);
     withNode(nodeId, (node) => ({ ...node, ...patch, id: node.id, type: node.type }));
   },
 
   updateNodePosition(nodeId, position) {
-    withNode(nodeId, (node) => ({ ...node, position }));
+    const graph = get().currentGraphId ? get().graphs[get().currentGraphId!] : undefined;
+    const node = graph?.nodes.find((item) => item.id === nodeId);
+    if (node && node.position.x === position.x && node.position.y === position.y) return;
+    withNode(nodeId, (current) => ({ ...current, position }));
   },
 
   saveLocationLayout(patch) {
@@ -473,8 +838,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ selection: { kind: "node", id: node.id } });
   },
 
-  deleteNodes(nodeIds) {
+  deleteNodes(nodeIds, edgeIds = []) {
     const remove = new Set(nodeIds);
+    const removeEdges = new Set(edgeIds);
     useProjectStore.setState((state) => {
       if (!state.currentGraphId) return {};
       const graph = state.graphs[state.currentGraphId];
@@ -488,7 +854,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       const nextGraph = {
         ...graph,
         nodes: graph.nodes.filter((node) => !remove.has(node.id)),
-        edges: graph.edges.filter((edge) => !remove.has(edge.source) && !remove.has(edge.target)),
+        edges: graph.edges.filter(
+          (edge) => !removeEdges.has(edge.id) && !remove.has(edge.source) && !remove.has(edge.target),
+        ),
       };
       graphs[state.currentGraphId] = nextGraph;
       let selection = state.selection;
@@ -559,6 +927,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   updateEdge(edgeId, patch) {
+    typing(`edge:${edgeId}`, patch);
     withEdge(edgeId, (edge) => ({ ...edge, ...patch, id: edge.id }));
   },
 
@@ -604,9 +973,9 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       parentNodeId: node.id,
     });
     child.nodes = [createNode({ position: { x: 160, y: 180 } })];
-    withNode(nodeId, (current) => ({ ...current, subgraphId: child.id }));
+    const parent = { ...graph, nodes: graph.nodes.map((item) => (item.id === nodeId ? { ...item, subgraphId: child.id } : item)) };
     set((current) => ({
-      graphs: { ...current.graphs, [child.id]: child },
+      graphs: { ...current.graphs, [graph.id]: parent, [child.id]: child },
       currentGraphId: child.id,
       selection: null,
       screen: "graph",
@@ -636,6 +1005,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   updateLine(nodeId, lineId, patch) {
+    typing(`line:${nodeId}:${lineId}`, patch);
     withNode(nodeId, (node) => ({
       ...node,
       lines: node.lines.map((line) => (line.id === lineId ? { ...line, ...patch, id: line.id } : line)),
@@ -681,6 +1051,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   updateVariable(variableId, patch) {
+    typing(`variable:${variableId}`, patch);
     set((state) => {
       if (!state.project) return {};
       return {
@@ -698,13 +1069,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   deleteVariable(variableId) {
     set((state) => {
       if (!state.project) return {};
-      return {
-        project: {
-          ...state.project,
-          variables: state.project.variables.filter((variable) => variable.id !== variableId),
-        },
-        dirty: true,
-      };
+      return deleteVariableEverywhere(state.project, state.graphs, variableId);
     });
   },
 
@@ -719,6 +1084,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   updateEntity(kind, entityId, patch) {
+    typing(`entity:${entityId}`, patch);
     set((state) => {
       if (!state.project) return {};
       const entities = entitiesOf(state.project, kind).map((entity) =>
@@ -729,10 +1095,10 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   deleteEntity(kind, entityId) {
+    // Its image files are removed by the next save.
     set((state) => {
       if (!state.project) return {};
-      const entities = entitiesOf(state.project, kind).filter((entity) => entity.id !== entityId);
-      return { project: withEntities(state.project, kind, entities), dirty: true };
+      return deleteEntityEverywhere(state.project, state.graphs, kind, entityId);
     });
   },
 
@@ -747,6 +1113,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     try {
       const added = await copyImagesIntoProject(state.projectPath, entityId, entity.images);
       if (added.length === 0) return;
+      for (const path of added) diskImages.add(path);
       get().updateEntity(kind, entityId, { images: [...entity.images, ...added] });
     } catch (error) {
       set({ banner: { tone: "error", text: errorMessage(error) } });
@@ -757,14 +1124,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     const state = get();
     const entity = state.project ? entitiesOf(state.project, kind).find((item) => item.id === entityId) : undefined;
     if (!entity) return;
+    // The file stays until the next save, so discarding or undoing keeps it.
     get().updateEntity(kind, entityId, { images: entity.images.filter((item) => item !== path) });
-    if (state.projectPath && !path.includes("..")) {
-      try {
-        await fs().remove(joinPath(state.projectPath, path));
-      } catch {
-        // The picture is already gone from the entity.
-      }
-    }
   },
 
   restartPlay() {
@@ -827,4 +1188,5 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       set({ busy: false });
     }
   },
-}));
+};
+});

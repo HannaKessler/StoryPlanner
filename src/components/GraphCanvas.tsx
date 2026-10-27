@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useMemo, useRef, type MouseEvent as ReactMouseEvent } from "react";
 import {
   Background,
   Controls,
@@ -94,9 +94,10 @@ function CanvasBody({
   const connectNodes = useProjectStore((state) => state.connectNodes);
   const updateNodePosition = useProjectStore((state) => state.updateNodePosition);
   const saveLocationLayout = useProjectStore((state) => state.saveLocationLayout);
-  const deleteNodes = useProjectStore((state) => state.deleteNodes);
-  const deleteEdges = useProjectStore((state) => state.deleteEdges);
-  const { fitView, screenToFlowPosition, getNodes } = useReactFlow();
+  const requestDeleteNodes = useProjectStore((state) => state.requestDeleteNodes);
+  const restoreTick = useProjectStore((state) => state.restoreTick);
+  const appliedTick = useRef(restoreTick);
+  const { fitView, screenToFlowPosition, getNodes, getEdges } = useReactFlow();
   const openMenu = useContextMenu((state) => state.open);
   const closeMenu = useContextMenu((state) => state.close);
   const arranging = mode === "locations";
@@ -126,8 +127,9 @@ function CanvasBody({
           item.nodes.map((node) => [node.locationId, node.characterIds, node.itemIds, node.subgraphId, node.lines.map((line) => line.speakerId)]),
         ),
         mode,
+        restoreTick,
       }),
-    [graph, graphs, project, mode],
+    [graph, graphs, project, mode, restoreTick],
   );
 
   useEffect(() => {
@@ -151,7 +153,10 @@ function CanvasBody({
   useEffect(() => {
     setNodes((current) => {
       const next = toNodes(graph, graphs, project, mode);
-      if (mode === "locations") return next;
+      // Undo and redo also put beats back where they were.
+      const restoring = appliedTick.current !== restoreTick;
+      appliedTick.current = restoreTick;
+      if (mode === "locations" || restoring) return next;
       return next.map((node) => {
         const previous = current.find((item) => item.id === node.id);
         return previous ? { ...node, position: previous.position } : node;
@@ -176,6 +181,27 @@ function CanvasBody({
       })),
     );
   }, [selection, setNodes, setEdges]);
+
+  useEffect(() => {
+    // Delete and Backspace go through the store, which confirms when sub-graphs would go too.
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== "Delete" && event.key !== "Backspace") return;
+      if (event.ctrlKey || event.metaKey || event.altKey || typingTarget(event.target)) return;
+      const state = useProjectStore.getState();
+      if (state.confirm || state.pendingClose || state.exportOpen) return;
+      const nodeIds = getNodes()
+        .filter((node) => node.selected && node.type === "story")
+        .map((node) => node.id);
+      const edgeIds = getEdges()
+        .filter((edge) => edge.selected)
+        .map((edge) => edge.id);
+      if (nodeIds.length === 0 && edgeIds.length === 0) return;
+      event.preventDefault();
+      requestDeleteNodes(nodeIds, edgeIds);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [getNodes, getEdges, requestDeleteNodes]);
 
   const onNodesChange = (changes: NodeChange<CanvasNode>[]) => {
     setNodes((current) => applyNodeChanges(changes, current));
@@ -264,11 +290,10 @@ function CanvasBody({
           }
           updateNodePosition(node.id, node.position);
         }}
-        onNodesDelete={(deleted) => deleteNodes(deleted.filter((node) => node.type === "story").map((node) => node.id))}
-        onEdgesDelete={(deleted) => deleteEdges(deleted.map((edge) => edge.id))}
+        onBeforeDelete={async () => false}
         nodesDraggable
         connectionRadius={90}
-        deleteKeyCode={["Backspace", "Delete"]}
+        deleteKeyCode={null}
         colorMode="dark"
         fitView
         proOptions={{ hideAttribution: false }}
@@ -278,6 +303,11 @@ function CanvasBody({
       </ReactFlow>
     </div>
   );
+}
+
+function typingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT";
 }
 
 function droppedOnNode(event: MouseEvent | TouchEvent): boolean {

@@ -16,7 +16,7 @@ const TITLES: Record<EntityKind, string> = {
 export function EntityEditor({ kind }: { kind: EntityKind }) {
   const project = useProjectStore((state) => state.project);
   const addEntity = useProjectStore((state) => state.addEntity);
-  const deleteEntity = useProjectStore((state) => state.deleteEntity);
+  const requestDeleteEntity = useProjectStore((state) => state.requestDeleteEntity);
   const [selected, setSelected] = useState<string | null>(null);
   if (!project) return null;
   const entities = entitiesOf(project, kind);
@@ -47,7 +47,7 @@ export function EntityEditor({ kind }: { kind: EntityKind }) {
                     focusRename(entity.id);
                   },
                 },
-                { label: "Delete", danger: true, onSelect: () => deleteEntity(kind, entity.id) },
+                { label: "Delete", danger: true, onSelect: () => requestDeleteEntity(kind, entity.id) },
               ])}
             >
               <button type="button" className="sp-beat" onClick={() => setSelected(entity.id)}>

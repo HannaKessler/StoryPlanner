@@ -32,6 +32,9 @@ export function AppShell() {
   const requestClose = useProjectStore((state) => state.requestClose);
   const setExportOpen = useProjectStore((state) => state.setExportOpen);
   const dismissBanner = useProjectStore((state) => state.dismissBanner);
+  const canUndo = useProjectStore((state) => state.past.length > 0);
+  const canRedo = useProjectStore((state) => state.future.length > 0);
+  const confirm = useProjectStore((state) => state.confirm);
   const [menu, setMenu] = useState(false);
 
   if (!project || !currentGraphId) return null;
@@ -58,6 +61,12 @@ export function AppShell() {
                   </button>
                   <button type="button" onClick={() => { setMenu(false); void save(); }}>
                     Save <kbd>Ctrl+S</kbd>
+                  </button>
+                  <button type="button" disabled={!canUndo} onClick={() => { setMenu(false); useProjectStore.getState().undo(); }}>
+                    Undo <kbd>Ctrl+Z</kbd>
+                  </button>
+                  <button type="button" disabled={!canRedo} onClick={() => { setMenu(false); useProjectStore.getState().redo(); }}>
+                    Redo <kbd>Ctrl+Y</kbd>
                   </button>
                   <button type="button" onClick={() => { setMenu(false); setExportOpen(true); }}>
                     Export…
@@ -162,6 +171,19 @@ export function AppShell() {
         </span>
       </footer>
       {exportOpen && <ExportDialog />}
+      {confirm && (
+        <Modal title={confirm.title} onClose={() => useProjectStore.getState().resolveConfirm(false)}>
+          <p className="sp-modal-text">{confirm.message}</p>
+          <div className="sp-modal-actions">
+            <button type="button" className="sp-btn" onClick={() => useProjectStore.getState().resolveConfirm(false)}>
+              Cancel
+            </button>
+            <button type="button" className="sp-btn is-danger" autoFocus onClick={() => useProjectStore.getState().resolveConfirm(true)}>
+              {confirm.confirmLabel}
+            </button>
+          </div>
+        </Modal>
+      )}
       {pendingClose && (
         <Modal title="Unsaved changes" onClose={() => useProjectStore.getState().cancelClose()}>
           <div className="sp-modal-actions">

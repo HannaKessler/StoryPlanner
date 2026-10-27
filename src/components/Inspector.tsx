@@ -51,8 +51,8 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
   const graphs = useProjectStore((state) => state.graphs);
   const updateNode = useProjectStore((state) => state.updateNode);
   const openSubgraph = useProjectStore((state) => state.openSubgraph);
-  const deleteSubgraph = useProjectStore((state) => state.deleteSubgraph);
-  const deleteNodes = useProjectStore((state) => state.deleteNodes);
+  const requestDeleteSubgraph = useProjectStore((state) => state.requestDeleteSubgraph);
+  const requestDeleteNodes = useProjectStore((state) => state.requestDeleteNodes);
   const connectNodes = useProjectStore((state) => state.connectNodes);
   const addLine = useProjectStore((state) => state.addLine);
   const addNodeEffect = useProjectStore((state) => state.addNodeEffect);
@@ -76,7 +76,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
       <div className="sp-insp-head">
         <span className="sp-kicker">Beat</span>
         <input className="sp-head-input" aria-label="Title" placeholder="Title" data-rename={node.id} value={node.title} onChange={(event) => updateNode(node.id, { title: event.target.value })} />
-        <IconButton label="Delete beat" danger onClick={() => deleteNodes([node.id])}>
+        <IconButton label="Delete beat" danger onClick={() => requestDeleteNodes([node.id])}>
           ×
         </IconButton>
       </div>
@@ -122,7 +122,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
           <button type="button" className="sp-chip-btn" onClick={() => openSubgraph(node.id)}>
             Open
           </button>
-          <IconButton label="Remove sub-graph" danger onClick={() => deleteSubgraph(node.id)}>
+          <IconButton label="Remove sub-graph" danger onClick={() => requestDeleteSubgraph(node.id)}>
             ×
           </IconButton>
         </div>
@@ -301,9 +301,22 @@ function EntityChips({
   selected: string[];
   onChange: (ids: string[]) => void;
 }) {
-  if (names.length === 0) return null;
+  const known = new Set(names.map((entity) => entity.id));
+  const missing = selected.filter((id) => !known.has(id));
+  if (names.length === 0 && missing.length === 0) return null;
   return (
     <div className="sp-loc-picks">
+      {missing.map((id) => (
+        <button
+          key={id}
+          type="button"
+          className="sp-chip-btn is-on is-missing"
+          title="Remove"
+          onClick={() => onChange(selected.filter((item) => item !== id))}
+        >
+          missing ×
+        </button>
+      ))}
       {names.map((entity) => {
         const on = selected.includes(entity.id);
         return (
