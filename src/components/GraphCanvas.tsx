@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import {
   Background,
   Controls,
@@ -20,13 +20,13 @@ import {
 } from "@xyflow/react";
 import { describeCondition } from "../domain/conditions";
 import { parallelOffset } from "../domain/edgeGeometry";
-import { indexInvolved, involvement } from "../domain/involved";
+import { involvedIndex, involvement, sameInvolvement } from "../domain/involved";
 import { boxAt, clampInBox, locationFrames, locationIdForBox, type MeasuredSizes } from "../domain/locations";
 import type { GraphDocument, ProjectDocument } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { useContextMenu } from "./ContextMenu";
 import { addBeatItems, beatItems, connectBeatItems, edgeItems, registerViewCenter } from "./menuItems";
-import { StoryNodeCard, type StoryFlowNode } from "./StoryNodeCard";
+import { StoryNodeCard, type StoryFlowNode, type StoryNodeData } from "./StoryNodeCard";
 import { TransitionEdge, type TransitionFlowEdge } from "./TransitionEdge";
 
 const MULTI_BOX = "multiple";
@@ -165,28 +165,9 @@ function CanvasBody({
     return () => registerViewCenter(null);
   }, [arranging, screenToFlowPosition]);
 
-  const [nodes, setNodes] = useNodesState<CanvasNode>(toNodes(graph, graphs, project, mode, sizes));
+  const dataCache = useRef(new Map<string, StoryNodeData>());
+  const [nodes, setNodes] = useNodesState<CanvasNode>(toNodes(graph, graphs, project, mode, sizes, dataCache.current));
   const [edges, setEdges] = useEdgesState(toEdges(graph, project));
-
-  const signature = useMemo(
-    () =>
-      JSON.stringify({
-        nodes: graph.nodes.map(({ position: _position, ...rest }) => rest),
-        edges: graph.edges,
-        boxes: graph.locationBoxes,
-        variables: project.variables,
-        characters: project.characters,
-        items: project.items,
-        locations: project.locations,
-        refs: Object.values(graphs).map((item) =>
-          item.nodes.map((node) => [node.locationId, node.characterIds, node.itemIds, node.subgraphId, node.lines.map((line) => line.speakerId)]),
-        ),
-        mode,
-        restoreTick,
-        sizes: mode === "locations" ? sizes : null,
-      }),
-    [graph, graphs, project, mode, restoreTick, sizes],
-  );
 
   useEffect(() => {
     const frame = window.setTimeout(() => fitView({ padding: 0.08, duration: 180 }), 40);
@@ -208,20 +189,41 @@ function CanvasBody({
 
   useEffect(() => {
     setNodes((current) => {
-      const next = toNodes(graph, graphs, project, mode, sizes);
+      const next = toNodes(graph, graphs, project, mode, sizes, dataCache.current);
       // Undo and redo also put beats back where they were.
       const restoring = appliedTick.current !== restoreTick;
       appliedTick.current = restoreTick;
       if (mode === "locations" || restoring) return next;
-      return next.map((node) => {
-        const previous = current.find((item) => item.id === node.id);
-        return previous ? { ...node, position: previous.position } : node;
+      const byId = new Map(current.map((node) => [node.id, node]));
+      let same = next.length === current.length;
+      const merged = next.map((node, index) => {
+        const previous = byId.get(node.id);
+        if (!previous) {
+          same = false;
+          return node;
+        }
+        // Unchanged beats keep their node object, so neither React Flow nor the card re-renders.
+        if (previous.data === node.data && previous.type === node.type && previous.parentId === node.parentId) {
+          if (current[index] !== previous) same = false;
+          return previous;
+        }
+        same = false;
+        return { ...node, position: previous.position, selected: previous.selected };
+      });
+      return same ? current : merged;
+    });
+  }, [graph, graphs, project, mode, sizes, restoreTick, setNodes]);
+
+  useEffect(() => {
+    setEdges((current) => {
+      const next = toEdges(graph, project);
+      const byId = new Map(current.map((edge) => [edge.id, edge]));
+      return next.map((edge) => {
+        const previous = byId.get(edge.id);
+        return previous ? { ...edge, selected: previous.selected } : edge;
       });
     });
-    setEdges(toEdges(graph, project));
-    // Signature tracks content other than the graph-view drag position.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature, setNodes, setEdges]);
+  }, [graph.edges, project, setEdges]);
 
   useEffect(() => {
     setNodes((current) =>
@@ -463,12 +465,17 @@ function toNodes(
   project: ProjectDocument,
   mode: "graph" | "locations",
   sizes: MeasuredSizes = {},
+  cache: Map<string, StoryNodeData> = new Map(),
 ): CanvasNode[] {
-  const involved = indexInvolved(graphs);
-  const dataFor = (story: GraphDocument["nodes"][number]) => ({
-    story,
-    involvement: involvement(involved, graph.id, story.id),
-  });
+  const involved = involvedIndex(graphs);
+  const dataFor = (story: GraphDocument["nodes"][number]): StoryNodeData => {
+    const next = involvement(involved, graph.id, story.id);
+    const cached = cache.get(story.id);
+    if (cached && cached.story === story && sameInvolvement(cached.involvement, next)) return cached;
+    const data: StoryNodeData = { story, involvement: next };
+    cache.set(story.id, data);
+    return data;
+  };
   if (mode === "graph") {
     return graph.nodes.map((story) => ({
       id: story.id,

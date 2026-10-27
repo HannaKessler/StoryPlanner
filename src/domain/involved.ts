@@ -93,6 +93,30 @@ export function indexInvolved(graphs: Record<string, GraphDocument>): Map<string
   return index;
 }
 
+const indexCache = new WeakMap<Record<string, GraphDocument>, Map<string, NodeInvolvement>>();
+
+/** indexInvolved, computed once per graphs object. */
+export function involvedIndex(graphs: Record<string, GraphDocument>): Map<string, NodeInvolvement> {
+  let index = indexCache.get(graphs);
+  if (!index) {
+    index = indexInvolved(graphs);
+    indexCache.set(graphs, index);
+  }
+  return index;
+}
+
+export function sameInvolvement(a: NodeInvolvement, b: NodeInvolvement): boolean {
+  return sameSets(a.own, b.own) && sameSets(a.all, b.all);
+}
+
+function sameSets(a: InvolvedSets, b: InvolvedSets): boolean {
+  return sameIds(a.locationIds, b.locationIds) && sameIds(a.characterIds, b.characterIds) && sameIds(a.itemIds, b.itemIds);
+}
+
+function sameIds(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((id, index) => id === b[index]);
+}
+
 export function involvement(
   index: Map<string, NodeInvolvement>,
   graphId: string,

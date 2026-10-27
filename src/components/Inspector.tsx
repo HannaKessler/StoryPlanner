@@ -1,10 +1,10 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { graphName } from "../domain/graphOps";
 import { entityLabel } from "../domain/names";
 import { describeCondition } from "../domain/conditions";
 import { describeEffect } from "../domain/effects";
 import { entityName } from "../domain/format";
-import { indexInvolved, involvement } from "../domain/involved";
+import { involvedIndex, involvement } from "../domain/involved";
 import { beatLabel, shortBeatLabel } from "../domain/labels";
 import type { GraphDocument, ProjectDocument, StoryEdge, StoryEntity } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
@@ -82,7 +82,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
   const moveNodeEffect = useProjectStore((state) => state.moveNodeEffect);
   const currentGraphId = useProjectStore((state) => state.currentGraphId);
   const node = graph.nodes.find((item) => item.id === nodeId);
-  const involved = useMemo(() => indexInvolved(graphs), [graphs]);
+  const involved = involvedIndex(graphs);
   if (!node || !project || !currentGraphId) return null;
   const child = node.subgraphId ? graphs[node.subgraphId] : undefined;
   const info = involvement(involved, currentGraphId, node.id);

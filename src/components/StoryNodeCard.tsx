@@ -1,4 +1,5 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
+import { memo } from "react";
 import { describeEffect } from "../domain/effects";
 import { entityName, speakerName } from "../domain/format";
 import { graphName } from "../domain/graphOps";
@@ -12,7 +13,8 @@ export type StoryNodeData = Record<string, unknown> & {
 };
 export type StoryFlowNode = Node<StoryNodeData, "story">;
 
-export function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
+/** Re-renders only when its beat, involvement or selection changes. */
+export const StoryNodeCard = memo(function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
   const story = data.story;
   const project = useProjectStore((state) => state.project);
   const openSubgraph = useProjectStore((state) => state.openSubgraph);
@@ -67,7 +69,7 @@ export function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
       <Handle type="source" position={Position.Right} id="out" className="sp-handle-out" />
     </article>
   );
-}
+}, (previous, next) => previous.data === next.data && previous.selected === next.selected);
 
 function RefLine({
   ids,
