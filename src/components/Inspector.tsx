@@ -44,10 +44,10 @@ function GraphInspector({ graph }: { graph: GraphDocument }) {
   return (
     <>
       <div className="sp-insp-head">
-        <span className="sp-kicker">{nested ? "Sub-graph" : "Graph"}</span>
+        <span className="sp-kicker">{nested ? "Children" : "Graph"}</span>
         <input
           className="sp-head-input"
-          aria-label={nested ? "Sub-graph name" : "Graph name"}
+          aria-label={nested ? "Name" : "Graph name"}
           placeholder={nested ? graphName({ ...graph, name: "" }, graphs, project) : undefined}
           value={graph.name}
           onChange={(event) => updateGraphMeta({ name: event.target.value })}
@@ -87,7 +87,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
   if (!node || !project || !currentGraphId) return null;
   const child = node.subgraphId ? graphs[node.subgraphId] : undefined;
   const info = involvement(involved, currentGraphId, node.id);
-  const fromSub = `From sub-graph: ${child ? graphName(child, graphs, project) : ""}`;
+  const fromSub = `From children of ${beatLabel(node, project)}`;
   const outgoing = graph.edges.filter((edge) => edge.source === node.id);
   const linked = new Set(outgoing.map((edge) => edge.target));
   const targets = graph.nodes.filter((item) => item.id !== node.id && !linked.has(item.id));
@@ -150,12 +150,12 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
       </Section>
 
       {child && (
-        <div className="sp-inner-row" title="Sub-graph">
+        <div className="sp-inner-row" title="Children">
           <span className="sp-inner-name">↳ {graphName(child, graphs, project)}</span>
           <button type="button" className="sp-chip-btn" onClick={() => openSubgraph(node.id)}>
             Open
           </button>
-          <IconButton label="Remove sub-graph" danger onClick={() => requestDeleteSubgraph(node.id)}>
+          <IconButton label="Remove children" danger onClick={() => requestDeleteSubgraph(node.id)}>
             ×
           </IconButton>
         </div>

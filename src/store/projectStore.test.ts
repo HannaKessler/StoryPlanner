@@ -139,7 +139,7 @@ describe("confirmed deletes", () => {
     store().createSubgraph(id);
     store().openGraph(store().project!.rootGraphId);
     store().requestDeleteNodes([id]);
-    expect(store().confirm?.message).toBe("Also deletes 1 nested beat.");
+    expect(store().confirm?.message).toBe("Also deletes 1 child beat.");
     store().resolveConfirm(false);
     expect(rootGraph().nodes).toHaveLength(1);
     store().requestDeleteNodes([id]);

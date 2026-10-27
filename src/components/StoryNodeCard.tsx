@@ -2,7 +2,6 @@ import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { memo } from "react";
 import { describeEffect } from "../domain/effects";
 import { entityName, speakerName } from "../domain/format";
-import { graphName } from "../domain/graphOps";
 import { beatLabel } from "../domain/labels";
 import type { NodeInvolvement } from "../domain/involved";
 import type { DialogueLine, ProjectDocument, StoryNode } from "../domain/types";
@@ -19,11 +18,7 @@ export const StoryNodeCard = memo(function StoryNodeCard({ data, selected }: Nod
   const story = data.story;
   const project = useProjectStore((state) => state.project);
   const openSubgraph = useProjectStore((state) => state.openSubgraph);
-  const subName = useProjectStore((state) => {
-    const child = story.subgraphId ? state.graphs[story.subgraphId] : undefined;
-    return child && state.project ? graphName(child, state.graphs, state.project) : "";
-  });
-  const from = `From sub-graph: ${subName}`;
+  const from = `From children of ${project ? beatLabel(story, project) : "this beat"}`;
   const title = story.title.trim();
   const summary = story.summary.trim();
   const own = data.involvement?.own;
@@ -42,7 +37,7 @@ export const StoryNodeCard = memo(function StoryNodeCard({ data, selected }: Nod
       <header>
         {title ? <h3>{title}</h3> : <h3 className="sp-unnamed">{project ? beatLabel(story, project) : "Beat"}</h3>}
         {story.subgraphId && (
-          <span className="sp-node-nest" title="Sub-graph">
+          <span className="sp-node-nest" title="Has children">
             ↳
           </span>
         )}

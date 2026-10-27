@@ -86,7 +86,7 @@ function writeNode(
     lines.push("", line.text.trim() || "…", "");
   }
   if (child) {
-    lines.push(`*Sub-graph: ${child.name.trim() || beatLabel(node, project)}*`, "");
+    lines.push(`*Children of ${beatLabel(node, project)}*`, "");
     writeGraph(child, Math.min(level + 1, 6), lines, seen, project, graphs);
   }
 

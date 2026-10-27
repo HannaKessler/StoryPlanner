@@ -93,7 +93,7 @@ function WritePage({ project, graph, node }: { project: ProjectDocument; graph: 
 
       {child && child.nodes.length > 0 && (
         <>
-          <h3 className="sp-write-label">Sub-graph</h3>
+          <h3 className="sp-write-label">Children</h3>
           <ul className="sp-write-links">
             {orderBeats(child).map((beat) => (
               <li key={beat.id}>

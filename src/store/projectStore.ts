@@ -862,7 +862,7 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
     set({
       confirm: {
         title: nodeIds.length === 1 ? "Delete beat" : `Delete ${plural(nodeIds.length, "beat")}`,
-        message: `Also deletes ${plural(nested, "nested beat")}.`,
+        message: `Also deletes ${plural(nested, "child beat")}.`,
         confirmLabel: "Delete",
         onConfirm: run,
       },
@@ -878,8 +878,8 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
     for (const id of descendantGraphIds(state.graphs, node.subgraphId)) nested += state.graphs[id]?.nodes.length ?? 0;
     set({
       confirm: {
-        title: "Remove sub-graph",
-        message: `Deletes ${plural(nested, "beat")}.`,
+        title: "Remove children",
+        message: `Deletes ${plural(nested, "child beat")}.`,
         confirmLabel: "Remove",
         onConfirm: () => get().deleteSubgraph(nodeId),
       },

@@ -38,8 +38,8 @@ export function beatItems(node: Pick<StoryNode, "id" | "subgraphId">): MenuItem[
   return [
     exists
       ? { label: "Open", onSelect: () => state.openSubgraph(node.id) }
-      : { label: "Create sub-graph", onSelect: () => state.createSubgraph(node.id) },
-    ...(exists ? [{ label: "Remove sub-graph", danger: true, onSelect: () => state.requestDeleteSubgraph(node.id) }] : []),
+      : { label: "Add children", onSelect: () => state.createSubgraph(node.id) },
+    ...(exists ? [{ label: "Remove children", danger: true, onSelect: () => state.requestDeleteSubgraph(node.id) }] : []),
     "separator",
     {
       label: "Rename",
