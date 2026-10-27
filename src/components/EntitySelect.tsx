@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { entityLabel } from "../domain/names";
 import { entitiesOf } from "../domain/format";
 import type { EntityKind } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
@@ -60,7 +61,7 @@ export function EntitySelect({
       {allowEmpty && <option value="">unset</option>}
       {entities.map((entity) => (
         <option key={entity.id} value={entity.id}>
-          {entity.name || "Untitled"}
+          {project ? entityLabel(project, entity) : entity.name}
         </option>
       ))}
       <option value="__new__">+ {kind}</option>

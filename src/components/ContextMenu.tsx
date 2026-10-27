@@ -31,6 +31,12 @@ export function menuHandler(items: () => MenuItem[]) {
   };
 }
 
+/** Opens the shared menu below a button, for "+" buttons that offer a choice. */
+export function openMenuBelow(element: HTMLElement, items: MenuItem[]) {
+  const rect = element.getBoundingClientRect();
+  useContextMenu.getState().open(rect.left, rect.bottom + 2, items);
+}
+
 /** Focuses and selects the inline name field marked with data-rename={id}. */
 export function focusRename(id: string) {
   window.setTimeout(() => {

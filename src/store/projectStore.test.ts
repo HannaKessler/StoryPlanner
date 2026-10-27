@@ -302,3 +302,23 @@ describe("save race", () => {
     expect(onDisk).toContain("Two");
   });
 });
+
+describe("names", () => {
+  it("gives new entities distinct names", async () => {
+    await openFresh();
+    store().addEntity("character");
+    store().addEntity("character");
+    store().addEntity("character", "Hero");
+    const names = store().project!.characters.map((item) => item.name);
+    expect(names).toEqual(["Hero", "Character 2", "Character 3", "Hero 2"]);
+  });
+
+  it("gives new variables distinct names", async () => {
+    await openFresh();
+    store().addVariable("boolean");
+    store().updateVariable(store().project!.variables[0].id, { name: "flag2" });
+    store().addVariable("boolean");
+    const names = store().project!.variables.map((item) => item.name);
+    expect(new Set(names).size).toBe(names.length);
+  });
+});

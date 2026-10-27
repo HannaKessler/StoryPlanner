@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { entitiesOf } from "../domain/format";
+import { entityLabel } from "../domain/names";
+import { entitiesOf, entityName } from "../domain/format";
 import { kindLabel } from "../domain/labels";
 import type { EntityKind, ProjectDocument, VariableDef, VariableValue } from "../domain/types";
 import { KNOWN_VARIABLE_KINDS } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
-import { focusRename, menuHandler, type MenuItem } from "./ContextMenu";
+import { focusRename, menuHandler, openMenuBelow, type MenuItem } from "./ContextMenu";
+import { isDuplicateName, uniqueName } from "../domain/names";
 import { IconButton, Section } from "./Panel";
 
 const KIND_SHORT: Record<string, string> = {
@@ -13,19 +15,24 @@ const KIND_SHORT: Record<string, string> = {
   character: "char",
   item: "item",
   location: "loc",
-  inventory: "items",
+  inventory: "inv",
 };
 
-function addVariableItems(): MenuItem[] {
+/** One entry per kind. Choosing one adds the variable and focuses its name. */
+function kindItems(prefix = ""): MenuItem[] {
   return KNOWN_VARIABLE_KINDS.map((kind) => ({
-    label: `Add ${kindLabel(kind).toLowerCase()} variable`,
-    onSelect: () => useProjectStore.getState().addVariable(kind),
+    label: `${prefix}${kindLabel(kind)}`,
+    onSelect: () => {
+      const id = useProjectStore.getState().addVariable(kind);
+      if (id) focusRename(id);
+    },
   }));
 }
 
+const addVariableItems = () => kindItems("Add ");
+
 export function VariablesPanel() {
   const project = useProjectStore((state) => state.project);
-  const addVariable = useProjectStore((state) => state.addVariable);
   if (!project) return null;
   return (
     <Section
@@ -33,11 +40,17 @@ export function VariablesPanel() {
       title="Variables"
       count={project.variables.length}
       onContextMenu={menuHandler(addVariableItems)}
-      actions={KNOWN_VARIABLE_KINDS.map((kind) => (
-        <button key={kind} type="button" className="sp-chip-btn" title={`Add a ${kindLabel(kind).toLowerCase()} variable`} onClick={() => addVariable(kind)}>
-          + {KIND_SHORT[kind]}
+      actions={
+        <button
+          type="button"
+          className="sp-chip-btn sp-add"
+          aria-label="Add variable"
+          title="Add variable"
+          onClick={(event) => openMenuBelow(event.currentTarget, kindItems())}
+        >
+          +
         </button>
-      ))}
+      }
     >
       <ul className="sp-var-list">
         {project.variables.map((variable) => (
@@ -52,6 +65,8 @@ function VariableRow({ variable, project }: { variable: VariableDef; project: Pr
   const updateVariable = useProjectStore((state) => state.updateVariable);
   const requestDeleteVariable = useProjectStore((state) => state.requestDeleteVariable);
   const [expanded, setExpanded] = useState(false);
+  const otherNames = project.variables.filter((item) => item.id !== variable.id).map((item) => item.name);
+  const duplicate = isDuplicateName(variable.name, otherNames);
   const known = (["boolean", "value", "character", "item", "location", "inventory"] as string[]).includes(variable.kind);
   const entityKind: EntityKind | null =
     variable.kind === "character" || variable.kind === "item" || variable.kind === "location"
@@ -80,11 +95,17 @@ function VariableRow({ variable, project }: { variable: VariableDef; project: Pr
           {KIND_SHORT[variable.kind] ?? variable.kind}
         </button>
         <input
-          className="sp-cell"
+          className={duplicate ? "sp-cell is-dup" : "sp-cell"}
           aria-label="Variable name"
+          aria-invalid={duplicate || undefined}
+          title={duplicate ? "Name in use" : undefined}
           data-rename={variable.id}
           value={variable.name}
           onChange={(event) => updateVariable(variable.id, { name: event.target.value })}
+          onBlur={() => {
+            const fixed = uniqueName(variable.name || KIND_SHORT[variable.kind] || "variable", otherNames);
+            if (fixed !== variable.name) updateVariable(variable.id, { name: fixed });
+          }}
         />
         {variable.kind === "boolean" && (
           <select
@@ -116,7 +137,7 @@ function VariableRow({ variable, project }: { variable: VariableDef; project: Pr
             <option value="">unset</option>
             {entitiesOf(project, entityKind).map((entity) => (
               <option key={entity.id} value={entity.id}>
-                {entity.name || "Untitled"}
+                {entityLabel(project, entity)}
               </option>
             ))}
           </select>
@@ -138,7 +159,7 @@ function VariableRow({ variable, project }: { variable: VariableDef; project: Pr
               .filter((item) => !(Array.isArray(variable.defaultValue) && variable.defaultValue.includes(item.id)))
               .map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.name || "Untitled"}
+                  {entityLabel(project, item)}
                 </option>
               ))}
           </select>
@@ -169,7 +190,7 @@ function VariableRow({ variable, project }: { variable: VariableDef; project: Pr
                     })
                   }
                 >
-                  {project.items.find((item) => item.id === id)?.name || "Untitled"} ×
+                  {entityName(project, id)} ×
                 </button>
               ))}
             </div>

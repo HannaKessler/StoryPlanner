@@ -1,4 +1,5 @@
 import { indexInvolved, involvement } from "./involved";
+import { entityLabel } from "./names";
 import type { GraphDocument, ProjectDocument, StoryNode } from "./types";
 
 /** Beats with no place of their own, and no single inherited place, share this box. */
@@ -66,7 +67,7 @@ export function locationGroups(
   const index = indexInvolved(graphs);
   const groups = project.locations.map((location) => ({
     id: location.id,
-    name: location.name || "Untitled",
+    name: entityLabel(project, location),
     nodeIds: [] as string[],
   }));
   const multiple = { id: MULTI_LOCATION, name: "Multiple", nodeIds: [] as string[] };

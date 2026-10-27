@@ -187,9 +187,12 @@ h1 { font-family: var(--font-story); font-size: 52px; line-height: 1.05; font-we
   line-height: 18px;
   white-space: nowrap;
 }
-.sp-chip-btn:hover, .sp-chip-select:hover, .sp-chip-btn.is-on { color: var(--text); background: var(--bg-elev-2); }
+.sp-chip-btn:hover, .sp-chip-select:hover { color: var(--text); background: var(--bg-elev-2); }
+.sp-chip-btn.is-on { color: var(--text); background: rgba(227, 161, 90, 0.16); border-color: rgba(227, 161, 90, 0.55); }
+.sp-chip-btn.is-on:hover { background: rgba(227, 161, 90, 0.24); }
+.sp-add { font-size: 14px; line-height: 18px; padding: 0 6px; }
 .sp-chip-btn:disabled { opacity: 0.45; cursor: default; }
-.sp-chip-btn.is-missing { color: var(--danger); }
+.sp-chip-btn.is-missing { color: var(--danger); border-color: rgba(212, 106, 92, 0.5); background: transparent; }
 .sp-chip-select { padding: 1px 4px; max-width: 120px; }
 .sp-mini {
   flex: none;
@@ -218,6 +221,7 @@ h1 { font-family: var(--font-story); font-size: 52px; line-height: 1.05; font-we
 }
 .sp-cell:hover { border-color: var(--line); }
 .sp-cell:focus { border-color: var(--accent); outline: none; }
+.sp-cell.is-dup, .sp-head-input.is-dup { border-color: var(--danger); }
 select.sp-cell, .sp-chip-select {
   appearance: none;
   -webkit-appearance: none;
@@ -289,7 +293,9 @@ input.sp-cell[type="number"]::-webkit-inner-spin-button, input.sp-cell[type="num
 .sp-gallery { display: flex; flex-wrap: wrap; gap: 8px; }
 .sp-gallery figure { position: relative; margin: 0; width: 96px; height: 96px; background: var(--bg-sunken); border-radius: 4px; overflow: hidden; }
 .sp-gallery img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.sp-gallery .sp-mini { position: absolute; top: 2px; right: 2px; }
+.sp-gallery .sp-mini { position: absolute; top: 3px; right: 3px; background: rgba(14, 13, 11, 0.8); color: var(--text); opacity: 0; }
+.sp-gallery figure:hover .sp-mini, .sp-gallery .sp-mini:focus-visible { opacity: 1; }
+.sp-unnamed { color: var(--text-faint); font-style: italic; }
 .sp-gallery-missing { display: block; width: 100%; height: 100%; }
 .sp-fields { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
 .sp-fields li { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 4px; align-items: center; }

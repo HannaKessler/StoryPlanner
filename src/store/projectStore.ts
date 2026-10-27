@@ -21,6 +21,7 @@ import {
 } from "../domain/factories";
 import { entitiesOf, withEntities } from "../domain/format";
 import { descendantGraphIds, splitTransition } from "../domain/graphOps";
+import { isDuplicateName, newEntityName, uniqueName } from "../domain/names";
 import {
   countEntityRefs,
   countVariableRefs,
@@ -174,7 +175,7 @@ interface ProjectStore {
   updateNodeEffect: (nodeId: string, effectId: string, patch: Partial<Effect>) => void;
   deleteNodeEffect: (nodeId: string, effectId: string) => void;
 
-  addVariable: (kind: string) => void;
+  addVariable: (kind: string) => string | null;
   updateVariable: (variableId: string, patch: Partial<VariableDef>) => void;
   deleteVariable: (variableId: string) => void;
   addEntity: (kind: EntityKind, name?: string) => string | null;
@@ -1042,12 +1043,19 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
   addVariable(kind) {
     set((state) => {
       if (!state.project) return {};
-      const count = state.project.variables.filter((variable) => variable.kind === kind).length + 1;
       const base =
         kind === "boolean" ? "flag" : kind === "value" ? "amount" : kind === "inventory" ? "inventory" : kind === "character" || kind === "item" || kind === "location" ? kind : "variable";
-      const variable = createVariable(kind, { name: count === 1 && kind === "inventory" ? "inventory" : `${base}${count}` });
+      const taken = state.project.variables.map((variable) => variable.name);
+      let count = state.project.variables.filter((variable) => variable.kind === kind).length + 1;
+      let name = count === 1 && kind === "inventory" ? "inventory" : `${base}${count}`;
+      while (isDuplicateName(name, taken)) {
+        count += 1;
+        name = `${base}${count}`;
+      }
+      const variable = createVariable(kind, { name });
       return { project: { ...state.project, variables: [...state.project.variables, variable] }, dirty: true };
     });
+    return get().project?.variables.at(-1)?.id ?? null;
   },
 
   updateVariable(variableId, patch) {
@@ -1074,13 +1082,16 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
   },
 
   addEntity(kind, name = "") {
-    const entity = createEntity({ name: name.trim() });
+    const project = get().project;
+    if (!project) return null;
+    const entities = entitiesOf(project, kind);
+    const wanted = name.trim() ? uniqueName(name, entities.map((item) => item.name)) : newEntityName(kind, entities);
+    const entity = createEntity({ name: wanted });
     set((state) => {
       if (!state.project) return {};
-      const entities = entitiesOf(state.project, kind);
-      return { project: withEntities(state.project, kind, [...entities, entity]), dirty: true };
+      return { project: withEntities(state.project, kind, [...entitiesOf(state.project, kind), entity]), dirty: true };
     });
-    return get().project ? entity.id : null;
+    return entity.id;
   },
 
   updateEntity(kind, entityId, patch) {

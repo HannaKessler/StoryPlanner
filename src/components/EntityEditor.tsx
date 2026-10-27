@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { readFileBytes } from "../desktop/tauri";
 import { entitiesOf } from "../domain/format";
+import { entityLabel, isDuplicateName, uniqueName } from "../domain/names";
 import { joinPath } from "../domain/paths";
 import type { EntityKind, StoryEntity } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
@@ -21,16 +22,26 @@ export function EntityEditor({ kind }: { kind: EntityKind }) {
   if (!project) return null;
   const entities = entitiesOf(project, kind);
   const current = entities.find((entity) => entity.id === selected) ?? entities[0] ?? null;
+  const add = () => {
+    const id = addEntity(kind);
+    if (!id) return;
+    setSelected(id);
+    focusRename(id);
+  };
 
   return (
     <div className="sp-library">
       <div
         className="sp-library-list"
-        onContextMenu={menuHandler(() => [{ label: `Add ${kind}`, onSelect: () => setSelected(addEntity(kind)) }])}
+        onContextMenu={menuHandler(() => [{ label: `Add ${kind}`, onSelect: add }])}
       >
         <header className="sp-sec-head">
           <span className="sp-sec-title">{TITLES[kind]}</span>
           <span className="sp-sec-count">{entities.length}</span>
+          <span className="sp-grow" />
+          <button type="button" className="sp-chip-btn sp-add" aria-label={`Add ${kind}`} title={`Add ${kind}`} onClick={add}>
+            +
+          </button>
         </header>
         <ul className="sp-beats">
           {entities.map((entity) => (
@@ -38,7 +49,7 @@ export function EntityEditor({ kind }: { kind: EntityKind }) {
               key={entity.id}
               className={current?.id === entity.id ? "is-active" : ""}
               onContextMenu={menuHandler(() => [
-                { label: `Add ${kind}`, onSelect: () => setSelected(addEntity(kind)) },
+                { label: `Add ${kind}`, onSelect: add },
                 "separator",
                 {
                   label: "Rename",
@@ -51,7 +62,7 @@ export function EntityEditor({ kind }: { kind: EntityKind }) {
               ])}
             >
               <button type="button" className="sp-beat" onClick={() => setSelected(entity.id)}>
-                <span className="sp-beat-title">{entity.name || "Untitled"}</span>
+                <span className={entity.name.trim() ? "sp-beat-title" : "sp-beat-title sp-unnamed"}>{entityLabel(project, entity)}</span>
               </button>
             </li>
           ))}
@@ -63,7 +74,10 @@ export function EntityEditor({ kind }: { kind: EntityKind }) {
 }
 
 function EntityDetail({ kind, entity }: { kind: EntityKind; entity: StoryEntity }) {
+  const project = useProjectStore((state) => state.project);
   const updateEntity = useProjectStore((state) => state.updateEntity);
+  const otherNames = project ? entitiesOf(project, kind).filter((item) => item.id !== entity.id).map((item) => item.name) : [];
+  const duplicate = isDuplicateName(entity.name, otherNames);
   const addEntityImages = useProjectStore((state) => state.addEntityImages);
   const removeEntityImage = useProjectStore((state) => state.removeEntityImage);
   return (
@@ -75,11 +89,18 @@ function EntityDetail({ kind, entity }: { kind: EntityKind; entity: StoryEntity 
       ])}
     >
       <input
-        className="sp-head-input"
+        className={duplicate ? "sp-head-input is-dup" : "sp-head-input"}
         aria-label="Name"
+        aria-invalid={duplicate || undefined}
+        title={duplicate ? "Name in use" : undefined}
+        placeholder={project ? entityLabel(project, entity) : undefined}
         data-rename={entity.id}
         value={entity.name}
         onChange={(event) => updateEntity(kind, entity.id, { name: event.target.value })}
+        onBlur={() => {
+          if (!duplicate) return;
+          updateEntity(kind, entity.id, { name: uniqueName(entity.name, otherNames) });
+        }}
       />
       <Section id={`entity:${entity.id}:notes`} title="Notes" summary={entity.notes}>
         <textarea
@@ -102,7 +123,14 @@ function EntityDetail({ kind, entity }: { kind: EntityKind; entity: StoryEntity 
       >
         <div className="sp-gallery">
           {entity.images.map((path) => (
-            <figure key={path}>
+            <figure
+              key={path}
+              onContextMenu={menuHandler(() => [
+                { label: "Add image", onSelect: () => void addEntityImages(kind, entity.id) },
+                "separator",
+                { label: "Remove image", danger: true, onSelect: () => void removeEntityImage(kind, entity.id, path) },
+              ])}
+            >
               <EntityImage path={path} />
               <IconButton label="Remove image" danger onClick={() => void removeEntityImage(kind, entity.id, path)}>
                 ×

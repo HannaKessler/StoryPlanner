@@ -1,4 +1,6 @@
 import { entitiesOf, formatValue, speakerName } from "../domain/format";
+import { entityName } from "../domain/format";
+import { graphName } from "../domain/graphOps";
 import { beatLabel } from "../domain/labels";
 import { entryNodes } from "../domain/graphOps";
 import { availableActions, playLocation, suggestedNodes, type PlayAction } from "../domain/play";
@@ -48,7 +50,7 @@ export function PlayMode() {
         </div>
         {choosing && (
           <article className="sp-script">
-            <h2>{choosing.name || "Untitled"}</h2>
+            <h2>{graphName(choosing, graphs, project)}</h2>
             {choices.length > 0 && (
               <div className="sp-play-group">
                 {choices.map((node) => (
@@ -163,7 +165,7 @@ export function PlayMode() {
                       <option value="">unset</option>
                       {entitiesOf(project, entityKind).map((entity) => (
                         <option key={entity.id} value={entity.id}>
-                          {entity.name || "Untitled"}
+                          {entityName(project, entity.id)}
                         </option>
                       ))}
                     </select>
@@ -206,11 +208,12 @@ function InventoryValue({
   choices: Array<{ id: string; name: string }>;
   onChange: (next: VariableValue) => void;
 }) {
+  const project = useProjectStore((state) => state.project);
   return (
     <span className="sp-inv">
       {ids.map((id) => (
         <button key={id} type="button" className="sp-chip-btn is-on" onClick={() => onChange(ids.filter((item) => item !== id))}>
-          {choices.find((item) => item.id === id)?.name || "Untitled"} ×
+          {project ? entityName(project, id) : id} ×
         </button>
       ))}
       <select
@@ -224,7 +227,7 @@ function InventoryValue({
         <option value="">+</option>
         {choices.filter((item) => !ids.includes(item.id)).map((item) => (
           <option key={item.id} value={item.id}>
-            {item.name || "Untitled"}
+            {project ? entityName(project, item.id) : item.name}
           </option>
         ))}
       </select>

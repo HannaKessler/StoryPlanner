@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { entityLabel } from "../domain/names";
 import type { DialogueLine } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { menuHandler } from "./ContextMenu";
@@ -110,7 +111,7 @@ export function SpeakerPicker({
       <option value="">Narration</option>
       {project.characters.map((character) => (
         <option key={character.id} value={character.id}>
-          {character.name || "Untitled"}
+          {entityLabel(project, character)}
         </option>
       ))}
       <option value="__new__">+ character</option>

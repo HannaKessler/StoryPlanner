@@ -50,14 +50,14 @@ export function graphBreadcrumbs(
     seen.add(current);
     const graph: GraphDocument | undefined = graphs[current];
     if (!graph) break;
-    crumbs.push({ id: graph.id, name: graphCrumbName(graph, graphs, project) });
+    crumbs.push({ id: graph.id, name: graphName(graph, graphs, project) });
     current = graph.parentGraphId;
   }
   return crumbs.reverse();
 }
 
 /** The graph's own name, or a label derived from its parent beat. Does not write either. */
-function graphCrumbName(
+export function graphName(
   graph: GraphDocument,
   graphs: Record<string, GraphDocument>,
   project?: ProjectDocument | null,

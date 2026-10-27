@@ -1,4 +1,5 @@
 import { speakerName } from "./format";
+import { entityLabel } from "./names";
 import { graphBreadcrumbs, orderedGraphs } from "./graphOps";
 import { beatLabel } from "./labels";
 import type {
@@ -40,7 +41,7 @@ export function exportVoiceSheets(
 
   const order = orderedGraphs(project, graphs);
   for (const character of characters) {
-      lines.push(`## ${character.name || "Untitled"}`, "");
+      lines.push(`## ${entityLabel(project, character)}`, "");
       if (character.notes.trim()) lines.push(character.notes.trim(), "");
       const appearances = collectLines(order, character.id);
       if (appearances.length === 0) {
@@ -64,7 +65,7 @@ export function exportVoiceSheets(
             lines.push(`> **${cue.speaker}:** *${cue.line.text.trim() || "…"}*${via}`, "");
           }
         }
-        lines.push(`**${(character.name || "Untitled").toUpperCase()}**`, "", line.text.trim() || "…", "", "---", "");
+        lines.push(`**${entityLabel(project, character).toUpperCase()}**`, "", line.text.trim() || "…", "", "---", "");
       }
   }
   return `${lines.join("\n").trim()}\n`;

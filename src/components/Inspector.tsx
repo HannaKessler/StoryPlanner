@@ -1,10 +1,11 @@
 import { useMemo } from "react";
+import { entityLabel } from "../domain/names";
 import { describeCondition } from "../domain/conditions";
 import { describeEffect } from "../domain/effects";
 import { entityName } from "../domain/format";
 import { indexInvolved, involvement } from "../domain/involved";
 import { beatLabel } from "../domain/labels";
-import type { GraphDocument, ProjectDocument, StoryEdge } from "../domain/types";
+import type { GraphDocument, ProjectDocument, StoryEdge, StoryEntity } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { ConditionBuilder } from "./ConditionBuilder";
 import { DialogueEditor } from "./DialogueEditor";
@@ -91,7 +92,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
           <option value="">None</option>
           {project.locations.map((location) => (
             <option key={location.id} value={location.id}>
-              {location.name || "Untitled"}
+              {entityLabel(project, location)}
             </option>
           ))}
         </select>
@@ -100,6 +101,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
 
       <Section id="insp:characters" title="Characters">
         <EntityChips
+          project={project}
           names={project.characters}
           selected={node.characterIds}
           onChange={(characterIds) => updateNode(node.id, { characterIds })}
@@ -109,6 +111,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
 
       <Section id="insp:items" title="Items">
         <EntityChips
+          project={project}
           names={project.items}
           selected={node.itemIds}
           onChange={(itemIds) => updateNode(node.id, { itemIds })}
@@ -293,11 +296,13 @@ function Inherited({ ids, project }: { ids: string[]; project: ProjectDocument }
 }
 
 function EntityChips({
+  project,
   names,
   selected,
   onChange,
 }: {
-  names: Array<{ id: string; name: string }>;
+  project: ProjectDocument;
+  names: StoryEntity[];
   selected: string[];
   onChange: (ids: string[]) => void;
 }) {
@@ -327,7 +332,7 @@ function EntityChips({
             aria-pressed={on}
             onClick={() => onChange(on ? selected.filter((id) => id !== entity.id) : [...selected, entity.id])}
           >
-            {entity.name || "Untitled"}
+            {entityLabel(project, entity)}
           </button>
         );
       })}

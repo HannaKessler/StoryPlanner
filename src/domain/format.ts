@@ -1,3 +1,4 @@
+import { entityLabel } from "./names";
 import type { EntityKind, ProjectDocument, Scalar, StoryEntity, VariableDef, VariableValue } from "./types";
 
 export function variableById(project: ProjectDocument, id: string): VariableDef | undefined {
@@ -19,14 +20,15 @@ export function entitiesOf(project: ProjectDocument, kind: EntityKind): StoryEnt
 export function entityName(project: ProjectDocument, id: string | null | undefined): string {
   if (!id) return "unset";
   for (const entity of [...project.characters, ...project.items, ...project.locations]) {
-    if (entity.id === id) return entity.name || "Untitled";
+    if (entity.id === id) return entityLabel(project, entity);
   }
   return "missing";
 }
 
 export function speakerName(project: ProjectDocument, id: string | null): string {
   if (!id) return "Narration";
-  return project.characters.find((entity) => entity.id === id)?.name || "Unknown speaker";
+  const character = project.characters.find((entity) => entity.id === id);
+  return character ? entityLabel(project, character) : "Unknown speaker";
 }
 
 export function formatValue(
