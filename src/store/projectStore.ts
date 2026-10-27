@@ -70,7 +70,7 @@ import type {
 } from "../domain/types";
 import { PROJECT_FILE } from "../domain/types";
 import { joinPath } from "../domain/paths";
-import { allOutlineKeys, buildOutline, orderBeats, outlineKey, visibleRows } from "../domain/outline";
+import { allOutlineKeys, buildOutline, numberEvents, orderBeats, outlineKey, visibleRows } from "../domain/outline";
 
 const RECENTS_KEY = "storyplanner.recents.v1";
 
@@ -658,9 +658,11 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
       const loaded = await loadProject(fs(), folder);
       // References to deleted entities or variables are dropped. The project is then unsaved.
       const clean = sanitizeReferences(loaded.project, loaded.graphs);
+      // Events saved without a number get the next free ones, so none shows as plain "Event".
+      const numbered = numberEvents(clean.graphs, clean.project.rootGraphId);
       resetImages(loaded.project);
       set({
-        ...freshContent(clean.project, clean.graphs, clean.count === 0),
+        ...freshContent(clean.project, numbered.graphs, clean.count === 0 && numbered.count === 0),
         projectPath: folder,
         screen: "graph",
         currentGraphId: loaded.project.rootGraphId,

@@ -105,3 +105,39 @@ export function allOutlineKeys(graphs: Record<string, GraphDocument>): string[] 
   }
   return keys;
 }
+
+/**
+ * Gives every event without a number the next free one (max + 1), in outline
+ * order, then any graphs the outline does not reach. Returns the count added.
+ */
+export function numberEvents(
+  graphs: Record<string, GraphDocument>,
+  rootGraphId: string,
+): { graphs: Record<string, GraphDocument>; count: number } {
+  const order: Array<{ graphId: string; nodeId: string }> = [];
+  const listed = new Set<string>();
+  const walk = (rows: OutlineRow[]) => {
+    for (const row of rows) {
+      listed.add(outlineKey(row.graphId, row.node.id));
+      if (row.node.number <= 0) order.push({ graphId: row.graphId, nodeId: row.node.id });
+      if (row.children) walk(row.children);
+    }
+  };
+  walk(buildOutline(graphs, rootGraphId));
+  for (const graph of Object.values(graphs)) {
+    for (const node of orderBeats(graph)) {
+      if (node.number <= 0 && !listed.has(outlineKey(graph.id, node.id))) order.push({ graphId: graph.id, nodeId: node.id });
+    }
+  }
+  if (order.length === 0) return { graphs, count: 0 };
+  let next = 0;
+  for (const graph of Object.values(graphs)) for (const node of graph.nodes) next = Math.max(next, node.number);
+  const assigned = new Map(order.map((entry) => [outlineKey(entry.graphId, entry.nodeId), ++next]));
+  const out: Record<string, GraphDocument> = {};
+  for (const [id, graph] of Object.entries(graphs)) {
+    out[id] = graph.nodes.some((node) => assigned.has(outlineKey(id, node.id)))
+      ? { ...graph, nodes: graph.nodes.map((node) => ({ ...node, number: assigned.get(outlineKey(id, node.id)) ?? node.number })) }
+      : graph;
+  }
+  return { graphs: out, count: order.length };
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createEdge, createGraph, createNode } from "./factories";
-import { ancestorKeys, buildOutline, orderBeats, outlineKey, visibleRows } from "./outline";
+import { ancestorKeys, buildOutline, numberEvents, orderBeats, outlineKey, visibleRows } from "./outline";
 import { buildSample } from "./sample";
 
 const at = (id: string, x: number, y: number) => createNode({ id, title: id, position: { x, y } });
@@ -48,5 +48,18 @@ describe("outline", () => {
     inner.nodes = [createNode({ id: "i", subgraphId: "outer" })];
     const tree = buildOutline({ outer, inner }, "outer");
     expect(tree[0].children?.[0].children).toBeNull();
+  });
+});
+
+describe("numberEvents", () => {
+  it("gives unnumbered events max + 1 in outline order and keeps existing numbers", () => {
+    const a = createNode({ id: "a", position: { x: 0, y: 0 } });
+    const b = createNode({ id: "b", number: 5, position: { x: 200, y: 0 } });
+    const c = createNode({ id: "c", position: { x: 400, y: 0 } });
+    const graph = createGraph({ id: "g", name: "", nodes: [c, b, a], edges: [createEdge("a", "b"), createEdge("b", "c")] });
+    const { graphs, count } = numberEvents({ g: graph }, "g");
+    expect(count).toBe(2);
+    expect(Object.fromEntries(graphs.g.nodes.map((node) => [node.id, node.number]))).toEqual({ a: 6, b: 5, c: 7 });
+    expect(numberEvents(graphs, "g").count).toBe(0);
   });
 });

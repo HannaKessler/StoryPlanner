@@ -488,6 +488,27 @@ describe("drag out a transition", () => {
 });
 
 describe("event numbers", () => {
+  it("starts a new project at Event 1, and the next event is 2", async () => {
+    setProjectFs(createMemoryFs());
+    vi.mocked(desktop.pickDirectory).mockResolvedValueOnce("/made");
+    await store().createNamedProject("Fresh");
+    const first = rootGraph().nodes[0];
+    expect(first.number).toBe(1);
+    store().addConnectedNode(first.id, { x: 300, y: 0 });
+    expect(rootGraph().nodes.map((node) => node.number)).toEqual([1, 2]);
+  });
+
+  it("numbers events saved without a number when the project opens", async () => {
+    await openFresh(async (files) => {
+      const path = Object.keys(files.dump()).find((key) => key.includes("/graphs/"))!;
+      const doc = JSON.parse(await files.readText(path));
+      doc.nodes = [{ ...doc.nodes[0], number: 0 }, { ...doc.nodes[0], id: "second", number: undefined, position: { x: 400, y: 0 } }];
+      await files.writeText(path, JSON.stringify(doc));
+    });
+    expect(rootGraph().nodes.map((node) => node.number)).toEqual([1, 2]);
+    expect(store().dirty).toBe(true);
+  });
+
   it("gives every new event the next project-wide number and frees only the top one", async () => {
     await openFresh();
     const numbers = () => Object.values(store().graphs).flatMap((graph) => graph.nodes.map((node) => node.number));
