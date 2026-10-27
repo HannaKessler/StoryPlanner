@@ -9,7 +9,6 @@ import { Inspector } from "./Inspector";
 import { LeftPanel } from "./LeftPanel";
 import { openMenuBelow, type MenuItem } from "./ContextMenu";
 import { Modal } from "./Modal";
-import { addBeatInView } from "./menuItems";
 import { PlayMode } from "./PlayMode";
 import { WriteMode } from "./WriteMode";
 
@@ -24,9 +23,7 @@ export function AppShell() {
   const pendingClose = useProjectStore((state) => state.pendingClose);
   const exportOpen = useProjectStore((state) => state.exportOpen);
   const busy = useProjectStore((state) => state.busy);
-  const canvasMode = useProjectStore((state) => state.canvasMode);
   const resumeIntent = useProjectStore((state) => state.resumeIntent);
-  const setCanvasMode = useProjectStore((state) => state.setCanvasMode);
   const renameProject = useProjectStore((state) => state.renameProject);
   const openGraph = useProjectStore((state) => state.openGraph);
   const dismissBanner = useProjectStore((state) => state.dismissBanner);
@@ -136,19 +133,6 @@ export function AppShell() {
                     </button>
                   </>
                 )}
-                {!writing && (
-                <button
-                  type="button"
-                  className={canvasMode === "locations" ? "sp-chip-btn is-on" : "sp-chip-btn"}
-                  aria-pressed={canvasMode === "locations"}
-                  onClick={() => setCanvasMode(canvasMode === "locations" ? "graph" : "locations")}
-                >
-                  Location view
-                </button>
-                )}
-                <button type="button" className="sp-chip-btn" onClick={addBeatInView}>
-                  + Beat
-                </button>
               </div>
             </div>
             {writing ? (
