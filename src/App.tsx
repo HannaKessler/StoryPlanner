@@ -36,7 +36,7 @@ export function App() {
       }
       if (mod && key === "s") {
         event.preventDefault();
-        if (state.project) void state.save();
+        if (state.project) void (event.shiftKey ? state.saveAs() : state.save());
         return;
       }
       // Reloading the window would drop unsaved work.

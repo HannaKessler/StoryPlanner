@@ -62,6 +62,12 @@ export async function readFileBytes(path: string): Promise<number[]> {
   return invoke<number[]>("read_file_bytes", { path });
 }
 
+/** The system temp folder. */
+export async function tempFolder(): Promise<string> {
+  const { tempDir } = await import("@tauri-apps/api/path");
+  return tempDir();
+}
+
 export async function sampleProjectDir(): Promise<string> {
   return invoke<string>("sample_project_dir");
 }

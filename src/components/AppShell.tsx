@@ -189,6 +189,7 @@ function fileItems(canUndo: boolean, canRedo: boolean): MenuItem[] {
     { label: "Open project", onSelect: () => state.requestClose("open") },
     "separator",
     { label: "Save", hint: "Ctrl+S", onSelect: () => void state.save() },
+    { label: "Save as…", hint: "Ctrl+Shift+S", onSelect: () => void state.saveAs() },
     { label: "Undo", hint: "Ctrl+Z", disabled: !canUndo, onSelect: () => state.undo() },
     { label: "Redo", hint: "Ctrl+Y", disabled: !canRedo, onSelect: () => state.redo() },
     "separator",

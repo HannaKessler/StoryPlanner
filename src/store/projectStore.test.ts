@@ -2,6 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryFs, createNewProject, saveProject, type ProjectFs } from "../domain/project";
 import { createEntity } from "../domain/factories";
 import { COALESCE_MS, HISTORY_LIMIT, setProjectFs, useProjectStore } from "./projectStore";
+import * as desktop from "../desktop/tauri";
+
+vi.mock("../desktop/tauri", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../desktop/tauri")>()),
+  pickDirectory: vi.fn(async () => null),
+  copyFile: vi.fn(async () => undefined),
+}));
 
 const ROOT = "/proj";
 
@@ -410,5 +417,28 @@ describe("lines and effects", () => {
     const [a, b] = rootGraph().nodes.at(-1)!.effects.map((effect) => effect.id);
     store().moveNodeEffect(id, b, -1);
     expect(rootGraph().nodes.at(-1)!.effects.map((effect) => effect.id)).toEqual([b, a]);
+  });
+});
+
+describe("save as", () => {
+  it("writes the project, unsaved edits included, into a new folder and continues there", async () => {
+    const files = await openFresh();
+    store().renameProject("Copy Me");
+    vi.mocked(desktop.pickDirectory).mockResolvedValueOnce("/elsewhere");
+    expect(await store().saveAs()).toBe(true);
+    expect(store().projectPath).toBe("/elsewhere/copy-me");
+    expect(store().dirty).toBe(false);
+    expect(await files.readText("/elsewhere/copy-me/project.json")).toContain("Copy Me");
+    expect(JSON.parse(await files.readText(`${ROOT}/project.json`)).name).toBe("Test");
+    expect(desktop.copyFile).toHaveBeenCalledWith(`${ROOT}/assets/hero/a.png`, "/elsewhere/copy-me/assets/hero/a.png");
+  });
+
+  it("refuses a folder that already holds a project", async () => {
+    await openFresh();
+    vi.mocked(desktop.pickDirectory).mockResolvedValueOnce("/");
+    store().renameProject("proj");
+    expect(await store().saveAs()).toBe(false);
+    expect(store().projectPath).toBe(ROOT);
+    expect(store().banner?.tone).toBe("error");
   });
 });

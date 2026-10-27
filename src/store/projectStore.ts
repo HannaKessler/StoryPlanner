@@ -1,11 +1,13 @@
 import { create } from "zustand";
 import {
+  copyFile,
   createTauriFs,
   errorMessage,
   inTauri,
   pickDirectory,
   pickSaveFile,
   sampleProjectDir,
+  tempFolder,
 } from "../desktop/tauri";
 import { opsForVariable } from "../domain/effects";
 import { copyImagesIntoProject } from "../domain/assets";
@@ -143,6 +145,8 @@ interface ProjectStore {
   openAt: (folder: string) => Promise<boolean>;
   openSample: () => Promise<void>;
   save: () => Promise<boolean>;
+  /** Copies the project, unsaved edits included, into a new folder and continues there. */
+  saveAs: () => Promise<boolean>;
   closeProject: () => void;
   requestClose: (intent?: ResumeIntent) => void;
   cancelClose: () => void;
@@ -328,6 +332,31 @@ function freshContent(project: ProjectDocument, graphs: Record<string, GraphDocu
 /** Image files this session knows are on disk, and those the saved project uses. */
 let diskImages = new Set<string>();
 let savedImages = new Set<string>();
+
+/** Writes a project into a folder that has none yet, with its images. */
+async function copyProjectTo(
+  from: string | null,
+  folder: string,
+  project: ProjectDocument,
+  graphs: Record<string, GraphDocument>,
+): Promise<ProjectDocument> {
+  const files = fs();
+  if (await files.exists(joinPath(folder, PROJECT_FILE))) {
+    throw new Error("That folder already contains a StoryPlanner project.");
+  }
+  const saved = await saveProject(files, folder, project, graphs);
+  if (from) {
+    for (const path of referencedImages(project)) {
+      if (!safeAsset(path)) continue;
+      try {
+        await copyFile(joinPath(from, path), joinPath(folder, path));
+      } catch {
+        // A missing image stays missing in the copy too.
+      }
+    }
+  }
+  return saved;
+}
 
 function resetImages(project: ProjectDocument | null) {
   savedImages = project ? referencedImages(project) : new Set();
@@ -597,7 +626,17 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
   async openSample() {
     set({ busy: true, banner: null });
     try {
-      const folder = await sampleProjectDir();
+      const source = await sampleProjectDir();
+      // The sample opens from a fresh copy, so edits never touch the bundled one.
+      let folder = source;
+      try {
+        const loaded = await loadProject(fs(), source);
+        const target = joinPath(await tempFolder(), `storyplanner-sample-${Date.now()}`);
+        await copyProjectTo(source, target, loaded.project, loaded.graphs);
+        folder = target;
+      } catch {
+        folder = source;
+      }
       await get().openAt(folder);
     } catch (error) {
       set({ banner: { tone: "error", text: errorMessage(error) } });
@@ -641,6 +680,35 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
       if (saveInFlight === run) saveInFlight = null;
     });
     return run;
+  },
+
+  async saveAs() {
+    const state = get();
+    if (!state.project) return false;
+    set({ busy: true, banner: null });
+    try {
+      const parent = await pickDirectory("Save project as");
+      if (!parent) return false;
+      const folder = joinPath(parent, slugify(state.project.name || "Untitled story"));
+      const snapshot = { project: state.project, graphs: state.graphs, revision: state.revision };
+      const saved = await copyProjectTo(state.projectPath, folder, snapshot.project, snapshot.graphs);
+      resetImages(saved);
+      const unchanged = get().revision === snapshot.revision;
+      set({
+        ...(unchanged ? { project: saved } : {}),
+        revision: get().revision,
+        projectPath: folder,
+        savedRevision: snapshot.revision,
+        dirty: get().revision !== snapshot.revision,
+        recents: remember(folder, saved.name, get().recents),
+      });
+      return true;
+    } catch (error) {
+      set({ banner: { tone: "error", text: errorMessage(error) } });
+      return false;
+    } finally {
+      set({ busy: false });
+    }
   },
 
   closeProject() {
