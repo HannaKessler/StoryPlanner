@@ -1,7 +1,7 @@
 import { beatLabel } from "../domain/labels";
 import { useProjectStore, type Screen } from "../store/projectStore";
-import { focusRename, menuHandler } from "./ContextMenu";
-import { addBeatItems, nodeGraphItems } from "./menuItems";
+import { menuHandler } from "./ContextMenu";
+import { addBeatItems, beatItems } from "./menuItems";
 import { Section } from "./Panel";
 import { VariablesPanel } from "./VariablesPanel";
 
@@ -42,32 +42,17 @@ function BeatsOutline() {
   const graph = useProjectStore((state) => (state.currentGraphId ? state.graphs[state.currentGraphId] : null));
   const selection = useProjectStore((state) => state.selection);
   const select = useProjectStore((state) => state.select);
-  const requestDeleteNodes = useProjectStore((state) => state.requestDeleteNodes);
   if (!graph) return null;
   return (
     <Section id="left:beats" title="Beats" count={graph.nodes.length} summary={graph.name} onContextMenu={menuHandler(() => addBeatItems())}>
       <ul className="sp-beats">
         {graph.nodes.map((node) => {
           const active = selection?.kind === "node" && selection.id === node.id;
-          const graphItems = nodeGraphItems(node);
           return (
             <li
               key={node.id}
               className={active ? "is-active" : ""}
-              onContextMenu={menuHandler(() => [
-                ...addBeatItems(),
-                "separator",
-                ...graphItems,
-                ...(graphItems.length > 0 ? (["separator"] as const) : []),
-                {
-                  label: "Rename",
-                  onSelect: () => {
-                    select({ kind: "node", id: node.id });
-                    focusRename(node.id);
-                  },
-                },
-                { label: "Delete", danger: true, onSelect: () => requestDeleteNodes([node.id]) },
-              ])}
+              onContextMenu={menuHandler(() => beatItems(node))}
             >
               <button type="button" className="sp-beat" onClick={() => select({ kind: "node", id: node.id })}>
                 <span className="sp-beat-title">{beatLabel(node, project)}</span>

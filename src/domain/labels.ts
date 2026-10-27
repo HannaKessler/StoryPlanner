@@ -19,6 +19,17 @@ export function beatLabel(node: StoryNode, project?: ProjectDocument | null): st
   return `Beat · ${node.id.slice(-6)}`;
 }
 
+/** Cuts long text to `max` characters with an ellipsis, for menus and selects. */
+export function clip(text: string, max = 40): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
+}
+
+/** A beat label short enough for a menu entry or a select option. */
+export function shortBeatLabel(node: StoryNode, project?: ProjectDocument | null): string {
+  return clip(beatLabel(node, project));
+}
+
 export function kindLabel(kind: string): string {
   if (kind === "boolean") return "Boolean";
   if (kind === "value") return "Value";

@@ -322,3 +322,51 @@ describe("names", () => {
     expect(new Set(names).size).toBe(names.length);
   });
 });
+
+describe("transitions and beats", () => {
+  it("keeps one transition per pair", async () => {
+    await openFresh();
+    store().addNode({ x: 0, y: 0 });
+    store().addNode({ x: 300, y: 0 });
+    const [a, b] = rootGraph().nodes.slice(-2).map((node) => node.id);
+    const before = rootGraph().edges.length;
+    store().connectNodes(a, b);
+    const first = store().selection;
+    store().connectNodes(a, b);
+    expect(rootGraph().edges.length).toBe(before + 1);
+    expect(store().selection).toEqual(first);
+    store().addReverseTransition(first!.id);
+    store().addReverseTransition(first!.id);
+    expect(rootGraph().edges.filter((edge) => edge.source === b && edge.target === a)).toHaveLength(1);
+  });
+
+  it("does not retarget a transition onto an existing pair", async () => {
+    await openFresh();
+    store().addNode({ x: 0, y: 0 });
+    store().addNode({ x: 300, y: 0 });
+    store().addNode({ x: 600, y: 0 });
+    const [a, b, c] = rootGraph().nodes.slice(-3).map((node) => node.id);
+    store().connectNodes(a, b);
+    store().connectNodes(a, c);
+    const toC = store().selection!.id;
+    store().updateEdge(toC, { target: b });
+    expect(rootGraph().edges.find((edge) => edge.id === toC)?.target).toBe(c);
+  });
+
+  it("duplicates a beat with fresh ids and no sub-graph", async () => {
+    await openFresh();
+    store().addNode({ x: 10, y: 10 });
+    const source = rootGraph().nodes.at(-1)!;
+    store().addLine(source.id);
+    store().createSubgraph(source.id);
+    store().openGraph(store().project!.rootGraphId);
+    store().duplicateNode(source.id);
+    const copy = rootGraph().nodes.at(-1)!;
+    expect(copy.id).not.toBe(source.id);
+    expect(copy.subgraphId).toBeNull();
+    expect(copy.lines).toHaveLength(1);
+    expect(copy.lines[0].id).not.toBe(rootGraph().nodes.find((node) => node.id === source.id)!.lines[0].id);
+    expect(copy.position).toEqual({ x: 50, y: 50 });
+    expect(store().selection).toEqual({ kind: "node", id: copy.id });
+  });
+});

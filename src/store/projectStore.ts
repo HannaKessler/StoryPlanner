@@ -158,7 +158,8 @@ interface ProjectStore {
   deleteEdges: (edgeIds: string[]) => void;
   connectNodes: (source: string, target: string) => void;
   addConnectedNode: (sourceId: string, position: { x: number; y: number }) => void;
-  addParallelTransition: (edgeId: string) => void;
+  addReverseTransition: (edgeId: string) => void;
+  duplicateNode: (nodeId: string) => void;
   insertBeatOnEdge: (edgeId: string) => void;
   updateEdge: (edgeId: string, patch: Partial<StoryEdge>) => void;
   moveEdge: (edgeId: string, direction: -1 | 1) => void;
@@ -879,8 +880,15 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
 
   connectNodes(source, target) {
     if (!source || !target || source === target) return;
+    const graph = get().currentGraphId ? get().graphs[get().currentGraphId!] : undefined;
+    // One transition per pair. Connecting again selects the one already there.
+    const existing = graph?.edges.find((edge) => edge.source === source && edge.target === target);
+    if (existing) {
+      set({ selection: { kind: "edge", id: existing.id } });
+      return;
+    }
     const edge = createEdge(source, target);
-    withGraph((graph) => ({ ...graph, edges: [...graph.edges, edge] }));
+    withGraph((current) => ({ ...current, edges: [...current.edges, edge] }));
     set({ selection: { kind: "edge", id: edge.id } });
   },
 
@@ -894,20 +902,33 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
     set({ selection: { kind: "node", id: node.id } });
   },
 
-  addParallelTransition(edgeId) {
+  addReverseTransition(edgeId) {
     const state = get();
     const graph = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
     const edge = graph?.edges.find((item) => item.id === edgeId);
     if (!edge) return;
-    const created = createEdge(edge.source, edge.target);
-    withGraph((current) => {
-      const index = current.edges.findIndex((item) => item.id === edgeId);
-      if (index < 0) return current;
-      const edges = current.edges.slice();
-      edges.splice(index + 1, 0, created);
-      return { ...current, edges };
+    get().connectNodes(edge.target, edge.source);
+  },
+
+  duplicateNode(nodeId) {
+    const state = get();
+    const graph = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
+    const source = graph?.nodes.find((item) => item.id === nodeId);
+    if (!source) return;
+    const node = createNode({
+      ...source,
+      id: undefined,
+      position: { x: source.position.x + 40, y: source.position.y + 40 },
+      locationPosition: source.locationPosition ? { x: source.locationPosition.x + 24, y: source.locationPosition.y + 24 } : null,
+      // The copy starts without a sub-graph. Sub-graphs belong to one beat.
+      subgraphId: null,
+      characterIds: [...source.characterIds],
+      itemIds: [...source.itemIds],
+      lines: source.lines.map((line) => createLine({ ...line, id: undefined })),
+      effects: source.effects.map((effect) => createEffect({ ...effect, id: undefined })),
     });
-    set({ selection: { kind: "edge", id: created.id } });
+    withGraph((current) => ({ ...current, nodes: [...current.nodes, node] }));
+    set({ selection: { kind: "node", id: node.id } });
   },
 
   insertBeatOnEdge(edgeId) {
@@ -928,6 +949,15 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
   },
 
   updateEdge(edgeId, patch) {
+    if (patch.source !== undefined || patch.target !== undefined) {
+      const graph = get().currentGraphId ? get().graphs[get().currentGraphId!] : undefined;
+      const edge = graph?.edges.find((item) => item.id === edgeId);
+      if (!graph || !edge) return;
+      const source = patch.source ?? edge.source;
+      const target = patch.target ?? edge.target;
+      if (source === target) return;
+      if (graph.edges.some((item) => item.id !== edgeId && item.source === source && item.target === target)) return;
+    }
     typing(`edge:${edgeId}`, patch);
     withEdge(edgeId, (edge) => ({ ...edge, ...patch, id: edge.id }));
   },

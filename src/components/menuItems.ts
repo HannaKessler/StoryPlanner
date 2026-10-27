@@ -1,7 +1,7 @@
 import { appendCondition, emptyRule } from "../domain/conditions";
 import type { Condition, StoryNode } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
-import type { MenuItem } from "./ContextMenu";
+import { focusRename, type MenuItem } from "./ContextMenu";
 
 export function addBeatItems(position?: { x: number; y: number }): MenuItem[] {
   return [{ label: "Add beat", onSelect: () => useProjectStore.getState().addNode(position) }];
@@ -12,24 +12,40 @@ export function connectBeatItems(sourceId: string, position: { x: number; y: num
   return [{ label: "Add beat", onSelect: () => useProjectStore.getState().addConnectedNode(sourceId, position) }];
 }
 
-/** Right-click menu for a beat. Creating a sub-graph is only this action. */
-export function nodeGraphItems(node: Pick<StoryNode, "id" | "subgraphId">): MenuItem[] {
+/** The one right-click menu for a beat, on the canvas and in the beat list. */
+export function beatItems(node: Pick<StoryNode, "id" | "subgraphId">): MenuItem[] {
   const state = useProjectStore.getState();
   const exists = Boolean(node.subgraphId && state.graphs[node.subgraphId]);
-  if (exists) {
-    return [{ label: "Open", onSelect: () => state.openSubgraph(node.id) }];
-  }
-  return [{ label: "Create sub-graph", onSelect: () => state.createSubgraph(node.id) }];
+  return [
+    exists
+      ? { label: "Open", onSelect: () => state.openSubgraph(node.id) }
+      : { label: "Create sub-graph", onSelect: () => state.createSubgraph(node.id) },
+    ...(exists ? [{ label: "Remove sub-graph", danger: true, onSelect: () => state.requestDeleteSubgraph(node.id) }] : []),
+    "separator",
+    {
+      label: "Rename",
+      onSelect: () => {
+        state.select({ kind: "node", id: node.id });
+        focusRename(node.id);
+      },
+    },
+    { label: "Duplicate", onSelect: () => state.duplicateNode(node.id) },
+    "separator",
+    { label: "Delete", danger: true, onSelect: () => state.requestDeleteNodes([node.id]) },
+  ];
 }
 
 /** Right-click menu for an existing transition. */
 export function edgeItems(edgeId: string): MenuItem[] {
+  const state = useProjectStore.getState();
+  const graph = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
+  const edge = graph?.edges.find((item) => item.id === edgeId);
+  const reverseExists = Boolean(edge && graph?.edges.some((item) => item.source === edge.target && item.target === edge.source));
   return [
-    { label: "Add transition", onSelect: () => useProjectStore.getState().addParallelTransition(edgeId) },
+    { label: "Add reverse transition", disabled: reverseExists, onSelect: () => state.addReverseTransition(edgeId) },
+    { label: "Insert beat", onSelect: () => state.insertBeatOnEdge(edgeId) },
     "separator",
-    { label: "Insert beat", onSelect: () => useProjectStore.getState().insertBeatOnEdge(edgeId) },
-    "separator",
-    { label: "Delete", danger: true, onSelect: () => useProjectStore.getState().deleteEdges([edgeId]) },
+    { label: "Delete", danger: true, onSelect: () => state.deleteEdges([edgeId]) },
   ];
 }
 

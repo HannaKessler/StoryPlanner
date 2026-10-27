@@ -24,7 +24,7 @@ import { locationFrames } from "../domain/locations";
 import type { GraphDocument, ProjectDocument } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { useContextMenu } from "./ContextMenu";
-import { addBeatItems, connectBeatItems, edgeItems, nodeGraphItems } from "./menuItems";
+import { addBeatItems, connectBeatItems, edgeItems, beatItems } from "./menuItems";
 import { StoryNodeCard, type StoryFlowNode } from "./StoryNodeCard";
 import { TransitionEdge, type TransitionFlowEdge } from "./TransitionEdge";
 
@@ -238,10 +238,8 @@ function CanvasBody({
         onNodeContextMenu={(event, node) => {
           event.preventDefault();
           if (node.type !== "story") return;
-          const items = nodeGraphItems(node.data.story);
-          if (items.length === 0) return;
           select({ kind: "node", id: node.id });
-          openMenu(event.clientX, event.clientY, items);
+          openMenu(event.clientX, event.clientY, beatItems(node.data.story));
         }}
         onEdgeContextMenu={(event, edge) => {
           event.preventDefault();

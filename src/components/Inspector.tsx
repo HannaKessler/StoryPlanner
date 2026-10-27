@@ -4,7 +4,7 @@ import { describeCondition } from "../domain/conditions";
 import { describeEffect } from "../domain/effects";
 import { entityName } from "../domain/format";
 import { indexInvolved, involvement } from "../domain/involved";
-import { beatLabel } from "../domain/labels";
+import { beatLabel, shortBeatLabel } from "../domain/labels";
 import type { GraphDocument, ProjectDocument, StoryEdge, StoryEntity } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { ConditionBuilder } from "./ConditionBuilder";
@@ -66,11 +66,12 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
   const child = node.subgraphId ? graphs[node.subgraphId] : undefined;
   const info = involvement(involved, currentGraphId, node.id);
   const outgoing = graph.edges.filter((edge) => edge.source === node.id);
-  const targets = graph.nodes.filter((item) => item.id !== node.id);
+  const linked = new Set(outgoing.map((edge) => edge.target));
+  const targets = graph.nodes.filter((item) => item.id !== node.id && !linked.has(item.id));
   const addTransitionItems = (): MenuItem[] =>
     targets.length === 0
       ? [{ label: "Add transition", disabled: true, onSelect: () => undefined }]
-      : targets.map((item) => ({ label: `Add transition to ${beatLabel(item, project)}`, onSelect: () => connectNodes(node.id, item.id) }));
+      : targets.map((item) => ({ label: `Add transition to ${shortBeatLabel(item, project)}`, onSelect: () => connectNodes(node.id, item.id) }));
 
   return (
     <>
@@ -204,7 +205,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
               <option value="">+ to…</option>
               {targets.map((item) => (
                   <option key={item.id} value={item.id}>
-                    {beatLabel(item, project)}
+                    {shortBeatLabel(item, project)}
                   </option>
                 ))}
             </select>
@@ -378,7 +379,7 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
             {graph.nodes
               .map((item) => (
                 <option key={item.id} value={item.id}>
-                  {beatLabel(item, project)}
+                  {shortBeatLabel(item, project)}
                 </option>
               ))}
           </select>
@@ -394,7 +395,7 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
           >
             {graph.nodes.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {beatLabel(item, project)}
+                  {shortBeatLabel(item, project)}
                 </option>
               ))}
           </select>
