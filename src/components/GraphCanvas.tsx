@@ -25,7 +25,7 @@ import { boxAt, clampInBox, locationFrames, locationIdForBox, type MeasuredSizes
 import type { GraphDocument, ProjectDocument } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { useContextMenu } from "./ContextMenu";
-import { addBeatItems, beatItems, connectBeatItems, edgeItems, registerViewCenter } from "./menuItems";
+import { addBeatItems, beatItems, edgeItems, registerViewCenter } from "./menuItems";
 import { StoryNodeCard, type StoryFlowNode, type StoryNodeData } from "./StoryNodeCard";
 import { TransitionEdge, type TransitionFlowEdge } from "./TransitionEdge";
 
@@ -166,6 +166,8 @@ function CanvasBody({
   }, [arranging, screenToFlowPosition]);
 
   const dataCache = useRef(new Map<string, StoryNodeData>());
+  const selectionRef = useRef(selection);
+  selectionRef.current = selection;
   const [nodes, setNodes] = useNodesState<CanvasNode>(toNodes(graph, graphs, project, mode, sizes, dataCache.current));
   const [edges, setEdges] = useEdgesState(toEdges(graph, project));
 
@@ -193,7 +195,11 @@ function CanvasBody({
       // Undo and redo also put beats back where they were.
       const restoring = appliedTick.current !== restoreTick;
       appliedTick.current = restoreTick;
-      if (mode === "locations" || restoring) return next;
+      if (mode === "locations" || restoring) {
+        // Rebuilt nodes keep the current selection.
+        const picked = selectionRef.current?.kind === "node" ? selectionRef.current.id : null;
+        return next.map((node) => (node.id === picked ? { ...node, selected: true } : node));
+      }
       const byId = new Map(current.map((node) => [node.id, node]));
       let same = next.length === current.length;
       const merged = next.map((node, index) => {
@@ -349,11 +355,28 @@ function CanvasBody({
           connectNodes(connection.source, connection.target);
         }}
         onConnectEnd={(event, connection) => {
-          if (arranging || !connection.fromNode || connection.toNode || droppedOnNode(event)) return;
+          if (!connection.fromNode || connection.fromNode.type !== "story" || connection.toNode || droppedOnNode(event)) return;
           const point = "changedTouches" in event ? event.changedTouches[0] : event;
           if (!point) return;
           const position = screenToFlowPosition({ x: point.clientX, y: point.clientY });
-          openMenu(point.clientX, point.clientY, connectBeatItems(connection.fromNode.id, position));
+          const into = connection.fromHandle?.type === "target";
+          const add = useProjectStore.getState().addConnectedNode;
+          if (!arranging) {
+            add(connection.fromNode.id, { x: position.x - 16, y: position.y - 20 }, { into });
+            return;
+          }
+          // Location-view coordinates are not graph positions. The box under the drop sets the location.
+          const box = boxAt(drawnBoxes(), position);
+          if (!box) {
+            add(connection.fromNode.id, null, { into, locationId: null });
+            return;
+          }
+          add(connection.fromNode.id, null, {
+            into,
+            locationId: locationIdForBox(box.id),
+            locationPosition: clampInBox({ x: position.x - box.position.x, y: position.y - box.position.y }),
+            keep: drawnPositions(box.id),
+          });
         }}
         onNodeClick={(_, node) => {
           if (node.type !== "story") return;
@@ -456,7 +479,7 @@ function typingTarget(target: EventTarget | null): boolean {
 function droppedOnNode(event: MouseEvent | TouchEvent): boolean {
   const point = "changedTouches" in event ? event.changedTouches[0] : event;
   if (!point) return false;
-  return document.elementsFromPoint(point.clientX, point.clientY).some((element) => element.closest(".react-flow__node"));
+  return document.elementsFromPoint(point.clientX, point.clientY).some((element) => element.closest(".react-flow__node-story"));
 }
 
 function toNodes(

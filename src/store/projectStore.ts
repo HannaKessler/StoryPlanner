@@ -180,7 +180,20 @@ interface ProjectStore {
   deleteNodes: (nodeIds: string[], edgeIds?: string[]) => void;
   deleteEdges: (edgeIds: string[]) => void;
   connectNodes: (source: string, target: string) => void;
-  addConnectedNode: (sourceId: string, position: { x: number; y: number }) => void;
+  /**
+   * Adds a beat joined to an existing one, as one undo step, and selects it.
+   * `into` makes the new beat lead into `sourceId` instead. `keep` pins beats already drawn in its box.
+   */
+  addConnectedNode: (
+    sourceId: string,
+    position: { x: number; y: number } | null,
+    options?: {
+      into?: boolean;
+      locationId?: string | null;
+      locationPosition?: { x: number; y: number } | null;
+      keep?: Record<string, { x: number; y: number }>;
+    },
+  ) => void;
   addReverseTransition: (edgeId: string) => void;
   duplicateNode: (nodeId: string) => void;
   insertBeatOnEdge: (edgeId: string) => void;
@@ -1002,13 +1015,22 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
     set({ selection: { kind: "edge", id: edge.id } });
   },
 
-  addConnectedNode(sourceId, position) {
+  addConnectedNode(sourceId, position, options = {}) {
     const state = get();
     const graph = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
     if (!graph || !graph.nodes.some((node) => node.id === sourceId)) return;
-    const node = createNode({ position });
-    const edge = createEdge(sourceId, node.id);
-    withGraph((current) => ({ ...current, nodes: [...current.nodes, node], edges: [...current.edges, edge] }));
+    const node = createNode({
+      position: position ?? nextBeatPosition(graph, sourceId),
+      ...(options.locationId !== undefined ? { locationId: options.locationId } : {}),
+      ...(options.locationPosition ? { locationPosition: options.locationPosition } : {}),
+    });
+    const edge = options.into ? createEdge(node.id, sourceId) : createEdge(sourceId, node.id);
+    const keep = options.keep ?? {};
+    withGraph((current) => ({
+      ...current,
+      nodes: [...current.nodes.map((item) => (keep[item.id] ? { ...item, locationPosition: keep[item.id] } : item)), node],
+      edges: [...current.edges, edge],
+    }));
     set({ selection: { kind: "node", id: node.id } });
   },
 

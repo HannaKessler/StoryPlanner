@@ -31,11 +31,6 @@ export function addBeatItems(position?: Point, partial?: Partial<Pick<StoryNode,
   ];
 }
 
-/** Menu shown when a connection is dropped on empty canvas. */
-export function connectBeatItems(sourceId: string, position: { x: number; y: number }): MenuItem[] {
-  return [{ label: "Add beat", onSelect: () => useProjectStore.getState().addConnectedNode(sourceId, position) }];
-}
-
 /** The one right-click menu for a beat, on the canvas and in the beat list. */
 export function beatItems(node: Pick<StoryNode, "id" | "subgraphId">): MenuItem[] {
   const state = useProjectStore.getState();

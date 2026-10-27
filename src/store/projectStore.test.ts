@@ -458,3 +458,31 @@ describe("quick create", () => {
     expect(rootGraph().nodes[0].locationId).toBe(id);
   });
 });
+
+describe("drag out a transition", () => {
+  it("adds a connected beat, selects it, and undoes both in one step", async () => {
+    await openFresh();
+    const source = rootGraph().nodes[0];
+    const before = { nodes: rootGraph().nodes.length, edges: rootGraph().edges.length };
+    store().addConnectedNode(source.id, { x: 300, y: 40 });
+    const added = rootGraph().nodes.at(-1)!;
+    expect(added.position).toEqual({ x: 300, y: 40 });
+    expect(rootGraph().edges.at(-1)).toMatchObject({ source: source.id, target: added.id });
+    expect(store().selection).toEqual({ kind: "node", id: added.id });
+    store().undo();
+    expect(rootGraph().nodes.length).toBe(before.nodes);
+    expect(rootGraph().edges.length).toBe(before.edges);
+  });
+
+  it("leads into the beat when dragged from its input, and takes the box's location", async () => {
+    await openFresh();
+    const source = rootGraph().nodes[0];
+    store().addConnectedNode(source.id, null, { into: true, locationId: "loc1", locationPosition: { x: 20, y: 30 } });
+    const added = rootGraph().nodes.at(-1)!;
+    expect(rootGraph().edges.at(-1)).toMatchObject({ source: added.id, target: source.id });
+    expect(added.locationId).toBe("loc1");
+    expect(added.locationPosition).toEqual({ x: 20, y: 30 });
+    store().undo();
+    expect(rootGraph().nodes.some((node) => node.id === added.id)).toBe(false);
+  });
+});
