@@ -67,7 +67,7 @@ function WritePage({ project, graph, node }: { project: ProjectDocument; graph: 
       <AutoTextarea
         className="sp-write-prose sp-write-summary"
         aria-label="Summary"
-        minRows={2}
+        minRows={1}
         maxRows={40}
         value={node.summary}
         onChange={(event) => updateNode(node.id, { summary: event.target.value })}
@@ -77,7 +77,7 @@ function WritePage({ project, graph, node }: { project: ProjectDocument; graph: 
       <AutoTextarea
         className="sp-write-prose"
         aria-label="Scene notes"
-        minRows={2}
+        minRows={1}
         maxRows={40}
         value={node.sceneNotes}
         onChange={(event) => updateNode(node.id, { sceneNotes: event.target.value })}
