@@ -63,6 +63,25 @@ export function AppShell() {
           />
           {dirty && <span className="sp-dirty">Unsaved</span>}
         </div>
+        <nav className="sp-libraries" aria-label="Libraries">
+          {(
+            [
+              ["characters", "Characters"],
+              ["items", "Items"],
+              ["locations", "Locations"],
+            ] as const
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className={screen === id ? "is-active" : ""}
+              aria-current={screen === id ? "page" : undefined}
+              onClick={() => useProjectStore.getState().setScreen(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
         <div className="sp-editmode" role="group" aria-label="Mode">
           {(
             [

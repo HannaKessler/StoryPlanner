@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { nextBeatPosition } from "../domain/graphOps";
 import { beatLabel } from "../domain/labels";
 import { ancestorKeys, buildOutline, outlineKey, visibleRows, type OutlineRow } from "../domain/outline";
-import { useProjectStore, type Screen } from "../store/projectStore";
+import { useProjectStore } from "../store/projectStore";
 import { menuHandler } from "./ContextMenu";
 import { addBeatItems, beatItems } from "./menuItems";
 import { Section } from "./Panel";
@@ -13,30 +13,7 @@ export function LeftPanel() {
     <aside className="sp-left sp-panel">
       <BeatsOutline />
       <VariablesPanel />
-      <LibraryLinks />
     </aside>
-  );
-}
-
-function LibraryLinks() {
-  const project = useProjectStore((state) => state.project);
-  const screen = useProjectStore((state) => state.screen);
-  const setScreen = useProjectStore((state) => state.setScreen);
-  if (!project) return null;
-  const links: Array<[Screen, string, number]> = [
-    ["characters", "Characters", project.characters.length],
-    ["items", "Items", project.items.length],
-    ["locations", "Locations", project.locations.length],
-  ];
-  return (
-    <nav className="sp-library-links" aria-label="Libraries">
-      {links.map(([id, label, count]) => (
-        <button key={id} type="button" className={screen === id ? "is-active" : ""} onClick={() => setScreen(id)}>
-          <span>{label}</span>
-          <span className="sp-sec-count">{count}</span>
-        </button>
-      ))}
-    </nav>
   );
 }
 
