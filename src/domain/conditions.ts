@@ -103,6 +103,28 @@ function describeNode(condition: Condition, project: ProjectDocument): string {
   return `${name} ${OP_LABEL[condition.op]} ${value}`;
 }
 
+/** The first clause that keeps a condition from passing, described. Empty when it passes. */
+export function failingClause(
+  condition: Condition | null,
+  values: Record<string, VariableValue>,
+  project: ProjectDocument,
+): string {
+  if (!condition || evaluateNode(condition, values, project.variables)) return "";
+  return firstFailing(condition, values, project);
+}
+
+function firstFailing(condition: Condition, values: Record<string, VariableValue>, project: ProjectDocument): string {
+  if (condition.type === "group" && condition.children.length > 0) {
+    if (condition.op === "and") {
+      const failed = condition.children.find((child) => !evaluateNode(child, values, project.variables));
+      if (failed) return firstFailing(failed, values, project);
+    } else if (condition.children.length === 1) {
+      return firstFailing(condition.children[0], values, project);
+    }
+  }
+  return describeNode(condition, project);
+}
+
 /** A new rule with no variable chosen. */
 export function emptyRule(): Condition {
   return { type: "compare", variableId: "", op: "eq", value: null };

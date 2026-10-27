@@ -3,7 +3,8 @@ import { entityName } from "../domain/format";
 import { graphName } from "../domain/graphOps";
 import { beatLabel } from "../domain/labels";
 import { entryNodes } from "../domain/graphOps";
-import { availableActions, playLocation, suggestedNodes, type PlayAction } from "../domain/play";
+import { ownInvolved } from "../domain/involved";
+import { availableActions, playLocation, startChoices, type PlayAction } from "../domain/play";
 import type { EntityKind, VariableValue } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { NumberField } from "./Panel";
@@ -26,9 +27,11 @@ export function PlayMode() {
   const restartPlay = useProjectStore((state) => state.restartPlay);
   const beginPlay = useProjectStore((state) => state.beginPlay);
   const cancelStartChoice = useProjectStore((state) => state.cancelStartChoice);
+  const stepBackPlay = useProjectStore((state) => state.stepBackPlay);
+  const jumpPlay = useProjectStore((state) => state.jumpPlay);
   if (!project || !play) return null;
   const choosing = play.choosingGraphId ? graphs[play.choosingGraphId] : null;
-  const choices = choosing ? suggestedNodes(choosing) : [];
+  const choices = choosing ? startChoices(choosing, choosing.id === project.rootGraphId) : [];
   const entries = new Set(choosing ? entryNodes(choosing).map((node) => node.id) : []);
   const location = play.choosingGraphId ? null : playLocation(play, graphs);
   const actions = availableActions(play, project, graphs);
@@ -41,10 +44,26 @@ export function PlayMode() {
     <div className="sp-play">
       <div className="sp-play-stage">
         <div className="sp-play-bar">
-          <p className="sp-play-log" title="Beats entered so far">
-            {play.log.join(" → ")}
-          </p>
+          <ol className="sp-play-log">
+            {play.log.map((title, index) => {
+              const past = (play.marks[index] ?? Infinity) < play.history.length;
+              return (
+                <li key={index}>
+                  {past ? (
+                    <button type="button" onClick={() => jumpPlay(index)}>
+                      {title}
+                    </button>
+                  ) : (
+                    <span aria-current={index === play.log.length - 1 ? "step" : undefined}>{title}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
           <span className="sp-grow" />
+          <button type="button" className="sp-chip-btn" disabled={play.history.length === 0} onClick={stepBackPlay}>
+            Step back
+          </button>
           <button type="button" className="sp-chip-btn" onClick={restartPlay}>
             Restart
           </button>
@@ -68,9 +87,10 @@ export function PlayMode() {
                 ))}
               </div>
             )}
+            {choices.length === 0 && <h3 className="sp-play-end">End</h3>}
             {play.frames.length > 0 && (
-              <button type="button" className="sp-chip-btn" onClick={cancelStartChoice}>
-                Back
+              <button type="button" className="sp-btn sp-play-back" onClick={cancelStartChoice}>
+                ← Back
               </button>
             )}
           </article>
@@ -79,6 +99,7 @@ export function PlayMode() {
         {location && (
           <article className="sp-script">
             <h2>{beatLabel(location.node, project)}</h2>
+            <BeatPlace node={location.node} />
             {location.node.summary.trim() && <p className="sp-script-summary">{location.node.summary}</p>}
             {location.node.sceneNotes.trim() && <p className="sp-script-note">{location.node.sceneNotes}</p>}
             {location.node.lines.length > 0 && (
@@ -106,7 +127,7 @@ export function PlayMode() {
                 ))}
               </div>
             ) : (
-              !back && <h3 className="sp-play-end">End</h3>
+              <h3 className="sp-play-end">End</h3>
             )}
             {back && <ActionButton action={back} onPick={performPlay} />}
           </article>
@@ -114,7 +135,7 @@ export function PlayMode() {
       </div>
       <aside className="sp-play-vars sp-panel">
         <header className="sp-sec-head">
-          <span className="sp-sec-title" title="Changed values are highlighted. Edit one to try another branch.">
+          <span className="sp-sec-title">
             Live variables
           </span>
           <span className="sp-sec-count">{project.variables.length}</span>
@@ -183,6 +204,18 @@ export function PlayMode() {
   );
 }
 
+function BeatPlace({ node }: { node: Parameters<typeof ownInvolved>[0] }) {
+  const project = useProjectStore((state) => state.project);
+  if (!project) return null;
+  const own = ownInvolved(node);
+  const parts = [
+    ...own.locationIds.map((id) => entityName(project, id)),
+    ...own.characterIds.map((id) => entityName(project, id)),
+  ];
+  if (parts.length === 0) return null;
+  return <p className="sp-play-place">{parts.join(" · ")}</p>;
+}
+
 function ActionButton({ action, onPick }: { action: PlayAction; onPick: (action: PlayAction) => void }) {
   const className = `sp-play-action is-${action.kind}${action.enabled ? "" : " is-off"}`;
   return (
@@ -193,6 +226,7 @@ function ActionButton({ action, onPick }: { action: PlayAction; onPick: (action:
         {!action.enabled && <span className="sp-blocked">blocked</span>}
       </span>
       {action.condition && <small>if {action.condition}</small>}
+      {action.failed && action.failed !== action.condition && <small className="sp-play-failed">fails: {action.failed}</small>}
     </button>
   );
 }

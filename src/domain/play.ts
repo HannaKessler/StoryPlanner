@@ -1,4 +1,4 @@
-import { describeCondition, evaluateCondition } from "./conditions";
+import { describeCondition, evaluateCondition, failingClause } from "./conditions";
 import { applyEffects, defaultValues } from "./effects";
 import { entryNodes } from "./graphOps";
 import { beatLabel } from "./labels";
@@ -9,13 +9,20 @@ export interface PlayFrame {
   nodeId: string;
 }
 
-export interface PlayState {
+export interface PlaySnapshot {
   frames: PlayFrame[];
   values: Record<string, VariableValue>;
   /** Titles of beats entered, in order. */
   log: string[];
+  /** For each log entry, how many steps had been taken right after it was entered. */
+  marks: number[];
   /** When set, play is waiting for a beat to enter in this graph. */
   choosingGraphId: string | null;
+}
+
+export interface PlayState extends PlaySnapshot {
+  /** Earlier states, oldest first. One per step taken. */
+  history: PlaySnapshot[];
 }
 
 export interface PlayAction {
@@ -25,6 +32,8 @@ export interface PlayAction {
   /** Target beat title for transitions. */
   target: string;
   condition: string;
+  /** First clause that blocks a disabled transition. */
+  failed: string;
   enabled: boolean;
   edgeId?: string;
 }
@@ -34,9 +43,66 @@ export function createPlayState(
   graphs: Record<string, GraphDocument>,
 ): PlayState {
   const values = defaultValues(project.variables);
+  const empty: PlayState = { frames: [], values, log: [], marks: [], choosingGraphId: null, history: [] };
   const root = graphs[project.rootGraphId];
-  if (!root) return { frames: [], values, log: [], choosingGraphId: null };
-  return enterGraph({ frames: [], values, log: [], choosingGraphId: null }, root);
+  if (!root) return empty;
+  return enterGraph(empty, root);
+}
+
+function snapshot(state: PlayState): PlaySnapshot {
+  const { frames, values, log, marks, choosingGraphId } = state;
+  return { frames, values, log, marks, choosingGraphId };
+}
+
+/** Records the current state so the step being taken can be undone. */
+function step(state: PlayState, next: PlaySnapshot, entered?: string): PlayState {
+  const history = [...state.history, snapshot(state)];
+  if (entered === undefined) return { ...next, history };
+  return { ...next, history, log: [...next.log, entered], marks: [...next.marks, history.length] };
+}
+
+export function stepBack(state: PlayState): PlayState {
+  const previous = state.history.at(-1);
+  if (!previous) return state;
+  return { ...previous, history: state.history.slice(0, -1) };
+}
+
+/** Returns to the moment a logged beat was entered. */
+export function jumpTo(state: PlayState, index: number): PlayState {
+  const mark = state.marks[index];
+  if (mark === undefined || mark >= state.history.length) return state;
+  return { ...state.history[mark], history: state.history.slice(0, mark) };
+}
+
+/** Keeps a play-through usable after the story was edited. Starts over when its place is gone. */
+export function reconcilePlay(
+  state: PlayState,
+  project: ProjectDocument,
+  graphs: Record<string, GraphDocument>,
+): PlayState {
+  const framesOk = state.frames.every((frame) => graphs[frame.graphId]?.nodes.some((node) => node.id === frame.nodeId));
+  const choosingOk = !state.choosingGraphId || Boolean(graphs[state.choosingGraphId]);
+  if (!framesOk || !choosingOk || (state.frames.length === 0 && !state.choosingGraphId)) {
+    return createPlayState(project, graphs);
+  }
+  const defaults = defaultValues(project.variables);
+  const values: Record<string, VariableValue> = {};
+  let changed = Object.keys(state.values).length !== project.variables.length;
+  for (const variable of project.variables) {
+    if (variable.id in state.values && sameKind(state.values[variable.id], defaults[variable.id])) {
+      values[variable.id] = state.values[variable.id];
+    } else {
+      values[variable.id] = defaults[variable.id];
+      changed = true;
+    }
+  }
+  if (!changed) return state;
+  return { ...state, values, history: [], marks: state.marks.map(() => 0) };
+}
+
+function sameKind(a: VariableValue, b: VariableValue): boolean {
+  if (Array.isArray(a) || Array.isArray(b)) return Array.isArray(a) && Array.isArray(b);
+  return typeof a === typeof b || a === null || b === null;
 }
 
 /** Waits so any beat in the graph can be entered. Beats with no incoming edge are the suggested ones. */
@@ -54,13 +120,23 @@ export function chooseStart(
   const graph = graphs[state.choosingGraphId];
   const node = graph?.nodes.find((item) => item.id === nodeId);
   if (!graph || !node) return state;
-  return {
-    ...state,
-    frames: [...state.frames, { graphId: graph.id, nodeId: node.id }],
-    values: applyEffects(state.values, node.effects, variables),
-    log: [...state.log, beatLabel(node)],
-    choosingGraphId: null,
-  };
+  return step(
+    state,
+    {
+      ...snapshot(state),
+      frames: [...state.frames, { graphId: graph.id, nodeId: node.id }],
+      values: applyEffects(state.values, node.effects, variables),
+      choosingGraphId: null,
+    },
+    beatLabel(node),
+  );
+}
+
+/** Beats offered when play enters a graph. Inside a sub-graph, only its entry beats when it has any. */
+export function startChoices(graph: GraphDocument, isRoot: boolean): StoryNode[] {
+  if (isRoot) return suggestedNodes(graph);
+  const entries = entryNodes(graph);
+  return entries.length > 0 ? entries : graph.nodes;
 }
 
 export function suggestedNodes(graph: GraphDocument): StoryNode[] {
@@ -97,9 +173,10 @@ export function availableActions(
     actions.push({
       id: `enter:${node.id}`,
       kind: "enter",
-      label: "Step in",
+      label: "Open",
       target: child.name.trim() || beatLabel(node, project),
       condition: "",
+      failed: "",
       enabled: true,
     });
   }
@@ -115,6 +192,7 @@ export function availableActions(
       target: targetTitle,
       condition: edge.condition ? describeCondition(edge.condition, project) : "",
       enabled: evaluateCondition(edge.condition, state.values, project.variables),
+      failed: failingClause(edge.condition, state.values, project),
       edgeId: edge.id,
     });
   }
@@ -128,6 +206,7 @@ export function availableActions(
       label: "Return",
       target: parentNode ? beatLabel(parentNode, project) : "Parent beat",
       condition: "",
+      failed: "",
       enabled: true,
     });
   }
@@ -150,12 +229,12 @@ export function performAction(
   if (fresh.kind === "enter" && node.subgraphId) {
     const child = graphs[node.subgraphId];
     if (!child) return state;
-    return enterGraph(state, child);
+    return step(state, { ...snapshot(state), choosingGraphId: child.id });
   }
 
   if (fresh.kind === "return") {
     if (state.frames.length <= 1) return state;
-    return { ...state, frames: state.frames.slice(0, -1) };
+    return step(state, { ...snapshot(state), frames: state.frames.slice(0, -1) });
   }
 
   if (fresh.kind === "transition" && fresh.edgeId) {
@@ -164,12 +243,16 @@ export function performAction(
     if (!edge || !target) return state;
     const frames = state.frames.slice(0, -1);
     frames.push({ graphId: graph.id, nodeId: target.id });
-    return {
-      frames,
-      values: applyEffects(state.values, target.effects, project.variables),
-      log: [...state.log, beatLabel(target, project)],
-      choosingGraphId: null,
-    };
+    return step(
+      state,
+      {
+        ...snapshot(state),
+        frames,
+        values: applyEffects(state.values, target.effects, project.variables),
+        choosingGraphId: null,
+      },
+      beatLabel(target, project),
+    );
   }
 
   return state;

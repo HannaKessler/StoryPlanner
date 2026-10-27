@@ -38,7 +38,17 @@ import {
   slugify,
   type ProjectFs,
 } from "../domain/project";
-import { chooseStart, createPlayState, performAction, setPlayValue, type PlayAction, type PlayState } from "../domain/play";
+import {
+  chooseStart,
+  createPlayState,
+  jumpTo,
+  performAction,
+  reconcilePlay,
+  setPlayValue,
+  stepBack,
+  type PlayAction,
+  type PlayState,
+} from "../domain/play";
 import { exportScreenplay } from "../domain/screenplay";
 import { stringifyDoc } from "../domain/schema";
 import { exportVoiceSheets } from "../domain/voices";
@@ -198,6 +208,8 @@ interface ProjectStore {
   beginPlay: (nodeId: string) => void;
   cancelStartChoice: () => void;
   performPlay: (action: PlayAction) => void;
+  stepBackPlay: () => void;
+  jumpPlay: (index: number) => void;
   updatePlayValue: (variableId: string, value: VariableValue) => void;
   exportText: (kind: ExportKind) => string;
   exportToFile: (kind: ExportKind) => Promise<void>;
@@ -495,10 +507,10 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
 
   setScreen(screen) {
     const state = get();
-    const play =
-      screen === "play" && !state.play && state.project
-        ? createPlayState(state.project, state.graphs)
-        : state.play;
+    let play = state.play;
+    if (screen === "play" && state.project) {
+      play = play ? reconcilePlay(play, state.project, state.graphs) : createPlayState(state.project, state.graphs);
+    }
     set({ screen, play, exportOpen: false });
   },
 
@@ -1231,6 +1243,16 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
     const state = get();
     if (!state.play || !state.project) return;
     set({ play: performAction(state.play, action, state.project, state.graphs) });
+  },
+
+  stepBackPlay() {
+    const play = get().play;
+    if (play) set({ play: stepBack(play) });
+  },
+
+  jumpPlay(index) {
+    const play = get().play;
+    if (play) set({ play: jumpTo(play, index) });
   },
 
   updatePlayValue(variableId, value) {
