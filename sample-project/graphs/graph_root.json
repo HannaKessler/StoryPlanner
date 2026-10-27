@@ -23,7 +23,20 @@
       "itemIds": [],
       "locationPosition": null,
       "lines": [],
-      "effects": []
+      "effects": [
+        {
+          "id": "fx_start_gold",
+          "variableId": "var_gold",
+          "op": "set",
+          "value": 5
+        },
+        {
+          "id": "fx_start_location",
+          "variableId": "var_location",
+          "op": "set",
+          "value": "tag_loc_gate"
+        }
+      ]
     },
     {
       "id": "node_root_approach",

@@ -10,36 +10,31 @@
       "id": "var_has_token",
       "name": "hasToken",
       "kind": "boolean",
-      "description": "The traveler is carrying a lantern token.",
-      "defaultValue": false
+      "description": "The traveler is carrying a lantern token."
     },
     {
       "id": "var_convinced",
       "name": "convinced",
       "kind": "boolean",
-      "description": "The gatekeeper is willing to open the gate.",
-      "defaultValue": false
+      "description": "The gatekeeper is willing to open the gate."
     },
     {
       "id": "var_asked_road",
       "name": "askedRoad",
       "kind": "boolean",
-      "description": "The traveler asked about the old road.",
-      "defaultValue": false
+      "description": "The traveler asked about the old road."
     },
     {
       "id": "var_gold",
       "name": "gold",
       "kind": "value",
-      "description": "Coins in the traveler's purse.",
-      "defaultValue": 5
+      "description": "Coins in the traveler's purse."
     },
     {
       "id": "var_location",
       "name": "location",
       "kind": "location",
-      "description": "Where the traveler is headed.",
-      "defaultValue": "tag_loc_gate"
+      "description": "Where the traveler is headed."
     }
   ],
   "characters": [

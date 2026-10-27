@@ -1,9 +1,17 @@
 import { entityName, formatValue, variableById } from "./format";
 import type { Effect, EffectOp, ProjectDocument, Scalar, VariableDef, VariableValue } from "./types";
 
+/** Every variable starts here. Only beat effects change it. */
+export function startValue(kind: string): VariableValue {
+  if (kind === "boolean") return false;
+  if (kind === "value") return 0;
+  if (kind === "inventory") return [];
+  return null;
+}
+
 export function defaultValues(variables: VariableDef[]): Record<string, VariableValue> {
   const values: Record<string, VariableValue> = {};
-  for (const variable of variables) values[variable.id] = variable.defaultValue;
+  for (const variable of variables) values[variable.id] = startValue(variable.kind);
   return values;
 }
 

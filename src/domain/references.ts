@@ -6,8 +6,6 @@ import type {
   GraphDocument,
   ProjectDocument,
   StoryNode,
-  VariableDef,
-  VariableValue,
 } from "./types";
 
 /** Variable kinds whose scalar value is an entity id. */
@@ -151,34 +149,14 @@ function scrub(project: ProjectDocument, graphs: Record<string, GraphDocument>, 
     }
   }
 
-  let variablesChanged = false;
-  const variables = project.variables
-    .filter((variable) => !rules.badVariable(variable.id))
-    .map((variable) => {
-      const value = scrubDefault(variable, rules, holdsEntity(variable.id));
-      if (value === variable.defaultValue) return variable;
-      variablesChanged = true;
-      count += Array.isArray(variable.defaultValue) && Array.isArray(value) ? variable.defaultValue.length - value.length : 1;
-      return { ...variable, defaultValue: value };
-    });
-  if (variables.length !== project.variables.length) variablesChanged = true;
+  const variables = project.variables.filter((variable) => !rules.badVariable(variable.id));
+  const variablesChanged = variables.length !== project.variables.length;
 
   return {
     project: variablesChanged ? { ...project, variables } : project,
     graphs: graphsChanged ? nextGraphs : graphs,
     count,
   };
-}
-
-function scrubDefault(variable: VariableDef, rules: Rules, holdsEntity: boolean): VariableValue {
-  const value = variable.defaultValue;
-  if (!holdsEntity) return value;
-  if (Array.isArray(value)) {
-    const next = value.filter((id) => !rules.badEntity(id));
-    return next.length === value.length ? value : next;
-  }
-  if (typeof value === "string" && value && rules.badEntity(value)) return null;
-  return value;
 }
 
 const none = () => false;

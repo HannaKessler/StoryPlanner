@@ -8,6 +8,7 @@ import { availableActions, playLocation, startChoices, type PlayAction } from ".
 import type { EntityKind, VariableValue } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { NumberField } from "./Panel";
+import { startValue } from "../domain/effects";
 
 const KIND_SHORT: Record<string, string> = {
   boolean: "bool",
@@ -143,7 +144,7 @@ export function PlayMode() {
         <ul className="sp-var-list">
           {project.variables.map((variable) => {
             const value = play.values[variable.id];
-            const changed = JSON.stringify(value) !== JSON.stringify(variable.defaultValue);
+            const changed = JSON.stringify(value) !== JSON.stringify(startValue(variable.kind));
             const entityKind: EntityKind | null =
               variable.kind === "character" || variable.kind === "item" || variable.kind === "location"
                 ? variable.kind
@@ -194,7 +195,7 @@ export function PlayMode() {
                     <span className="sp-cell sp-cell-value">{value == null ? "unset" : String(value)}</span>
                   )}
                 </div>
-                {changed && <p className="sp-var-default">was {formatValue(project, variable, variable.defaultValue)}</p>}
+                {changed && <p className="sp-var-default">was {formatValue(project, variable, startValue(variable.kind) as never)}</p>}
               </li>
             );
           })}

@@ -37,8 +37,6 @@ export interface VariableDef {
   /** Open-ended. This version creates boolean, value, character, item, location, and inventory. */
   kind: string;
   description: string;
-  /** Inventory defaults are item ids. Other kinds use a scalar. */
-  defaultValue: VariableValue;
 }
 
 /** A person, place, or thing. Not a graph node. */

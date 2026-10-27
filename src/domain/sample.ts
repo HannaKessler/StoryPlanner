@@ -69,7 +69,6 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
         name: "hasToken",
         kind: "boolean",
         description: "The traveler is carrying a lantern token.",
-        defaultValue: false,
         tagCategoryId: null,
       },
       {
@@ -77,7 +76,6 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
         name: "convinced",
         kind: "boolean",
         description: "The gatekeeper is willing to open the gate.",
-        defaultValue: false,
         tagCategoryId: null,
       },
       {
@@ -85,7 +83,6 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
         name: "askedRoad",
         kind: "boolean",
         description: "The traveler asked about the old road.",
-        defaultValue: false,
         tagCategoryId: null,
       },
       {
@@ -93,7 +90,6 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
         name: "gold",
         kind: "value",
         description: "Coins in the traveler's purse.",
-        defaultValue: 5,
         tagCategoryId: null,
       },
       {
@@ -101,7 +97,6 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
         name: "location",
         kind: "tag",
         description: "Where the traveler is headed.",
-        defaultValue: "tag_loc_gate",
         tagCategoryId: "cat_locations",
       },
     ],
@@ -158,6 +153,10 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
         sceneNotes: "",
         subgraphId: null,
         lines: [],
+        effects: [
+          effect("fx_start_gold", "var_gold", "set", 5),
+          effect("fx_start_location", "var_location", "set", "tag_loc_gate"),
+        ],
       }),
       node({
         id: "node_root_approach",

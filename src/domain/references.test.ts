@@ -16,9 +16,9 @@ function fixture() {
     updatedAt: "",
     rootGraphId: "root",
     variables: [
-      createVariable("boolean", { id: "open", name: "open", defaultValue: false }),
-      createVariable("character", { id: "leader", name: "leader", defaultValue: "hero" }),
-      createVariable("inventory", { id: "bag", name: "bag", defaultValue: ["key"] }),
+      createVariable("boolean", { id: "open", name: "open" }),
+      createVariable("character", { id: "leader", name: "leader" }),
+      createVariable("inventory", { id: "bag", name: "bag" }),
     ],
     characters: [hero, guard],
     items: [key],
@@ -60,10 +60,10 @@ function fixture() {
 describe("entity deletion", () => {
   it("counts every place an entity is used", () => {
     const { project, graphs } = fixture();
-    // node chip, speaker, variable default, NOT rule
-    expect(countEntityRefs(project, graphs, "hero")).toBe(4);
-    // node item, inventory default, effect, has rule
-    expect(countEntityRefs(project, graphs, "key")).toBe(4);
+    // node chip, speaker, NOT rule
+    expect(countEntityRefs(project, graphs, "hero")).toBe(3);
+    // node item, effect, has rule
+    expect(countEntityRefs(project, graphs, "key")).toBe(3);
     expect(countEntityRefs(project, graphs, "gate")).toBe(1);
     expect(countEntityRefs(project, graphs, "nobody")).toBe(0);
   });
@@ -75,7 +75,6 @@ describe("entity deletion", () => {
     expect(next.project.characters.map((item) => item.id)).toEqual(["guard"]);
     expect(a.characterIds).toEqual(["guard"]);
     expect(a.lines.map((line) => line.speakerId)).toEqual([null, "guard"]);
-    expect(next.project.variables.find((item) => item.id === "leader")?.defaultValue).toBeNull();
     const condition = next.graphs.root.edges[0].condition;
     expect(condition?.type === "group" && condition.children).toHaveLength(2);
     expect(countEntityRefs(next.project, next.graphs, "hero")).toBe(0);
@@ -87,7 +86,6 @@ describe("entity deletion", () => {
     const a = next.graphs.root.nodes[0];
     expect(a.itemIds).toEqual([]);
     expect(a.effects.map((effect) => effect.id)).toEqual(["e1"]);
-    expect(next.project.variables.find((item) => item.id === "bag")?.defaultValue).toEqual([]);
     const condition = next.graphs.root.edges[0].condition;
     expect(condition).toEqual({
       type: "group",

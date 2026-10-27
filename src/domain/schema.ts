@@ -19,7 +19,6 @@ import {
   type StoryEntity,
   type StoryNode,
   type VariableDef,
-  type VariableValue,
 } from "./types";
 
 export class SchemaError extends Error {
@@ -429,20 +428,9 @@ function parseEntityList(value: unknown, path: string): StoryEntity[] {
   return asArray(value ?? [], path).map((item, index) => parseEntity(item, child(path, index)));
 }
 
-function migrateDefault(kind: string, value: unknown, path: string): VariableValue {
-  if (kind === "inventory") {
-    if (value === null || value === undefined) return [];
-    if (typeof value === "string") return value ? [value] : [];
-    return asArray(value, path).map((item, index) => asNonEmpty(item, child(path, index)));
-  }
-  if (value === undefined) return kind === "boolean" ? false : kind === "value" ? 0 : null;
-  return asScalar(value, path);
-}
-
 function parseVariable(value: unknown, path: string, categories: Record<string, unknown>[]): VariableDef {
   if (!isRecord(value)) fail(path, "expected a variable");
   let kind = asNonEmpty(value.kind, child(path, "kind"));
-  let rawDefault = value.defaultValue;
   if (kind === "tag") {
     const categoryId = typeof value.tagCategoryId === "string" ? value.tagCategoryId : "";
     const category = categories.find((item) => item.id === categoryId);
@@ -454,25 +442,11 @@ function parseVariable(value: unknown, path: string, categories: Record<string, 
       kind = category ? categoryKind(category) : "item";
     }
   }
-  const defaultValue = migrateDefault(kind, rawDefault, child(path, "defaultValue"));
-  if (kind === "boolean" && typeof defaultValue !== "boolean") {
-    fail(child(path, "defaultValue"), "boolean variables need a boolean default");
-  }
-  if (kind === "value" && typeof defaultValue !== "number") {
-    fail(child(path, "defaultValue"), "value variables need a numeric default");
-  }
-  if ((kind === "character" || kind === "item" || kind === "location") && defaultValue !== null && typeof defaultValue !== "string") {
-    fail(child(path, "defaultValue"), `${kind} variables need an id or null`);
-  }
-  if (kind === "inventory" && !Array.isArray(defaultValue)) {
-    fail(child(path, "defaultValue"), "inventory variables need a list of item ids");
-  }
   return {
     id: asNonEmpty(value.id, child(path, "id")),
     name: asString(value.name, child(path, "name")),
     kind,
     description: optionalString(value, "description", path),
-    defaultValue,
   };
 }
 

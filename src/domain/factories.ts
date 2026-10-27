@@ -9,7 +9,6 @@ import type {
   StoryEntity,
   StoryNode,
   VariableDef,
-  VariableValue,
 } from "./types";
 
 export function createNode(partial: Partial<StoryNode> = {}): StoryNode {
@@ -77,22 +76,11 @@ export function createEffect(partial: Partial<Effect> = {}): Effect {
 }
 
 export function createVariable(kind: string, partial: Partial<VariableDef> = {}): VariableDef {
-  const defaultValue: VariableValue =
-    partial.defaultValue !== undefined
-      ? partial.defaultValue
-      : kind === "boolean"
-        ? false
-        : kind === "value"
-          ? 0
-          : kind === "inventory"
-            ? []
-            : null;
   return {
     id: partial.id ?? createId(),
     name: partial.name ?? "",
     kind,
     description: partial.description ?? "",
-    defaultValue,
   };
 }
 

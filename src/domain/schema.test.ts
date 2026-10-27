@@ -171,10 +171,11 @@ describe("schema", () => {
       { key: "color", value: "#abc" },
       { key: "category", value: "Moods" },
     ]);
-    expect(parsed.variables.map((variable) => [variable.id, variable.kind, variable.defaultValue])).toEqual([
-      ["var_location", "location", "loc_a"],
-      ["var_bag", "inventory", ["item_coin"]],
+    expect(parsed.variables.map((variable) => [variable.id, variable.kind])).toEqual([
+      ["var_location", "location"],
+      ["var_bag", "inventory"],
     ]);
+    expect(parsed.variables[0]).not.toHaveProperty("defaultValue");
     expect(parsed.variables[0]).not.toHaveProperty("tagCategoryId");
 
     const graph = {
@@ -243,16 +244,8 @@ describe("schema", () => {
       name: "reputation",
       kind: "meter",
       description: "Added by a future version.",
-      defaultValue: "steady",
     });
     expect(parseProject(withKind).variables.at(-1)?.kind).toBe("meter");
-  });
-
-  it("rejects a boolean variable with a numeric default", () => {
-    const { project } = buildSample();
-    const broken = structuredClone(project);
-    broken.variables[0].defaultValue = 1;
-    expect(() => parseProject(broken)).toThrow(/boolean/);
   });
 
   it("parses a bundle and keeps computed involvement out of the stored beats", () => {
