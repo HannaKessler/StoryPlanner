@@ -9,6 +9,7 @@ import { GraphCanvas } from "./GraphCanvas";
 import { Inspector } from "./Inspector";
 import { LeftPanel } from "./LeftPanel";
 import { Modal } from "./Modal";
+import { addBeatInView } from "./menuItems";
 import { PlayMode } from "./PlayMode";
 
 export function AppShell() {
@@ -27,7 +28,6 @@ export function AppShell() {
   const setScreen = useProjectStore((state) => state.setScreen);
   const renameProject = useProjectStore((state) => state.renameProject);
   const openGraph = useProjectStore((state) => state.openGraph);
-  const addNode = useProjectStore((state) => state.addNode);
   const save = useProjectStore((state) => state.save);
   const requestClose = useProjectStore((state) => state.requestClose);
   const setExportOpen = useProjectStore((state) => state.setExportOpen);
@@ -138,7 +138,7 @@ export function AppShell() {
                 >
                   Locations
                 </button>
-                <button type="button" className="sp-chip-btn" onClick={() => addNode()}>
+                <button type="button" className="sp-chip-btn" onClick={addBeatInView}>
                   + Beat
                 </button>
               </div>

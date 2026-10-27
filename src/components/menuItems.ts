@@ -1,10 +1,34 @@
 import { appendCondition, emptyRule } from "../domain/conditions";
+import { nextBeatPosition } from "../domain/graphOps";
 import type { Condition, StoryNode } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { focusRename, type MenuItem } from "./ContextMenu";
 
-export function addBeatItems(position?: { x: number; y: number }): MenuItem[] {
-  return [{ label: "Add beat", onSelect: () => useProjectStore.getState().addNode(position) }];
+type Point = { x: number; y: number };
+
+/** The canvas registers how to find the centre of the view in graph coordinates. */
+let viewCenter: (() => Point | null) | null = null;
+
+export function registerViewCenter(next: (() => Point | null) | null) {
+  viewCenter = next;
+}
+
+/** Adds a beat next to the selected beat, or in the middle of the view, and selects it. */
+export function addBeatInView() {
+  const state = useProjectStore.getState();
+  const graph = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
+  if (!graph) return;
+  const selected = state.selection?.kind === "node" ? state.selection.id : null;
+  state.addNode(nextBeatPosition(graph, selected, viewCenter?.() ?? null));
+}
+
+export function addBeatItems(position?: Point, partial?: Partial<Pick<StoryNode, "locationId" | "locationPosition">>): MenuItem[] {
+  return [
+    {
+      label: "Add beat",
+      onSelect: () => (position || partial ? useProjectStore.getState().addNode(position, partial) : addBeatInView()),
+    },
+  ];
 }
 
 /** Menu shown when a connection is dropped on empty canvas. */

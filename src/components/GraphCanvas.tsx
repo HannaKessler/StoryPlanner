@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
 import {
   Background,
   Controls,
   MarkerType,
+  MiniMap,
   NodeResizer,
   ReactFlow,
   ReactFlowProvider,
@@ -20,13 +21,15 @@ import {
 import { describeCondition } from "../domain/conditions";
 import { parallelOffset } from "../domain/edgeGeometry";
 import { indexInvolved, involvement } from "../domain/involved";
-import { locationFrames } from "../domain/locations";
+import { boxAt, clampInBox, locationFrames, locationIdForBox, type MeasuredSizes } from "../domain/locations";
 import type { GraphDocument, ProjectDocument } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { useContextMenu } from "./ContextMenu";
-import { addBeatItems, connectBeatItems, edgeItems, beatItems } from "./menuItems";
+import { addBeatItems, beatItems, connectBeatItems, edgeItems, registerViewCenter } from "./menuItems";
 import { StoryNodeCard, type StoryFlowNode } from "./StoryNodeCard";
 import { TransitionEdge, type TransitionFlowEdge } from "./TransitionEdge";
+
+const MULTI_BOX = "multiple";
 
 type BoxNode = Node<{ locationId: string; name: string; minWidth: number; minHeight: number }, "box">;
 type CanvasNode = StoryFlowNode | BoxNode;
@@ -102,15 +105,67 @@ function CanvasBody({
   const closeMenu = useContextMenu((state) => state.close);
   const arranging = mode === "locations";
 
+  const [sizes, setSizes] = useState<MeasuredSizes>({});
+
+  /** Location boxes as drawn, in flow coordinates. */
+  const drawnBoxes = () =>
+    getNodes()
+      .filter((node): node is BoxNode => node.type === "box")
+      .map((node) => ({
+        id: node.data.locationId,
+        position: node.position,
+        size: { width: node.measured?.width ?? node.width ?? 0, height: node.measured?.height ?? node.height ?? 0 },
+      }));
+
+  /** Points of the beats drawn in a box, so a change elsewhere does not restack them. */
+  const drawnPositions = (boxId: string) =>
+    Object.fromEntries(
+      getNodes()
+        .filter((node) => node.type === "story" && node.parentId === `box:${boxId}`)
+        .map((node) => [node.id, { x: Math.round(node.position.x), y: Math.round(node.position.y) }]),
+    );
+
   const onPaneMenu = (event: ReactMouseEvent | MouseEvent) => {
     event.preventDefault();
-    // A pane click here is in location-view coordinates, which must not become a graph position.
-    if (arranging) return;
     const position = screenToFlowPosition({ x: event.clientX, y: event.clientY });
-    openMenu(event.clientX, event.clientY, addBeatItems(position));
+    if (!arranging) {
+      openMenu(event.clientX, event.clientY, addBeatItems(position));
+      return;
+    }
+    // Location-view coordinates must not become a graph position. The beat goes in the box under the pointer.
+    const box = boxAt(drawnBoxes(), position);
+    if (!box) {
+      openMenu(event.clientX, event.clientY, addBeatItems(undefined, {}));
+      return;
+    }
+    // Beats already in the box stay where they are drawn when the new one arrives.
+    const keep = drawnPositions(box.id);
+    openMenu(event.clientX, event.clientY, [
+      {
+        label: "Add beat",
+        onSelect: () => {
+          saveLocationLayout({ nodePositions: keep });
+          useProjectStore.getState().addNode(undefined, {
+            locationId: locationIdForBox(box.id),
+            locationPosition: clampInBox({ x: position.x - box.position.x, y: position.y - box.position.y }),
+          });
+        },
+      },
+    ]);
   };
 
-  const [nodes, setNodes] = useNodesState<CanvasNode>(toNodes(graph, graphs, project, mode));
+  useEffect(() => {
+    if (arranging) return;
+    registerViewCenter(() => {
+      const pane = document.querySelector(".sp-canvas");
+      if (!pane) return null;
+      const rect = pane.getBoundingClientRect();
+      return screenToFlowPosition({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+    });
+    return () => registerViewCenter(null);
+  }, [arranging, screenToFlowPosition]);
+
+  const [nodes, setNodes] = useNodesState<CanvasNode>(toNodes(graph, graphs, project, mode, sizes));
   const [edges, setEdges] = useEdgesState(toEdges(graph, project));
 
   const signature = useMemo(
@@ -128,8 +183,9 @@ function CanvasBody({
         ),
         mode,
         restoreTick,
+        sizes: mode === "locations" ? sizes : null,
       }),
-    [graph, graphs, project, mode, restoreTick],
+    [graph, graphs, project, mode, restoreTick, sizes],
   );
 
   useEffect(() => {
@@ -152,7 +208,7 @@ function CanvasBody({
 
   useEffect(() => {
     setNodes((current) => {
-      const next = toNodes(graph, graphs, project, mode);
+      const next = toNodes(graph, graphs, project, mode, sizes);
       // Undo and redo also put beats back where they were.
       const restoring = appliedTick.current !== restoreTick;
       appliedTick.current = restoreTick;
@@ -205,6 +261,20 @@ function CanvasBody({
 
   const onNodesChange = (changes: NodeChange<CanvasNode>[]) => {
     setNodes((current) => applyNodeChanges(changes, current));
+    if (!arranging) return;
+    // Boxes are sized from the cards as drawn, once React Flow has measured them.
+    const measured: MeasuredSizes = {};
+    for (const change of changes) {
+      if (change.type !== "dimensions" || !change.dimensions || change.id.startsWith("box:")) continue;
+      measured[change.id] = { width: Math.round(change.dimensions.width), height: Math.round(change.dimensions.height) };
+    }
+    if (Object.keys(measured).length === 0) return;
+    setSizes((current) => {
+      const changed = Object.entries(measured).some(
+        ([id, size]) => current[id]?.width !== size.width || current[id]?.height !== size.height,
+      );
+      return changed ? { ...current, ...measured } : current;
+    });
   };
   const onEdgesChange = (changes: EdgeChange<TransitionFlowEdge>[]) => {
     setEdges((current) => applyEdgeChanges(changes, current));
@@ -237,6 +307,10 @@ function CanvasBody({
         onEdgeClick={(_, edge) => select({ kind: "edge", id: edge.id })}
         onNodeContextMenu={(event, node) => {
           event.preventDefault();
+          if (node.type === "box") {
+            onPaneMenu(event);
+            return;
+          }
           if (node.type !== "story") return;
           select({ kind: "node", id: node.id });
           openMenu(event.clientX, event.clientY, beatItems(node.data.story));
@@ -266,24 +340,27 @@ function CanvasBody({
           }
           if (node.type !== "story") return;
           if (arranging) {
-            saveLocationLayout({
-              nodePositions: { [node.id]: { x: Math.round(node.position.x), y: Math.round(node.position.y) } },
-            });
             const parent = getNodes().find((item) => item.id === node.parentId);
-            if (parent?.type === "box") {
-              const box = parent as BoxNode;
-              const width = box.measured?.width ?? box.width ?? 0;
-              const height = box.measured?.height ?? box.height ?? 0;
-              if (width > 0 && height > 0) {
-                saveLocationLayout({
-                  box: {
-                    id: box.data.locationId,
-                    position: { x: Math.round(parent.position.x), y: Math.round(parent.position.y) },
-                    size: { width: Math.round(width), height: Math.round(height) },
-                  },
-                });
-              }
+            const origin = parent?.position ?? { x: 0, y: 0 };
+            const width = node.measured?.width ?? 0;
+            const height = node.measured?.height ?? 0;
+            const absolute = { x: origin.x + node.position.x, y: origin.y + node.position.y };
+            const center = { x: absolute.x + width / 2, y: absolute.y + height / 2 };
+            const target = boxAt(drawnBoxes(), center);
+            const currentBox = parent?.type === "box" ? (parent as BoxNode).data.locationId : null;
+            if (target && target.id !== currentBox && target.id !== MULTI_BOX) {
+              // Dropping into another box moves the beat to that location.
+              useProjectStore
+                .getState()
+                .moveToLocation(
+                  node.id,
+                  locationIdForBox(target.id),
+                  clampInBox({ x: absolute.x - target.position.x, y: absolute.y - target.position.y }),
+                  drawnPositions(target.id),
+                );
+              return;
             }
+            saveLocationLayout({ nodePositions: { [node.id]: clampInBox(node.position) } });
             return;
           }
           updateNodePosition(node.id, node.position);
@@ -293,11 +370,24 @@ function CanvasBody({
         connectionRadius={90}
         deleteKeyCode={null}
         colorMode="dark"
+        minZoom={0.1}
+        maxZoom={2}
         fitView
         proOptions={{ hideAttribution: false }}
       >
         <Background color="#3a342c" gap={20} size={1.1} />
         <Controls showInteractive={false} />
+        <MiniMap
+          pannable
+          zoomable
+          ariaLabel="Overview"
+          style={{ width: 160, height: 110 }}
+          bgColor="#12110f"
+          maskColor="rgba(8, 7, 6, 0.6)"
+          nodeColor={(node) => (node.type === "box" ? "transparent" : "#5c5348")}
+          nodeStrokeColor={(node) => (node.type === "box" ? "#3a342c" : "transparent")}
+          nodeBorderRadius={3}
+        />
       </ReactFlow>
     </div>
   );
@@ -319,6 +409,7 @@ function toNodes(
   graphs: Record<string, GraphDocument>,
   project: ProjectDocument,
   mode: "graph" | "locations",
+  sizes: MeasuredSizes = {},
 ): CanvasNode[] {
   const involved = indexInvolved(graphs);
   const dataFor = (story: GraphDocument["nodes"][number]) => ({
@@ -335,7 +426,7 @@ function toNodes(
   }
   const boxes: BoxNode[] = [];
   const stories: StoryFlowNode[] = [];
-  for (const frame of locationFrames(graph, project, graphs)) {
+  for (const frame of locationFrames(graph, project, graphs, sizes)) {
     const boxId = `box:${frame.id}`;
     boxes.push({
       id: boxId,
@@ -357,7 +448,6 @@ function toNodes(
         id: story.id,
         type: "story",
         parentId: boxId,
-        extent: "parent",
         position: item.position,
         data: dataFor(story),
         zIndex: 1,

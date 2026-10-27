@@ -112,3 +112,33 @@ export function orderedGraphs(
   for (const graph of Object.values(graphs)) walk(graph.id);
   return result;
 }
+
+const CARD_W = 230;
+const STEP_X = 280;
+const STEP_Y = 90;
+
+function occupied(graph: GraphDocument, point: { x: number; y: number }): boolean {
+  return graph.nodes.some((node) => Math.abs(node.position.x - point.x) < CARD_W / 2 && Math.abs(node.position.y - point.y) < 60);
+}
+
+/**
+ * Where a new beat goes: right of the selected beat, else centred on the
+ * view, else right of the rightmost beat. Moves down past beats already there.
+ */
+export function nextBeatPosition(
+  graph: GraphDocument,
+  selectedId: string | null,
+  viewCenter?: { x: number; y: number } | null,
+): { x: number; y: number } {
+  const selected = selectedId ? graph.nodes.find((node) => node.id === selectedId) : undefined;
+  let point: { x: number; y: number };
+  if (selected) point = { x: selected.position.x + STEP_X, y: selected.position.y };
+  else if (viewCenter) point = { x: viewCenter.x - CARD_W / 2, y: viewCenter.y - 30 };
+  else {
+    const maxX = graph.nodes.reduce((max, node) => Math.max(max, node.position.x), -STEP_X + 80);
+    point = { x: maxX + STEP_X, y: 140 };
+  }
+  point = { x: Math.round(point.x), y: Math.round(point.y) };
+  for (let tries = 0; tries < 50 && occupied(graph, point); tries += 1) point = { ...point, y: point.y + STEP_Y };
+  return point;
+}

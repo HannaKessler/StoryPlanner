@@ -15,7 +15,9 @@ const BOX_GAP = 72;
 const MIN_W = PAD + CARD_W + PAD;
 const MIN_H = TITLE + 96;
 
-/** Height the location layout reserves for a card. Lines, notes, and refs add rows. */
+export type MeasuredSizes = Record<string, { width: number; height: number }>;
+
+/** Height the location layout reserves for a card before it has been measured. */
 function cardHeight(node: StoryNode | undefined, extraRows = 0): number {
   if (!node) return 72;
   let body = node.title.trim() ? 18 : 0;
@@ -58,7 +60,7 @@ export function placementLocationId(
   return UNPLACED_LOCATION;
 }
 
-/** Boxes for the current graph, including an empty Unplaced box. Does not read graph-view positions except to order beats that have no saved location point. */
+/** Boxes for the current graph that hold at least one beat. Does not read graph-view positions except to order beats that have no saved location point. */
 export function locationGroups(
   graph: GraphDocument,
   project: ProjectDocument,
@@ -85,7 +87,8 @@ export function locationGroups(
     const group = groups.find((item) => item.id === place) ?? (place === MULTI_LOCATION ? multiple : unplaced);
     group.nodeIds.push(node.id);
   }
-  return [...groups, ...(multiple.nodeIds.length > 0 ? [multiple] : []), unplaced];
+  // Only boxes that hold beats are drawn.
+  return [...groups, multiple, unplaced].filter((group) => group.nodeIds.length > 0);
 }
 
 /**
@@ -97,12 +100,15 @@ export function locationFrames(
   graph: GraphDocument,
   project: ProjectDocument,
   graphs: Record<string, GraphDocument> = { [graph.id]: graph },
+  measured: MeasuredSizes = {},
 ): LocationFrame[] {
   const saved = new Map(graph.locationBoxes.map((box) => [box.id, box]));
   const involved = indexInvolved(graphs);
   const drafts = locationGroups(graph, project, graphs).map((group) => {
     const placed = new Map<string, { x: number; y: number }>();
+    const widthOf = (id: string) => measured[id]?.width ?? CARD_W;
     const heightOf = (id: string) => {
+      if (measured[id]) return measured[id].height;
       const node = graph.nodes.find((item) => item.id === id);
       const info = involvement(involved, graph.id, id);
       const extra = [info.all.locationIds, info.all.characterIds, info.all.itemIds].filter((ids) => ids.length > 0).length;
@@ -123,7 +129,7 @@ export function locationFrames(
     let contentWidth = MIN_W;
     let contentHeight = MIN_H;
     for (const [id, position] of placed) {
-      contentWidth = Math.max(contentWidth, position.x + CARD_W + PAD);
+      contentWidth = Math.max(contentWidth, position.x + widthOf(id) + PAD);
       contentHeight = Math.max(contentHeight, position.y + heightOf(id) + PAD);
     }
     return { group, placed, contentWidth, contentHeight, saved: saved.get(group.id) };
@@ -151,4 +157,31 @@ export function locationFrames(
       nodes: draft.group.nodeIds.map((id) => ({ id, position: draft.placed.get(id)! })),
     };
   });
+}
+
+/** Box ids that are not a location. Dropping a beat there clears its own location. */
+export function locationIdForBox(boxId: string): string | null {
+  return boxId === UNPLACED_LOCATION || boxId === MULTI_LOCATION ? null : boxId;
+}
+
+/** The last box whose rectangle holds the point, or null. */
+export function boxAt<T extends { id: string; position: { x: number; y: number }; size: { width: number; height: number } }>(
+  boxes: T[],
+  point: { x: number; y: number },
+): T | null {
+  let found: T | null = null;
+  for (const box of boxes) {
+    const inside =
+      point.x >= box.position.x &&
+      point.y >= box.position.y &&
+      point.x <= box.position.x + box.size.width &&
+      point.y <= box.position.y + box.size.height;
+    if (inside) found = box;
+  }
+  return found;
+}
+
+/** Keeps a beat below the box title and inside the left edge. */
+export function clampInBox(point: { x: number; y: number }): { x: number; y: number } {
+  return { x: Math.max(PAD / 2, Math.round(point.x)), y: Math.max(TITLE, Math.round(point.y)) };
 }

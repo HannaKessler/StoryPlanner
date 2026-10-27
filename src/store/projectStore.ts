@@ -20,7 +20,7 @@ import {
   moveItem,
 } from "../domain/factories";
 import { entitiesOf, withEntities } from "../domain/format";
-import { descendantGraphIds, splitTransition } from "../domain/graphOps";
+import { descendantGraphIds, nextBeatPosition, splitTransition } from "../domain/graphOps";
 import { isDuplicateName, newEntityName, uniqueName } from "../domain/names";
 import {
   countEntityRefs,
@@ -153,7 +153,14 @@ interface ProjectStore {
   updateNode: (nodeId: string, patch: Partial<StoryNode>) => void;
   updateNodePosition: (nodeId: string, position: { x: number; y: number }) => void;
   saveLocationLayout: (patch: { box?: LocationBox; nodePositions?: Record<string, { x: number; y: number }> }) => void;
-  addNode: (position?: { x: number; y: number }) => void;
+  /** Gives a beat its own location and a point in that box. `keep` pins beats already drawn there. */
+  moveToLocation: (
+    nodeId: string,
+    locationId: string | null,
+    locationPosition: { x: number; y: number },
+    keep?: Record<string, { x: number; y: number }>,
+  ) => void;
+  addNode: (position?: { x: number; y: number }, partial?: Partial<Pick<StoryNode, "locationId" | "locationPosition">>) => void;
   deleteNodes: (nodeIds: string[], edgeIds?: string[]) => void;
   deleteEdges: (edgeIds: string[]) => void;
   connectNodes: (source: string, target: string) => void;
@@ -830,12 +837,22 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
     });
   },
 
-  addNode(position) {
+  moveToLocation(nodeId, locationId, locationPosition, keep = {}) {
+    withGraph((graph) => ({
+      ...graph,
+      nodes: graph.nodes.map((node) => {
+        if (node.id === nodeId) return { ...node, locationId, locationPosition };
+        return keep[node.id] ? { ...node, locationPosition: keep[node.id] } : node;
+      }),
+    }));
+  },
+
+  addNode(position, partial = {}) {
     const state = get();
     const graph = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
     if (!graph) return;
-    const maxX = graph.nodes.reduce((max, node) => Math.max(max, node.position.x), 0);
-    const node = createNode({ position: position ?? { x: maxX + 280, y: 140 + (graph.nodes.length % 4) * 48 } });
+    const selected = state.selection?.kind === "node" ? state.selection.id : null;
+    const node = createNode({ ...partial, position: position ?? nextBeatPosition(graph, selected) });
     withGraph((current) => ({ ...current, nodes: [...current.nodes, node] }));
     set({ selection: { kind: "node", id: node.id } });
   },

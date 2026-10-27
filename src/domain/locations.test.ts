@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { locationFrames } from "./locations";
+import { boxAt, clampInBox, locationFrames, locationIdForBox } from "./locations";
+import { createNode } from "./factories";
 import { buildSample } from "./sample";
 
 describe("location boxes", () => {
@@ -15,7 +16,6 @@ describe("location boxes", () => {
       "The Lantern Gate",
       "The Old Road",
       "Inside the Walls",
-      "Unplaced",
     ]);
     const gate = frames.find((frame) => frame.id === "tag_loc_gate");
     const road = frames.find((frame) => frame.id === "tag_loc_road");
@@ -55,5 +55,33 @@ describe("location boxes", () => {
     const approach = frames.find((frame) => frame.id === "tag_loc_gate");
     const approachNode = approach?.nodes.find((node) => node.id === "node_root_approach");
     expect(approachNode?.position).not.toEqual(root.nodes.find((node) => node.id === "node_root_approach")?.position);
+  });
+
+  it("hides empty boxes and shows Unplaced only when it has beats", () => {
+    const empty = { ...root, nodes: [] };
+    expect(locationFrames(empty, project, graphs)).toEqual([]);
+    const loose = { ...root, nodes: [createNode({ id: "loose" })] };
+    const frames = locationFrames(loose, project, { ...graphs, [root.id]: loose });
+    expect(frames.map((frame) => frame.name)).toEqual(["Unplaced"]);
+  });
+
+  it("sizes boxes from measured cards", () => {
+    const road = (sizes = {}) => locationFrames(root, project, graphs, sizes).find((frame) => frame.id === "tag_loc_road")!;
+    const tall = Object.fromEntries(road().nodes.map((node) => [node.id, { width: 400, height: 500 }]));
+    const measured = road(tall);
+    expect(measured.size.width).toBeGreaterThanOrEqual(400);
+    expect(measured.size.height).toBeGreaterThanOrEqual(3 * 500);
+  });
+
+  it("finds the box under a drop point", () => {
+    const boxes = [
+      { id: "a", position: { x: 0, y: 0 }, size: { width: 100, height: 100 } },
+      { id: "b", position: { x: 200, y: 0 }, size: { width: 100, height: 100 } },
+    ];
+    expect(boxAt(boxes, { x: 250, y: 50 })?.id).toBe("b");
+    expect(boxAt(boxes, { x: 150, y: 50 })).toBeNull();
+    expect(locationIdForBox("unplaced")).toBeNull();
+    expect(locationIdForBox("loc_1")).toBe("loc_1");
+    expect(clampInBox({ x: -20, y: 2 }).y).toBeGreaterThan(2);
   });
 });
