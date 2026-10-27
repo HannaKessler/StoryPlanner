@@ -86,6 +86,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
   if (!node || !project || !currentGraphId) return null;
   const child = node.subgraphId ? graphs[node.subgraphId] : undefined;
   const info = involvement(involved, currentGraphId, node.id);
+  const fromSub = `From sub-graph: ${child ? graphName(child, graphs, project) : ""}`;
   const outgoing = graph.edges.filter((edge) => edge.source === node.id);
   const linked = new Set(outgoing.map((edge) => edge.target));
   const targets = graph.nodes.filter((item) => item.id !== node.id && !linked.has(item.id));
@@ -130,7 +131,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
             </option>
           ))}
         </select>
-        <Inherited ids={info.inherited.locationIds} project={project} />
+        <Inherited ids={info.inherited.locationIds} project={project} from={fromSub} />
       </Section>
 
       <Section id="insp:characters" title="Characters">
@@ -140,7 +141,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
           selected={node.characterIds}
           onChange={(characterIds) => updateNode(node.id, { characterIds })}
         />
-        <Inherited ids={info.inherited.characterIds} project={project} />
+        <Inherited ids={info.inherited.characterIds} project={project} from={fromSub} />
       </Section>
 
       <Section id="insp:items" title="Items">
@@ -150,7 +151,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
           selected={node.itemIds}
           onChange={(itemIds) => updateNode(node.id, { itemIds })}
         />
-        <Inherited ids={info.inherited.itemIds} project={project} />
+        <Inherited ids={info.inherited.itemIds} project={project} from={fromSub} />
       </Section>
 
       {child && (
@@ -322,12 +323,12 @@ function TransitionList({
   );
 }
 
-function Inherited({ ids, project }: { ids: string[]; project: ProjectDocument }) {
+function Inherited({ ids, project, from }: { ids: string[]; project: ProjectDocument; from: string }) {
   if (ids.length === 0) return null;
   return (
     <p className="sp-node-refs">
       {ids.map((id) => (
-        <span key={id} className="sp-ref is-inherited" title="Sub-graph">
+        <span key={id} className="sp-ref is-inherited" title={from}>
           {entityName(project, id)}
         </span>
       ))}

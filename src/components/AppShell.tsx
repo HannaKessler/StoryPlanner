@@ -69,6 +69,7 @@ export function AppShell() {
               key={id}
               type="button"
               className={screen === id ? "is-active" : ""}
+              aria-current={screen === id ? "page" : undefined}
               onClick={() => setScreen(id)}
             >
               {label}
@@ -81,7 +82,7 @@ export function AppShell() {
       </header>
       <div className="sp-main">
         {banner && (
-          <div className={banner.tone === "error" ? "sp-banner is-error" : "sp-banner"} role="status">
+          <div className={banner.tone === "error" ? "sp-banner is-error" : "sp-banner"} role={banner.tone === "error" ? "alert" : "status"}>
             <span>{banner.text}</span>
             <button type="button" onClick={dismissBanner} aria-label="Dismiss">
               ×
@@ -95,7 +96,12 @@ export function AppShell() {
                 {crumbs.map((crumb, index) => (
                   <span key={crumb.id}>
                     {index > 0 && <span className="sp-crumb-sep">/</span>}
-                    <button type="button" onClick={() => openGraph(crumb.id)} disabled={crumb.id === currentGraphId}>
+                    <button
+                      type="button"
+                      onClick={() => openGraph(crumb.id)}
+                      disabled={crumb.id === currentGraphId}
+                      aria-current={crumb.id === currentGraphId ? "location" : undefined}
+                    >
                       {crumb.name}
                     </button>
                   </span>

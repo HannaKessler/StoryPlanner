@@ -39,7 +39,7 @@ export function StartScreen() {
           </button>
         </div>
         {banner && (
-          <p className={banner.tone === "error" ? "sp-banner is-error" : "sp-banner"} role="status">
+          <p className={banner.tone === "error" ? "sp-banner is-error" : "sp-banner"} role={banner.tone === "error" ? "alert" : "status"}>
             {banner.text}
             <button type="button" onClick={dismissBanner} aria-label="Dismiss">
               ×
@@ -98,7 +98,7 @@ export function NewProjectDialog({
       <Field label="Project name">
         <input className="sp-input" value={name} onChange={(event) => setName(event.target.value)} autoFocus onFocus={(event) => event.target.select()} />
       </Field>
-      {banner?.tone === "error" && <p className="sp-banner is-error">{banner.text}</p>}
+      {banner?.tone === "error" && <p className="sp-banner is-error" role="alert">{banner.text}</p>}
       <div className="sp-modal-actions">
         <button type="button" className="sp-btn" onClick={onClose}>
           Cancel

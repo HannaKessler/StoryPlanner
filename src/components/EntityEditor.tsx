@@ -131,7 +131,7 @@ function EntityDetail({ kind, entity }: { kind: EntityKind; entity: StoryEntity 
                 { label: "Remove image", danger: true, onSelect: () => void removeEntityImage(kind, entity.id, path) },
               ])}
             >
-              <EntityImage path={path} />
+              <EntityImage path={path} alt={project ? entityLabel(project, entity) : entity.name} />
               <IconButton label="Remove image" danger onClick={() => void removeEntityImage(kind, entity.id, path)}>
                 ×
               </IconButton>
@@ -193,16 +193,27 @@ function EntityDetail({ kind, entity }: { kind: EntityKind; entity: StoryEntity 
   );
 }
 
-function EntityImage({ path }: { path: string }) {
+/** Decoded images by full path, so switching entities does not read and encode them again. */
+const imageCache = new Map<string, string>();
+
+function EntityImage({ path, alt }: { path: string; alt: string }) {
   const projectPath = useProjectStore((state) => state.projectPath);
-  const [src, setSrc] = useState("");
+  const full = projectPath ? joinPath(projectPath, path) : "";
+  const [src, setSrc] = useState(() => imageCache.get(full) ?? "");
   useEffect(() => {
-    if (!projectPath) return;
+    if (!full) return;
+    const cached = imageCache.get(full);
+    if (cached) {
+      setSrc(cached);
+      return;
+    }
     let cancelled = false;
-    void readFileBytes(joinPath(projectPath, path))
+    void readFileBytes(full)
       .then((bytes) => {
+        const url = `data:${mime(path)};base64,${toBase64(bytes)}`;
+        imageCache.set(full, url);
         if (cancelled) return;
-        setSrc(`data:${mime(path)};base64,${toBase64(bytes)}`);
+        setSrc(url);
       })
       .catch(() => {
         if (!cancelled) setSrc("");
@@ -210,9 +221,9 @@ function EntityImage({ path }: { path: string }) {
     return () => {
       cancelled = true;
     };
-  }, [path, projectPath]);
+  }, [full, path]);
   if (!src) return <span className="sp-gallery-missing" />;
-  return <img src={src} alt="" />;
+  return <img src={src} alt={alt} />;
 }
 
 function mime(path: string): string {

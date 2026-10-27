@@ -1,6 +1,7 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { describeEffect } from "../domain/effects";
 import { entityName, speakerName } from "../domain/format";
+import { graphName } from "../domain/graphOps";
 import type { NodeInvolvement } from "../domain/involved";
 import type { DialogueLine, ProjectDocument, StoryNode } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
@@ -15,6 +16,11 @@ export function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
   const story = data.story;
   const project = useProjectStore((state) => state.project);
   const openSubgraph = useProjectStore((state) => state.openSubgraph);
+  const subName = useProjectStore((state) => {
+    const child = story.subgraphId ? state.graphs[story.subgraphId] : undefined;
+    return child && state.project ? graphName(child, state.graphs, state.project) : "";
+  });
+  const from = `From sub-graph: ${subName}`;
   const title = story.title.trim();
   const summary = story.summary.trim();
   const own = data.involvement?.own;
@@ -40,9 +46,9 @@ export function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
           )}
         </header>
       )}
-      {project && <RefLine ids={all?.locationIds ?? []} own={own?.locationIds ?? []} project={project} />}
-      {project && <RefLine ids={all?.characterIds ?? []} own={own?.characterIds ?? []} project={project} kind="who" />}
-      {project && <RefLine ids={all?.itemIds ?? []} own={own?.itemIds ?? []} project={project} kind="item" />}
+      {project && <RefLine ids={all?.locationIds ?? []} own={own?.locationIds ?? []} project={project} from={from} />}
+      {project && <RefLine ids={all?.characterIds ?? []} own={own?.characterIds ?? []} project={project} from={from} kind="who" />}
+      {project && <RefLine ids={all?.itemIds ?? []} own={own?.itemIds ?? []} project={project} from={from} kind="item" />}
       {summary && <p>{summary}</p>}
       {story.lines.length > 0 && (
         <ul className="sp-node-lines">
@@ -67,11 +73,13 @@ function RefLine({
   ids,
   own,
   project,
+  from,
   kind,
 }: {
   ids: string[];
   own: string[];
   project: ProjectDocument;
+  from: string;
   kind?: "who" | "item";
 }) {
   if (ids.length === 0) return null;
@@ -79,7 +87,7 @@ function RefLine({
   return (
     <p className={`sp-node-refs${kind ? ` is-${kind}` : ""}`}>
       {ids.map((id) => (
-        <span key={id} className={ownSet.has(id) ? "sp-ref" : "sp-ref is-inherited"} title={ownSet.has(id) ? undefined : "Sub-graph"}>
+        <span key={id} className={ownSet.has(id) ? "sp-ref" : "sp-ref is-inherited"} title={ownSet.has(id) ? undefined : from}>
           {entityName(project, id)}
         </span>
       ))}
