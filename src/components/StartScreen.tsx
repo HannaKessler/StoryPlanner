@@ -89,24 +89,25 @@ export function NewProjectDialog({
   const banner = useProjectStore((state) => state.banner);
   return (
     <Modal title="New project" onClose={onClose}>
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!busy && name.trim()) void onCreate(name);
+        }}
+      >
       <Field label="Project name">
-        <input className="sp-input" value={name} onChange={(event) => setName(event.target.value)} autoFocus />
+        <input className="sp-input" value={name} onChange={(event) => setName(event.target.value)} autoFocus onFocus={(event) => event.target.select()} />
       </Field>
       {banner?.tone === "error" && <p className="sp-banner is-error">{banner.text}</p>}
       <div className="sp-modal-actions">
         <button type="button" className="sp-btn" onClick={onClose}>
           Cancel
         </button>
-        <button
-          type="button"
-          className="sp-btn is-primary"
-          disabled={busy || !name.trim()}
-          title="The project folder is created inside the folder you pick"
-          onClick={() => void onCreate(name)}
-        >
+        <button type="submit" className="sp-btn is-primary" disabled={busy || !name.trim()}>
           Choose folder…
         </button>
       </div>
+      </form>
     </Modal>
   );
 }

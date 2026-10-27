@@ -30,6 +30,11 @@ export function shortBeatLabel(node: StoryNode, project?: ProjectDocument | null
   return clip(beatLabel(node, project));
 }
 
+/** `1 beat`, `2 beats`. */
+export function plural(count: number, word: string): string {
+  return `${count} ${word}${count === 1 ? "" : "s"}`;
+}
+
 export function kindLabel(kind: string): string {
   if (kind === "boolean") return "Boolean";
   if (kind === "value") return "Value";

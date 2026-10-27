@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { graphName } from "../domain/graphOps";
 import { entityLabel } from "../domain/names";
 import { describeCondition } from "../domain/conditions";
 import { describeEffect } from "../domain/effects";
@@ -29,20 +30,34 @@ export function Inspector() {
 
 function GraphInspector({ graph }: { graph: GraphDocument }) {
   const updateGraphMeta = useProjectStore((state) => state.updateGraphMeta);
+  const graphs = useProjectStore((state) => state.graphs);
+  const project = useProjectStore((state) => state.project);
+  const nested = Boolean(graph.parentNodeId);
+  // A sub-graph's notes live on its beat. Older files may still have some here, so those stay visible.
+  const showNotes = !nested || graph.sceneNotes.trim() !== "";
   return (
     <>
       <div className="sp-insp-head">
-        <span className="sp-kicker">Graph</span>
-        <input className="sp-head-input" aria-label="Graph name" value={graph.name} onChange={(event) => updateGraphMeta({ name: event.target.value })} />
-      </div>
-      <Section id="insp:graph-notes" title="Scene notes" summary={graph.sceneNotes}>
-        <textarea
-          className="sp-cell sp-area"
-          rows={3}
-          value={graph.sceneNotes}
-          onChange={(event) => updateGraphMeta({ sceneNotes: event.target.value })}
+        <span className="sp-kicker">{nested ? "Sub-graph" : "Graph"}</span>
+        <input
+          className="sp-head-input"
+          aria-label={nested ? "Sub-graph name" : "Graph name"}
+          placeholder={nested ? graphName({ ...graph, name: "" }, graphs, project) : undefined}
+          value={graph.name}
+          onChange={(event) => updateGraphMeta({ name: event.target.value })}
         />
-      </Section>
+      </div>
+      {showNotes && (
+        <Section id="insp:graph-notes" title="Scene notes" summary={graph.sceneNotes}>
+          <textarea
+            className="sp-cell sp-area"
+            rows={3}
+            aria-label="Scene notes"
+            value={graph.sceneNotes}
+            onChange={(event) => updateGraphMeta({ sceneNotes: event.target.value })}
+          />
+        </Section>
+      )}
     </>
   );
 }
@@ -122,7 +137,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
 
       {child && (
         <div className="sp-inner-row" title="Sub-graph">
-          <span className="sp-inner-name">↳ {child.name.trim() || beatLabel(node, project)}</span>
+          <span className="sp-inner-name">↳ {graphName(child, graphs, project)}</span>
           <button type="button" className="sp-chip-btn" onClick={() => openSubgraph(node.id)}>
             Open
           </button>

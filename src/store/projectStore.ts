@@ -212,7 +212,7 @@ export function setProjectFs(next: ProjectFs | null) {
 function fs(): ProjectFs {
   if (filesystem) return filesystem;
   if (!inTauri()) {
-    throw new Error("Project folders need the StoryPlanner desktop window. Run npm run tauri dev.");
+    throw new Error("Project folders open in the StoryPlanner desktop app.");
   }
   filesystem ??= createTauriFs();
   return filesystem;
@@ -1015,8 +1015,9 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
       set({ currentGraphId: node.subgraphId, selection: null, screen: "graph" });
       return;
     }
+    // The name stays empty so the sub-graph follows the beat's label.
     const child = createGraph({
-      name: node.title.trim(),
+      name: "",
       parentGraphId: graph.id,
       parentNodeId: node.id,
     });

@@ -92,8 +92,19 @@ export function onWindowCloseRequested(handler: () => boolean): () => void {
   };
 }
 
+const FRIENDLY: Array<[RegExp, string]> = [
+  [/os error (2|3)\b|no such file|cannot find the (file|path)|not found/i, "File or folder not found."],
+  [/os error (5|13)\b|permission denied|access is denied/i, "Permission denied."],
+  [/os error 32\b|used by another process/i, "The file is open in another program."],
+  [/os error (28|112)\b|no space|disk is full/i, "The disk is full."],
+  [/os error (17|80|183)\b|already exists/i, "That file already exists."],
+  [/json|unexpected token|unexpected end/i, "The project file could not be read."],
+];
+
+/** A short message for the banner. Raw system text such as "(os error 3)" is not shown. */
 export function errorMessage(error: unknown): string {
-  if (typeof error === "string") return error;
-  if (error instanceof Error && error.message) return error.message;
-  return "Something went wrong.";
+  const raw = typeof error === "string" ? error : error instanceof Error ? error.message : "";
+  if (!raw) return "Something went wrong.";
+  for (const [pattern, message] of FRIENDLY) if (pattern.test(raw)) return message;
+  return raw.replace(/\s*\(os error \d+\)/gi, "").trim() || "Something went wrong.";
 }

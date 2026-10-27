@@ -1,3 +1,4 @@
+import { graphName } from "../domain/graphOps";
 import { beatLabel } from "../domain/labels";
 import { useProjectStore, type Screen } from "../store/projectStore";
 import { menuHandler } from "./ContextMenu";
@@ -40,11 +41,12 @@ function LibraryLinks() {
 function BeatsOutline() {
   const project = useProjectStore((state) => state.project);
   const graph = useProjectStore((state) => (state.currentGraphId ? state.graphs[state.currentGraphId] : null));
+  const graphs = useProjectStore((state) => state.graphs);
   const selection = useProjectStore((state) => state.selection);
   const select = useProjectStore((state) => state.select);
   if (!graph) return null;
   return (
-    <Section id="left:beats" title="Beats" count={graph.nodes.length} summary={graph.name} onContextMenu={menuHandler(() => addBeatItems())}>
+    <Section id="left:beats" title="Beats" count={graph.nodes.length} summary={graphName(graph, graphs, project)} onContextMenu={menuHandler(() => addBeatItems())}>
       <ul className="sp-beats">
         {graph.nodes.map((node) => {
           const active = selection?.kind === "node" && selection.id === node.id;

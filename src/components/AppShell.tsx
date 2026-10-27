@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { graphBreadcrumbs } from "../domain/graphOps";
-import { SCHEMA_VERSION } from "../domain/types";
+import { plural } from "../domain/labels";
 import { libraryKind } from "../domain/format";
 import { useProjectStore } from "../store/projectStore";
 import { EntityEditor } from "./EntityEditor";
@@ -36,6 +36,13 @@ export function AppShell() {
   const canRedo = useProjectStore((state) => state.future.length > 0);
   const confirm = useProjectStore((state) => state.confirm);
   const [menu, setMenu] = useState(false);
+
+  useEffect(() => {
+    if (!menu) return;
+    const onKey = (event: KeyboardEvent) => event.key === "Escape" && setMenu(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menu]);
 
   if (!project || !currentGraphId) return null;
   const graph = graphs[currentGraphId];
@@ -163,11 +170,11 @@ export function AppShell() {
         <span>
           {graph && (
             <>
-              {`${graph.nodes.length} beats · ${graph.edges.length} transitions (${graph.edges.filter((edge) => edge.condition).length} conditional)`}
+              {`${plural(graph.nodes.length, "beat")} · ${plural(graph.edges.length, "transition")} (${graph.edges.filter((edge) => edge.condition).length} conditional)`}
               {" · "}
             </>
           )}
-          {project.variables.length} variables · schema v{SCHEMA_VERSION}
+          {plural(project.variables.length, "variable")}
         </span>
       </footer>
       {exportOpen && <ExportDialog />}

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { inTauri, onWindowCloseRequested, setWindowTitle } from "./desktop/tauri";
 import { AppShell } from "./components/AppShell";
-import { ContextMenu } from "./components/ContextMenu";
+import { ContextMenu, useContextMenu } from "./components/ContextMenu";
 import { StartScreen } from "./components/StartScreen";
 import { useProjectStore } from "./store/projectStore";
 
@@ -23,6 +23,17 @@ export function App() {
       const state = useProjectStore.getState();
       const mod = event.metaKey || event.ctrlKey;
       const key = event.key.toLowerCase();
+      if (key === "escape") {
+        // Menus and dialogs close themselves. Otherwise Escape leaves a text field, then clears the selection.
+        if (useContextMenu.getState().menu || state.confirm || state.pendingClose || state.exportOpen) return;
+        if (document.querySelector(".sp-menu-pop, .sp-modal")) return;
+        if (editingText(event.target)) {
+          (event.target as HTMLElement).blur();
+          return;
+        }
+        if (state.selection) state.select(null);
+        return;
+      }
       if (mod && key === "s") {
         event.preventDefault();
         if (state.project) void state.save();

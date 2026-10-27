@@ -370,3 +370,15 @@ describe("transitions and beats", () => {
     expect(store().selection).toEqual({ kind: "node", id: copy.id });
   });
 });
+
+describe("sub-graph names", () => {
+  it("leaves a new sub-graph unnamed so it follows the beat", async () => {
+    await openFresh();
+    store().addNode({ x: 0, y: 0 });
+    const node = rootGraph().nodes.at(-1)!;
+    store().updateNode(node.id, { title: "Gate" });
+    store().createSubgraph(node.id);
+    const child = store().graphs[store().currentGraphId!];
+    expect(child.name).toBe("");
+  });
+});
