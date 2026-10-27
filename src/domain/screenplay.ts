@@ -68,13 +68,14 @@ function writeNode(
     return;
   }
   seen.add(id);
-  lines.push(heading(level, beatLabel(node, project)), "");
-  if (node.summary.trim()) {
-    lines.push(node.summary.trim(), "");
-  }
-  if (node.sceneNotes.trim()) {
-    lines.push(...quote(node.sceneNotes), "");
-  }
+  const summary = node.summary.trim();
+  const notes = node.sceneNotes.trim();
+  const child = node.subgraphId ? graphs[node.subgraphId] : undefined;
+  const hasContent = Boolean(summary || notes || node.effects.length || node.lines.length || child);
+  const revisited = graph.edges.filter((edge) => edge.target === node.id).length > 1;
+  if (hasContent || revisited) lines.push(heading(level, beatLabel(node, project)), "");
+  if (summary) lines.push(summary, "");
+  if (notes && notes !== summary) lines.push(...quote(notes), "");
   if (node.effects.length > 0) {
     lines.push(`*On enter: ${node.effects.map((effect) => describeEffect(effect, project)).join("; ")}.*`, "");
   }
@@ -84,8 +85,7 @@ function writeNode(
     if (line.direction.trim()) lines.push(`*(${line.direction.trim()})*`);
     lines.push("", line.text.trim() || "…", "");
   }
-  if (node.subgraphId && graphs[node.subgraphId]) {
-    const child = graphs[node.subgraphId];
+  if (child) {
     lines.push(`*Sub-graph: ${child.name.trim() || beatLabel(node, project)}*`, "");
     writeGraph(child, Math.min(level + 1, 6), lines, seen, project, graphs);
   }
@@ -125,7 +125,8 @@ function writeTransition(
   const title = target ? beatLabel(target, project) : "Missing beat";
   const heading = edge.label ? `${edge.label} → ${title}` : `→ ${title}`;
   lines.push(`**${heading}**`);
-  lines.push(`*When ${describeCondition(edge.condition, project)}.*`, "");
+  if (edge.condition) lines.push(`*When ${describeCondition(edge.condition, project)}.*`);
+  lines.push("");
 }
 
 function key(graph: GraphDocument, node: StoryNode): string {

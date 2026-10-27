@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { createEdge, createEntity, createNode } from "./factories";
 import { exportScreenplay } from "./screenplay";
 import { buildSample } from "./sample";
 import { parseGraph, parseJson, parseProject } from "./schema";
@@ -60,5 +61,32 @@ describe("sample project folder", () => {
       );
       expect(loaded).toEqual(graph);
     }
+  });
+});
+
+describe("export tidiness", () => {
+  it("skips empty beats, unconditional When lines, and repeated notes", () => {
+    const root = graphs[project.rootGraphId];
+    const empty = createNode({ id: "node_empty", title: "Nothing here" });
+    const twin = createNode({ id: "node_twin", title: "Twin", summary: "Same words.", sceneNotes: "Same words." });
+    const start = root.nodes[0];
+    const edited = {
+      ...graphs,
+      [root.id]: {
+        ...root,
+        nodes: [...root.nodes, empty, twin],
+        edges: [...root.edges, createEdge(start.id, empty.id), createEdge(empty.id, twin.id)],
+      },
+    };
+    const text = exportScreenplay(project, edited);
+    expect(text).not.toContain("When Always");
+    expect(text).not.toContain("Nothing here\n");
+    expect(text.match(/Same words\./g)).toHaveLength(1);
+  });
+
+  it("leaves characters without lines out of voice sheets", () => {
+    const silent = createEntity({ id: "char_silent", name: "Silent Sam" });
+    const text = exportVoiceSheets({ ...project, characters: [...project.characters, silent] }, graphs);
+    expect(text).not.toContain("Silent Sam");
   });
 });

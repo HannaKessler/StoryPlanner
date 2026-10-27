@@ -561,7 +561,9 @@ form.sp-speaker { display: flex; }
 .sp-modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .sp-modal-head h2 { font-family: var(--font-story); font-size: 20px; font-weight: 600; }
 .sp-modal-text { color: var(--text-dim); }
-.sp-modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.sp-modal-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 14px; }
+.sp-saved { margin-right: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); font-size: 12px; animation: sp-fade 4s ease forwards; }
+@keyframes sp-fade { 0%, 75% { opacity: 1; } 100% { opacity: 0; } }
 .sp-export { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 14px; }
 .sp-export-options { display: flex; flex-direction: column; gap: 4px; }
 .sp-export-options button.is-active { background: var(--bg-elev-2); }

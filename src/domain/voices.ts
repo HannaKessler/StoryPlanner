@@ -40,14 +40,13 @@ export function exportVoiceSheets(
   }
 
   const order = orderedGraphs(project, graphs);
+  let written = 0;
   for (const character of characters) {
+      const appearances = collectLines(order, character.id);
+      if (appearances.length === 0) continue;
+      written += 1;
       lines.push(`## ${entityLabel(project, character)}`, "");
       if (character.notes.trim()) lines.push(character.notes.trim(), "");
-      const appearances = collectLines(order, character.id);
-      if (appearances.length === 0) {
-        lines.push("_No lines yet._", "");
-        continue;
-      }
       for (const appearance of appearances) {
         const { graph, node, line, index } = appearance;
         const cues = responseCues(graph, node, index, graphs, project);
@@ -68,6 +67,7 @@ export function exportVoiceSheets(
         lines.push(`**${entityLabel(project, character).toUpperCase()}**`, "", line.text.trim() || "…", "", "---", "");
       }
   }
+  if (written === 0) lines.push("_No lines yet._", "");
   return `${lines.join("\n").trim()}\n`;
 }
 

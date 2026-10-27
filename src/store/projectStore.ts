@@ -212,7 +212,8 @@ interface ProjectStore {
   jumpPlay: (index: number) => void;
   updatePlayValue: (variableId: string, value: VariableValue) => void;
   exportText: (kind: ExportKind) => string;
-  exportToFile: (kind: ExportKind) => Promise<void>;
+  /** Resolves to the saved path, or null when cancelled or failed. */
+  exportToFile: (kind: ExportKind) => Promise<string | null>;
 }
 
 let filesystem: ProjectFs | null = null;
@@ -1273,7 +1274,7 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
 
   async exportToFile(kind) {
     const state = get();
-    if (!state.project) return;
+    if (!state.project) return null;
     const slug = slugify(state.project.name);
     const extension = kind === "bundle" ? "json" : "md";
     const filename =
@@ -1281,11 +1282,12 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
     set({ busy: true });
     try {
       const target = await pickSaveFile("Export", filename, extension);
-      if (!target) return;
+      if (!target) return null;
       await fs().writeText(target, get().exportText(kind));
-      set({ banner: { tone: "info", text: "Export saved." } });
+      return target;
     } catch (error) {
       set({ banner: { tone: "error", text: errorMessage(error) } });
+      return null;
     } finally {
       set({ busy: false });
     }

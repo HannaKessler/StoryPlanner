@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { bundleProject, slugify } from "../domain/project";
 import { stringifyDoc } from "../domain/schema";
 import { exportScreenplay } from "../domain/screenplay";
@@ -6,22 +6,10 @@ import { exportVoiceSheets } from "../domain/voices";
 import { useProjectStore, type ExportKind } from "../store/projectStore";
 import { Modal } from "./Modal";
 
-const OPTIONS: Array<{ id: ExportKind; title: string; detail: string }> = [
-  {
-    id: "bundle",
-    title: "Bundled JSON",
-    detail: "The whole project folder in one file for engine add-ons. Schema version included.",
-  },
-  {
-    id: "screenplay",
-    title: "Full screenplay",
-    detail: "Markdown that follows the branches and keeps scene notes, transitions, and their conditions.",
-  },
-  {
-    id: "voices",
-    title: "Voice actor sheets",
-    detail: "One section per character. Each line is preceded by the italic line it answers, including every path.",
-  },
+const OPTIONS: Array<{ id: ExportKind; title: string }> = [
+  { id: "bundle", title: "Bundled JSON" },
+  { id: "screenplay", title: "Full screenplay" },
+  { id: "voices", title: "Voice actor sheets" },
 ];
 
 export function ExportDialog() {
@@ -32,6 +20,12 @@ export function ExportDialog() {
   const busy = useProjectStore((state) => state.busy);
   const [kind, setKind] = useState<ExportKind>("bundle");
   const [copied, setCopied] = useState(false);
+  const [saved, setSaved] = useState<{ path: string; at: number } | null>(null);
+  useEffect(() => {
+    if (!saved) return;
+    const timer = window.setTimeout(() => setSaved(null), 4000);
+    return () => window.clearTimeout(timer);
+  }, [saved]);
   const text = useMemo(() => {
     if (!project) return "";
     if (kind === "bundle") return stringifyDoc(bundleProject(project, graphs, new Date().toISOString()));
@@ -45,13 +39,13 @@ export function ExportDialog() {
       <div className="sp-export">
         <div className="sp-export-options">
           {OPTIONS.map((item) => (
-            <button key={item.id} type="button" className={item.id === kind ? "is-active" : ""} title={item.detail} onClick={() => setKind(item.id)}>
+            <button key={item.id} type="button" className={item.id === kind ? "is-active" : ""} onClick={() => setKind(item.id)}>
               <strong>{item.title}</strong>
             </button>
           ))}
         </div>
         <div className="sp-export-preview">
-          <p className="sp-muted" title="Includes unsaved edits">
+          <p className="sp-muted">
             <code>
               {kind === "bundle"
                 ? `${slugify(project.name)}.json`
@@ -62,6 +56,11 @@ export function ExportDialog() {
           </p>
           <pre>{text}</pre>
           <div className="sp-modal-actions">
+            {saved && (
+              <span key={saved.at} className="sp-saved" role="status">
+                Saved to <code>{saved.path}</code>
+              </span>
+            )}
             <button
               type="button"
               className="sp-btn"
@@ -74,7 +73,11 @@ export function ExportDialog() {
             >
               {copied ? "Copied" : "Copy"}
             </button>
-            <button type="button" className="sp-btn is-primary" disabled={busy} onClick={() => void exportToFile(kind)}>
+            <button type="button" className="sp-btn is-primary" disabled={busy} onClick={() =>
+                void exportToFile(kind).then((path) => {
+                  if (path) setSaved({ path, at: Date.now() });
+                })
+              }>
               Save file
             </button>
           </div>
