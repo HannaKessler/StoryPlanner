@@ -510,8 +510,11 @@ form.sp-speaker { display: flex; }
 }
 .react-flow__resize-control { pointer-events: auto; }
 .sp-loc-picks { display: flex; flex-wrap: wrap; gap: 4px; }
-.react-flow__handle { width: 9px; height: 9px; background: var(--accent); border: 0; }
-.sp-handle-out { top: 22px !important; }
+.react-flow__handle { width: 13px; height: 13px; background: var(--accent); border: 2px solid #241f1a; }
+/* A larger, invisible target so a drag that just misses the dot still connects. */
+.react-flow__handle::before { content: ""; position: absolute; inset: -9px; border-radius: 50%; }
+.react-flow__handle:hover { background: #f0b878; }
+.react-flow__minimap { border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
 .react-flow__controls-button, .react-flow__minimap { background: var(--bg-elev) !important; border-color: var(--line) !important; fill: var(--text); }
 .react-flow__attribution { background: transparent !important; color: var(--text-faint) !important; }
 
