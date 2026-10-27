@@ -95,10 +95,9 @@ function ConditionNode({
     return (
       <div
         className={`sp-cond-group is-${value.op}`}
-        title={value.children.length === 0 ? (value.op === "and" ? "Empty: always passes" : "Empty: never passes") : undefined}
         onContextMenu={menuHandler(() => [
           ...groupAddItems(value, onChange, noVariables),
-          { label: "Wrap in NOT", onSelect: () => onChange({ type: "not", child: value }) },
+          { label: "Not", onSelect: () => onChange({ type: "not", child: value }) },
           "separator",
           { label: "Delete group", danger: true, onSelect: () => onChange(null) },
         ])}
@@ -133,7 +132,7 @@ function ConditionNode({
               </button>
             </>
           )}
-          <button type="button" className="sp-chip-btn" title="Wrap in NOT" onClick={() => onChange({ type: "not", child: value })}>
+          <button type="button" className="sp-chip-btn" onClick={() => onChange({ type: "not", child: value })}>
             not
           </button>
           <IconButton label="Delete group" danger onClick={() => onChange(null)}>
@@ -157,7 +156,7 @@ function RuleRow({ value, onChange, project }: { value: Rule; onChange: (next: C
     <div
       className="sp-cond-rule"
       onContextMenu={menuHandler(() => [
-        { label: "Wrap in NOT", onSelect: () => onChange({ type: "not", child: value }) },
+        { label: "Not", onSelect: () => onChange({ type: "not", child: value }) },
         "separator",
         { label: "Delete rule", danger: true, onSelect: () => onChange(null) },
       ])}
@@ -197,7 +196,7 @@ function RuleRow({ value, onChange, project }: { value: Rule; onChange: (next: C
           <ValueInput kind={variable?.kind} value={value.value} onChange={(next) => onChange({ ...value, value: next })} />
         </>
       )}
-      <IconButton label="Wrap in NOT" onClick={() => onChange({ type: "not", child: value })}>
+      <IconButton label="Not" onClick={() => onChange({ type: "not", child: value })}>
         ¬
       </IconButton>
       <IconButton label="Delete rule" danger onClick={() => onChange(null)}>

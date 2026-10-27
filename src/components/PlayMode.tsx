@@ -154,7 +154,7 @@ export function PlayMode() {
               <li key={variable.id} className={changed ? "sp-var is-changed" : "sp-var"}>
                 <div className="sp-var-main">
                   <span className={`sp-kind sp-kind-${variable.kind}`}>{KIND_SHORT[variable.kind] ?? variable.kind}</span>
-                  <span className="sp-var-name" title={`default ${formatValue(project, variable, variable.defaultValue)}`}>
+                  <span className="sp-var-name">
                     {variable.name}
                   </span>
                   {variable.kind === "boolean" ? (

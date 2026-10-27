@@ -357,7 +357,7 @@ function EntityChips({
           key={id}
           type="button"
           className="sp-chip-btn is-on is-missing"
-          title="Remove"
+          aria-label="Delete missing reference"
           onClick={() => onChange(selected.filter((item) => item !== id))}
         >
           missing ×

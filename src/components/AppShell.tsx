@@ -24,6 +24,7 @@ export function AppShell() {
   const exportOpen = useProjectStore((state) => state.exportOpen);
   const busy = useProjectStore((state) => state.busy);
   const canvasMode = useProjectStore((state) => state.canvasMode);
+  const resumeIntent = useProjectStore((state) => state.resumeIntent);
   const setCanvasMode = useProjectStore((state) => state.setCanvasMode);
   const setScreen = useProjectStore((state) => state.setScreen);
   const renameProject = useProjectStore((state) => state.renameProject);
@@ -114,7 +115,7 @@ export function AppShell() {
                   aria-pressed={canvasMode === "locations"}
                   onClick={() => setCanvasMode(canvasMode === "locations" ? "graph" : "locations")}
                 >
-                  Locations
+                  Location view
                 </button>
                 <button type="button" className="sp-chip-btn" onClick={addBeatInView}>
                   + Beat
@@ -168,11 +169,11 @@ export function AppShell() {
             <button type="button" className="sp-btn" onClick={() => useProjectStore.getState().cancelClose()}>
               Cancel
             </button>
-            <button type="button" className="sp-btn" onClick={() => useProjectStore.getState().discardAndClose()}>
+            <button type="button" className="sp-btn is-danger" onClick={() => useProjectStore.getState().discardAndClose()}>
               Discard
             </button>
             <button type="button" className="sp-btn is-primary" disabled={busy} onClick={() => void useProjectStore.getState().saveAndClose()}>
-              Save and close
+              {resumeIntent === "new" || resumeIntent === "open" ? "Save and continue" : "Save and close"}
             </button>
           </div>
         </Modal>

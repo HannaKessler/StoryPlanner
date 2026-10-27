@@ -177,7 +177,7 @@ function EntityDetail({ kind, entity }: { kind: EntityKind; entity: StoryEntity 
                 }}
               />
               <IconButton
-                label="Remove field"
+                label="Delete field"
                 danger
                 onClick={() =>
                   updateEntity(kind, entity.id, { fields: entity.fields.filter((_, fieldIndex) => fieldIndex !== index) })
