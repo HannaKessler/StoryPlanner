@@ -96,3 +96,12 @@ export function ancestorKeys(graphs: Record<string, GraphDocument>, graphId: str
   }
   return keys;
 }
+
+/** Every beat key that holds a sub-graph, for walking the whole tree. */
+export function allOutlineKeys(graphs: Record<string, GraphDocument>): string[] {
+  const keys: string[] = [];
+  for (const graph of Object.values(graphs)) {
+    for (const node of graph.nodes) if (node.subgraphId) keys.push(outlineKey(graph.id, node.id));
+  }
+  return keys;
+}

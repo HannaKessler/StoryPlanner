@@ -70,6 +70,7 @@ import type {
 } from "../domain/types";
 import { PROJECT_FILE } from "../domain/types";
 import { joinPath } from "../domain/paths";
+import { allOutlineKeys, buildOutline, orderBeats, outlineKey, visibleRows } from "../domain/outline";
 
 const RECENTS_KEY = "storyplanner.recents.v1";
 
@@ -84,6 +85,7 @@ export type Screen = "graph" | "play" | "characters" | "items" | "locations";
 /** What to do once the project has closed. `quit` closes the window. */
 export type ResumeIntent = "new" | "open" | "quit" | null;
 export type ExportKind = "bundle" | "screenplay" | "voices";
+export type EditMode = "structure" | "write";
 
 /** A project state that undo and redo can return to. */
 export interface Snapshot {
@@ -124,6 +126,10 @@ interface ProjectStore {
   confirm: ConfirmRequest | null;
   screen: Screen;
   canvasMode: "graph" | "locations";
+  /** Structure shows the canvas; Write shows the selected beat as a page. */
+  editMode: EditMode;
+  /** Side panels shown in Structure mode. */
+  panels: { left: boolean; right: boolean };
   currentGraphId: string | null;
   selection: Selection;
   exportOpen: boolean;
@@ -139,6 +145,10 @@ interface ProjectStore {
   dismissBanner: () => void;
   setScreen: (screen: Screen) => void;
   setCanvasMode: (mode: "graph" | "locations") => void;
+  setEditMode: (mode: EditMode) => void;
+  togglePanel: (side: "left" | "right") => void;
+  /** Selects the next or previous beat in outline order, across sub-graphs. */
+  stepBeat: (direction: -1 | 1) => void;
   setExportOpen: (open: boolean) => void;
   createNamedProject: (name: string) => Promise<void>;
   openFromDialog: () => Promise<void>;
@@ -532,6 +542,8 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
   confirm: null,
   screen: "graph",
   canvasMode: "graph",
+  editMode: "structure",
+  panels: { left: true, right: true },
   currentGraphId: null,
   selection: null,
   exportOpen: false,
@@ -563,6 +575,33 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
 
   setCanvasMode(canvasMode) {
     set({ canvasMode });
+  },
+
+  setEditMode(editMode) {
+    const state = get();
+    const graph = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
+    let selection = state.selection;
+    // A page needs a beat. The selection carries over; a transition shows the beat it leaves.
+    if (editMode === "write" && graph && selection?.kind !== "node") {
+      const edge = selection?.kind === "edge" ? graph.edges.find((item) => item.id === selection!.id) : undefined;
+      const first = edge ? edge.source : orderBeats(graph)[0]?.id;
+      selection = first ? { kind: "node", id: first } : null;
+    }
+    set({ editMode, selection, screen: "graph" });
+  },
+
+  togglePanel(side) {
+    set((state) => ({ panels: { ...state.panels, [side]: !state.panels[side] } }));
+  },
+
+  stepBeat(direction) {
+    const state = get();
+    if (!state.project || !state.currentGraphId) return;
+    const rows = visibleRows(buildOutline(state.graphs, state.project.rootGraphId), new Set(allOutlineKeys(state.graphs)));
+    const current = state.selection?.kind === "node" ? outlineKey(state.currentGraphId, state.selection.id) : null;
+    const index = rows.findIndex((row) => row.key === current);
+    const next = index < 0 ? rows[direction > 0 ? 0 : rows.length - 1] : rows[index + direction];
+    if (next) get().selectBeat(next.graphId, next.node.id);
   },
 
   setExportOpen(open) {

@@ -486,3 +486,37 @@ describe("drag out a transition", () => {
     expect(rootGraph().nodes.some((node) => node.id === added.id)).toBe(false);
   });
 });
+
+describe("structure and write modes", () => {
+  it("keeps the selection, gives Write mode a beat, and steps through the outline", async () => {
+    await openFresh();
+    const graph = rootGraph();
+    store().addConnectedNode(graph.nodes[0].id, { x: 300, y: 0 });
+    const second = store().selection;
+    store().setEditMode("write");
+    expect(store().editMode).toBe("write");
+    expect(store().selection).toEqual(second);
+    store().select(null);
+    store().setEditMode("structure");
+    expect(store().selection).toBeNull();
+    store().setEditMode("write");
+    expect(store().selection).toEqual({ kind: "node", id: graph.nodes[0].id });
+    store().stepBeat(1);
+    expect(store().selection).toEqual(second);
+    store().stepBeat(1);
+    expect(store().selection).toEqual(second);
+    store().stepBeat(-1);
+    expect(store().selection).toEqual({ kind: "node", id: graph.nodes[0].id });
+  });
+
+  it("undoes a Write-mode edit and keeps it when switching back", async () => {
+    await openFresh();
+    const node = rootGraph().nodes[0];
+    store().setEditMode("write");
+    store().updateNode(node.id, { summary: "Written in Write mode" });
+    store().setEditMode("structure");
+    expect(rootGraph().nodes[0].summary).toBe("Written in Write mode");
+    store().undo();
+    expect(rootGraph().nodes[0].summary).toBe(node.summary);
+  });
+});

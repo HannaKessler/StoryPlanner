@@ -11,6 +11,7 @@ import { openMenuBelow, type MenuItem } from "./ContextMenu";
 import { Modal } from "./Modal";
 import { addBeatInView } from "./menuItems";
 import { PlayMode } from "./PlayMode";
+import { WriteMode } from "./WriteMode";
 
 export function AppShell() {
   const project = useProjectStore((state) => state.project);
@@ -34,6 +35,11 @@ export function AppShell() {
   const canUndo = useProjectStore((state) => state.past.length > 0);
   const canRedo = useProjectStore((state) => state.future.length > 0);
   const confirm = useProjectStore((state) => state.confirm);
+  const editMode = useProjectStore((state) => state.editMode);
+  const panels = useProjectStore((state) => state.panels);
+  const setEditMode = useProjectStore((state) => state.setEditMode);
+  const togglePanel = useProjectStore((state) => state.togglePanel);
+  const writing = screen === "graph" && editMode === "write";
 
   if (!project || !currentGraphId) return null;
   const graph = graphs[currentGraphId];
@@ -58,6 +64,21 @@ export function AppShell() {
             onChange={(event) => renameProject(event.target.value)}
           />
           {dirty && <span className="sp-dirty">Unsaved</span>}
+        </div>
+        <div className="sp-editmode" role="group" aria-label="Mode">
+          {(
+            [
+              ["structure", "Structure"],
+              ["write", "Write"],
+            ] as const
+          ).map(([id, label]) => {
+            const on = screen === "graph" && editMode === id;
+            return (
+              <button key={id} type="button" className={on ? "is-active" : ""} aria-pressed={on} onClick={() => setEditMode(id)}>
+                {label}
+              </button>
+            );
+          })}
         </div>
         <nav className="sp-modes" aria-label="Sections">
           {(
@@ -109,6 +130,17 @@ export function AppShell() {
                 ))}
               </nav>
               <div className="sp-toolbar">
+                {!writing && (
+                  <>
+                    <button type="button" className={panels.left ? "sp-chip-btn is-on" : "sp-chip-btn"} aria-pressed={panels.left} onClick={() => togglePanel("left")}>
+                      Outline
+                    </button>
+                    <button type="button" className={panels.right ? "sp-chip-btn is-on" : "sp-chip-btn"} aria-pressed={panels.right} onClick={() => togglePanel("right")}>
+                      Inspector
+                    </button>
+                  </>
+                )}
+                {!writing && (
                 <button
                   type="button"
                   className={canvasMode === "locations" ? "sp-chip-btn is-on" : "sp-chip-btn"}
@@ -117,16 +149,24 @@ export function AppShell() {
                 >
                   Location view
                 </button>
+                )}
                 <button type="button" className="sp-chip-btn" onClick={addBeatInView}>
                   + Beat
                 </button>
               </div>
             </div>
-            <div className="sp-workspace">
-              <LeftPanel />
-              <GraphCanvas />
-              <Inspector />
-            </div>
+            {writing ? (
+              <div className="sp-workspace is-write">
+                <LeftPanel />
+                <WriteMode />
+              </div>
+            ) : (
+              <div className={`sp-workspace${panels.left ? "" : " no-left"}${panels.right ? "" : " no-right"}`}>
+                {panels.left && <LeftPanel />}
+                <GraphCanvas />
+                {panels.right && <Inspector />}
+              </div>
+            )}
           </>
         )}
         {screen === "play" && <PlayMode />}

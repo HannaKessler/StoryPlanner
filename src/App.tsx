@@ -31,7 +31,8 @@ export function App() {
           (event.target as HTMLElement).blur();
           return;
         }
-        if (state.selection) state.select(null);
+        // A page in Write mode always shows a beat.
+        if (state.selection && !(state.screen === "graph" && state.editMode === "write")) state.select(null);
         return;
       }
       if (mod && key === "s") {
@@ -54,6 +55,24 @@ export function App() {
       if (state.project && !typing && mod && !event.altKey && key === "d" && state.selection?.kind === "node" && state.screen === "graph") {
         event.preventDefault();
         state.duplicateNode(state.selection.id);
+        return;
+      }
+      const modal = Boolean(document.querySelector(".sp-modal, .sp-context"));
+      if (state.project && !modal && mod && !event.altKey && !event.shiftKey && (key === "1" || key === "2")) {
+        event.preventDefault();
+        state.setEditMode(key === "1" ? "structure" : "write");
+        return;
+      }
+      // Tab switches mode unless a field or button has focus, where it keeps moving focus.
+      if (state.project && !typing && !mod && !event.altKey && !event.shiftKey && key === "tab" && state.screen === "graph" && !focusMoves(event.target)) {
+        event.preventDefault();
+        state.setEditMode(state.editMode === "write" ? "structure" : "write");
+        return;
+      }
+      if (state.project && !modal && mod && !event.altKey && !event.shiftKey && (key === "arrowdown" || key === "arrowup") && state.screen === "graph") {
+        event.preventDefault();
+        (document.activeElement as HTMLElement | null)?.blur?.();
+        state.stepBeat(key === "arrowdown" ? 1 : -1);
         return;
       }
       if (!mod || event.altKey || !state.project || typing) return;
@@ -101,4 +120,9 @@ function editingText(target: EventTarget | null): boolean {
   if (target.isContentEditable) return true;
   const tag = target.tagName;
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+}
+
+/** Controls where Tab should keep its usual meaning. */
+function focusMoves(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && Boolean(target.closest("button, a[href], summary, .sp-modal, .sp-context"));
 }
