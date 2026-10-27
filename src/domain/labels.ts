@@ -3,7 +3,7 @@ import type { ProjectDocument, StoryNode } from "./types";
 
 /**
  * A label for lists and breadcrumbs. Uses the title when the writer set one.
- * Otherwise the first line, or a short id. Nothing here is saved.
+ * Otherwise the first line, or the event number. Nothing here is saved.
  */
 export function beatLabel(node: StoryNode, project?: ProjectDocument | null): string {
   const title = node.title.trim();
@@ -16,7 +16,7 @@ export function beatLabel(node: StoryNode, project?: ProjectDocument | null): st
       : text;
     if (spoken) return spoken;
   }
-  return `Beat · ${node.id.slice(-6)}`;
+  return node.number > 0 ? `Event ${node.number}` : "Event";
 }
 
 /** Cuts long text to `max` characters with an ellipsis, for menus and selects. */

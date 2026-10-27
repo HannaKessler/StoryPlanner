@@ -10,6 +10,7 @@
     {
       "id": "node_in_start",
       "type": "beat",
+      "number": 17,
       "position": {
         "x": 40,
         "y": 180
@@ -28,6 +29,7 @@
     {
       "id": "node_in_court",
       "type": "beat",
+      "number": 18,
       "position": {
         "x": 320,
         "y": 150
@@ -53,6 +55,7 @@
     {
       "id": "node_in_end",
       "type": "beat",
+      "number": 19,
       "position": {
         "x": 680,
         "y": 170

@@ -609,9 +609,10 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
     node_in_court: ["tag_loc_inside"],
     node_in_end: ["tag_loc_inside"],
   };
+  let count = 0;
   const place = <T extends { nodes: Array<{ id: string }> }>(graph: T) => ({
     ...graph,
-    nodes: graph.nodes.map((item) => ({ ...item, tagIds: locations[item.id] ?? [] })),
+    nodes: graph.nodes.map((item) => ({ ...item, number: ++count, tagIds: locations[item.id] ?? [] })),
   });
 
   const context = migrationContext(project);

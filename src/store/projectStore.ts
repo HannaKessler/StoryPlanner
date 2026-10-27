@@ -22,7 +22,7 @@ import {
   moveItem,
 } from "../domain/factories";
 import { entitiesOf, withEntities } from "../domain/format";
-import { descendantGraphIds, nextBeatPosition, splitTransition } from "../domain/graphOps";
+import { descendantGraphIds, nextBeatNumber, nextBeatPosition, splitTransition } from "../domain/graphOps";
 import { isDuplicateName, newEntityName, uniqueName } from "../domain/names";
 import {
   countEntityRefs,
@@ -997,7 +997,7 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
     const graph = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
     if (!graph) return;
     const selected = state.selection?.kind === "node" ? state.selection.id : null;
-    const node = createNode({ ...partial, position: position ?? nextBeatPosition(graph, selected) });
+    const node = createNode({ ...partial, number: nextBeatNumber(state.graphs), position: position ?? nextBeatPosition(graph, selected) });
     withGraph((current) => ({ ...current, nodes: [...current.nodes, node] }));
     set({ selection: { kind: "node", id: node.id } });
   },
@@ -1059,6 +1059,7 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
     const graph = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
     if (!graph || !graph.nodes.some((node) => node.id === sourceId)) return;
     const node = createNode({
+      number: nextBeatNumber(state.graphs),
       position: position ?? nextBeatPosition(graph, sourceId),
       ...(options.locationId !== undefined ? { locationId: options.locationId } : {}),
       ...(options.locationPosition ? { locationPosition: options.locationPosition } : {}),
@@ -1089,6 +1090,7 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
     const node = createNode({
       ...source,
       id: undefined,
+      number: nextBeatNumber(state.graphs),
       position: { x: source.position.x + 40, y: source.position.y + 40 },
       locationPosition: source.locationPosition ? { x: source.locationPosition.x + 24, y: source.locationPosition.y + 24 } : null,
       // The copy starts without a sub-graph. Sub-graphs belong to one beat.
@@ -1109,7 +1111,7 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
     if (!graph) return;
     const edge = graph.edges.find((item) => item.id === edgeId);
     if (!edge) return;
-    const node = createNode();
+    const node = createNode({ number: nextBeatNumber(state.graphs) });
     const next = splitTransition(graph, edgeId, node, createEdge(node.id, edge.target));
     if (!next) return;
     set({
@@ -1175,7 +1177,7 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
       parentGraphId: graph.id,
       parentNodeId: node.id,
     });
-    child.nodes = [createNode({ position: { x: 160, y: 180 } })];
+    child.nodes = [createNode({ number: nextBeatNumber(get().graphs), position: { x: 160, y: 180 } })];
     const parent = { ...graph, nodes: graph.nodes.map((item) => (item.id === nodeId ? { ...item, subgraphId: child.id } : item)) };
     set((current) => ({
       graphs: { ...current.graphs, [graph.id]: parent, [child.id]: child },

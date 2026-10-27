@@ -57,6 +57,13 @@ export function graphBreadcrumbs(
 }
 
 /** The graph's own name, or a label derived from its parent beat. Does not write either. */
+/** The number for a new event: one more than the highest number in the project. */
+export function nextBeatNumber(graphs: Record<string, GraphDocument>): number {
+  let max = 0;
+  for (const graph of Object.values(graphs)) for (const node of graph.nodes) if (node.number > max) max = node.number;
+  return max + 1;
+}
+
 export function graphName(
   graph: GraphDocument,
   graphs: Record<string, GraphDocument>,

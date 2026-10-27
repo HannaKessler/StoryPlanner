@@ -15,6 +15,7 @@ export function createNode(partial: Partial<StoryNode> = {}): StoryNode {
   return {
     id: partial.id ?? createId(),
     type: "beat",
+    number: partial.number ?? 0,
     position: partial.position ?? { x: 80, y: 160 },
     title: partial.title ?? "",
     summary: partial.summary ?? "",

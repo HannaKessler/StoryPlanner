@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parallelOffset, transitionCurve } from "./edgeGeometry";
 import { createEdge, createGraph, createNode } from "./factories";
-import { entryNodes, graphBreadcrumbs, splitTransition } from "./graphOps";
+import { entryNodes, graphBreadcrumbs, nextBeatNumber, splitTransition } from "./graphOps";
 import { beatLabel } from "./labels";
 import { buildSample } from "./sample";
 
@@ -92,13 +92,19 @@ describe("untitled beats", () => {
     expect(node.title).toBe("");
   });
 
-  it("falls back to a short id when a beat has no lines", () => {
-    const node = createNode({ id: "node_event_123456" });
-    expect(beatLabel(node)).toBe("Beat · 123456");
+  it("falls back to the event number when a beat has no lines", () => {
+    expect(beatLabel(createNode({ id: "node_event_123456", number: 7 }))).toBe("Event 7");
+  });
+
+  it("numbers new events one past the highest in the project", () => {
+    const a = createGraph({ id: "a", name: "", nodes: [createNode({ number: 1 }), createNode({ number: 4 })], edges: [] });
+    const b = createGraph({ id: "b", name: "", nodes: [createNode({ number: 2 })], edges: [] });
+    expect(nextBeatNumber({ a, b })).toBe(5);
+    expect(nextBeatNumber({})).toBe(1);
   });
 
   it("names an untitled sub-graph from its parent beat without writing that name", () => {
-    const node = createNode({ id: "node_parent_99aabb", title: "" });
+    const node = createNode({ id: "node_parent_99aabb", title: "", number: 3 });
     const parent = createGraph({ id: "g", name: "Root", nodes: [node], edges: [] });
     const child = createGraph({
       id: "c",
@@ -109,7 +115,7 @@ describe("untitled beats", () => {
       edges: [],
     });
     const crumbs = graphBreadcrumbs({ g: parent, c: child }, "c");
-    expect(crumbs.map((crumb) => crumb.name)).toEqual(["Root", "Beat · 99aabb"]);
+    expect(crumbs.map((crumb) => crumb.name)).toEqual(["Root", "Event 3"]);
     expect(child.name).toBe("");
     expect(node.title).toBe("");
   });

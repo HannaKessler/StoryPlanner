@@ -83,6 +83,8 @@ export interface DialogueLine {
 export interface StoryNode {
   id: string;
   type: StoryNodeType;
+  /** Project-wide display number for untitled events. Set once at creation; 0 when unset. */
+  number: number;
   position: { x: number; y: number };
   /** Optional. Empty until the writer names the beat. Display fallbacks are not stored here. */
   title: string;

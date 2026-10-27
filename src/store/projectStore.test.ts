@@ -487,6 +487,27 @@ describe("drag out a transition", () => {
   });
 });
 
+describe("event numbers", () => {
+  it("gives every new event the next project-wide number and frees only the top one", async () => {
+    await openFresh();
+    const numbers = () => Object.values(store().graphs).flatMap((graph) => graph.nodes.map((node) => node.number));
+    const first = rootGraph().nodes[0];
+    expect(first.number).toBe(1);
+    store().addConnectedNode(first.id, { x: 300, y: 0 });
+    store().addNode({ x: 0, y: 300 });
+    store().duplicateNode(first.id);
+    expect(rootGraph().nodes.map((node) => node.number)).toEqual([1, 2, 3, 4]);
+    store().deleteNodes([rootGraph().nodes[3].id]);
+    store().addNode({ x: 0, y: 400 });
+    expect(rootGraph().nodes.at(-1)!.number).toBe(4);
+    store().deleteNodes([rootGraph().nodes[1].id]);
+    store().addNode({ x: 0, y: 500 });
+    expect(rootGraph().nodes.at(-1)!.number).toBe(5);
+    store().createSubgraph(first.id);
+    expect(numbers().sort((x, y) => x - y)).toEqual([1, 3, 4, 5, 6]);
+  });
+});
+
 describe("structure and write modes", () => {
   it("keeps the selection, gives Write mode a beat, and steps through the outline", async () => {
     await openFresh();

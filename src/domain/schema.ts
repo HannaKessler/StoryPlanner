@@ -244,6 +244,7 @@ function parseNode(value: unknown, path: string, context: TagMigration): StoryNo
   return {
     id: asNonEmpty(value.id, child(path, "id")),
     type: "beat",
+    number: typeof value.number === "number" && Number.isInteger(value.number) && value.number > 0 ? value.number : 0,
     position: {
       x: asNumber(value.position.x, child(child(path, "position"), "x")),
       y: asNumber(value.position.y, child(child(path, "position"), "y")),
