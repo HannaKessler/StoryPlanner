@@ -47,6 +47,7 @@ export function CreateField({
         className="sp-cell"
         aria-label={label}
         role="combobox"
+        data-draft
         aria-expanded={options.length > 0}
         autoFocus
         value={name}

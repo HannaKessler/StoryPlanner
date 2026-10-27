@@ -111,6 +111,7 @@ export function NumberField({
     <input
       className={className}
       inputMode="decimal"
+      data-draft
       aria-label={label}
       value={text ?? String(value)}
       onChange={(event) => {

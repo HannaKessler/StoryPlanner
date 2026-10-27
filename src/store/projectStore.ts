@@ -92,6 +92,9 @@ export interface Snapshot {
   project: ProjectDocument;
   graphs: Record<string, GraphDocument>;
   revision: number;
+  /** Where the writer was when this state was left, so undo and redo return there. */
+  graphId?: string | null;
+  selection?: Selection;
 }
 
 export interface ConfirmRequest {
@@ -337,9 +340,19 @@ function trackHistory(prev: StoreState, patch: StatePatch): StatePatch {
   const revision = nextRevision();
   const next: StatePatch = { ...patch, revision, dirty: revision !== prev.savedRevision, future: [] };
   if (!coalesce) {
-    next.past = [...prev.past, { project: prev.project, graphs: prev.graphs, revision: prev.revision }].slice(-HISTORY_LIMIT);
+    next.past = [...prev.past, snapshotOf(prev)].slice(-HISTORY_LIMIT);
   }
   return next;
+}
+
+function snapshotOf(state: StoreState): Snapshot {
+  return {
+    project: state.project!,
+    graphs: state.graphs,
+    revision: state.revision,
+    graphId: state.currentGraphId,
+    selection: state.selection,
+  };
 }
 
 /** Content just read from or written to disk. History starts empty. */
@@ -445,15 +458,21 @@ function plural(count: number, word: string): string {
 
 function restore(state: StoreState, target: Snapshot): StatePatch {
   lastTyping = null;
+  // Go back to the graph and selection the change was made from.
   const currentGraphId =
-    state.currentGraphId && target.graphs[state.currentGraphId] ? state.currentGraphId : target.project.rootGraphId;
+    target.graphId && target.graphs[target.graphId]
+      ? target.graphId
+      : state.currentGraphId && target.graphs[state.currentGraphId]
+        ? state.currentGraphId
+        : target.project.rootGraphId;
+  const selection = validSelection(target.selection !== undefined ? target.selection : state.selection, target.graphs[currentGraphId]);
   return {
     project: target.project,
     graphs: target.graphs,
     revision: target.revision,
     dirty: target.revision !== state.savedRevision,
     currentGraphId,
-    selection: validSelection(state.selection, target.graphs[currentGraphId]),
+    selection,
     restoreTick: state.restoreTick + 1,
     play: state.screen === "play" ? createPlayState(target.project, target.graphs) : null,
   };
@@ -821,7 +840,7 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
     set({
       ...restore(state, target),
       past: state.past.slice(0, -1),
-      future: [...state.future, { project: state.project, graphs: state.graphs, revision: state.revision }],
+      future: [...state.future, snapshotOf(state)],
     });
   },
 
@@ -832,7 +851,7 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
     set({
       ...restore(state, target),
       future: state.future.slice(0, -1),
-      past: [...state.past, { project: state.project, graphs: state.graphs, revision: state.revision }].slice(-HISTORY_LIMIT),
+      past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
     });
   },
 

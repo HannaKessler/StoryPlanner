@@ -80,17 +80,31 @@ export function App() {
         state.stepBeat(key === "arrowdown" ? 1 : -1);
         return;
       }
-      if (!mod || event.altKey || !state.project || typing) return;
-      if (key === "z" && !event.shiftKey) {
-        event.preventDefault();
-        state.undo();
-      } else if (key === "y" || (key === "z" && event.shiftKey)) {
-        event.preventDefault();
-        state.redo();
-      }
     };
+    // Undo and redo use the app's history from anywhere, fields included, so they run first.
+    const onUndoKey = (event: KeyboardEvent) => {
+      const state = useProjectStore.getState();
+      const key = event.key.toLowerCase();
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || !state.project) return;
+      const redo = key === "y" || (key === "z" && event.shiftKey);
+      if (key !== "z" && !redo) return;
+      event.preventDefault();
+      event.stopPropagation();
+      // A question on screen is answered or cancelled first.
+      if (state.confirm || state.pendingClose) return;
+      if (useContextMenu.getState().menu) useContextMenu.getState().close();
+      // A field holding a draft commits it on blur, so undo then takes it back.
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest("[data-draft]")) target.blur();
+      if (redo) state.redo();
+      else state.undo();
+    };
+    window.addEventListener("keydown", onUndoKey, true);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onUndoKey, true);
+      window.removeEventListener("keydown", onKey);
+    };
   }, []);
 
   useEffect(() => {
