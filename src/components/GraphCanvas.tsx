@@ -100,7 +100,7 @@ function CanvasBody({
   const requestDeleteNodes = useProjectStore((state) => state.requestDeleteNodes);
   const restoreTick = useProjectStore((state) => state.restoreTick);
   const appliedTick = useRef(restoreTick);
-  const { fitView, screenToFlowPosition, getNodes, getEdges } = useReactFlow();
+  const { fitView, screenToFlowPosition, getNodes, getEdges, getViewport, setCenter } = useReactFlow();
   const openMenu = useContextMenu((state) => state.open);
   const closeMenu = useContextMenu((state) => state.close);
   const arranging = mode === "locations";
@@ -237,6 +237,27 @@ function CanvasBody({
       })),
     );
   }, [selection, setNodes, setEdges]);
+
+  useEffect(() => {
+    // A beat selected from the list or just added is scrolled into view when it is off-screen.
+    if (selection?.kind !== "node") return;
+    const frame = window.setTimeout(() => {
+      const node = getNodes().find((item) => item.id === selection.id);
+      const pane = document.querySelector(".sp-canvas")?.getBoundingClientRect();
+      if (!node || !pane) return;
+      const parent = node.parentId ? getNodes().find((item) => item.id === node.parentId) : undefined;
+      const x = (parent?.position.x ?? 0) + node.position.x;
+      const y = (parent?.position.y ?? 0) + node.position.y;
+      const width = node.measured?.width ?? 230;
+      const height = node.measured?.height ?? 60;
+      const { x: vx, y: vy, zoom } = getViewport();
+      const left = x * zoom + vx;
+      const top = y * zoom + vy;
+      const visible = left >= 0 && top >= 0 && left + width * zoom <= pane.width && top + height * zoom <= pane.height;
+      if (!visible) void setCenter(x + width / 2, y + height / 2, { zoom, duration: 200 });
+    }, 60);
+    return () => window.clearTimeout(frame);
+  }, [selection, getNodes, getViewport, setCenter]);
 
   useEffect(() => {
     // Delete and Backspace go through the store, which confirms when sub-graphs would go too.
