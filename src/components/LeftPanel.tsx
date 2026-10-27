@@ -8,11 +8,11 @@ import { addBeatItems, beatItems } from "./menuItems";
 import { Section } from "./Panel";
 import { VariablesPanel } from "./VariablesPanel";
 
-export function LeftPanel() {
+export function LeftPanel({ outlineOnly = false }: { outlineOnly?: boolean }) {
   return (
     <aside className="sp-left sp-panel">
       <BeatsOutline />
-      <VariablesPanel />
+      {!outlineOnly && <VariablesPanel />}
     </aside>
   );
 }

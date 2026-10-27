@@ -153,7 +153,7 @@ export function AppShell() {
             </div>
             {writing ? (
               <div className="sp-workspace is-write">
-                <LeftPanel />
+                <LeftPanel outlineOnly />
                 <WriteMode />
               </div>
             ) : (
