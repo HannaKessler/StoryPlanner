@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { entityLabel } from "../domain/names";
 import type { DialogueLine } from "../domain/types";
+import { CreateField } from "./CreateField";
 import { useProjectStore } from "../store/projectStore";
 import { menuHandler } from "./ContextMenu";
 import { AutoTextarea, IconButton } from "./Panel";
@@ -79,32 +80,14 @@ export function SpeakerPicker({
   onChange: (speakerId: string | null) => void;
 }) {
   const project = useProjectStore((state) => state.project);
-  const addEntity = useProjectStore((state) => state.addEntity);
   const [adding, setAdding] = useState(false);
-  const [name, setName] = useState("");
   if (!project) return null;
 
   if (adding) {
     return (
-      <form
-        className="sp-speaker"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const id = addEntity("character", name);
-          if (id) onChange(id);
-          setName("");
-          setAdding(false);
-        }}
-      >
-        <input
-          className="sp-cell"
-          value={name}
-          aria-label="New character name"
-          onChange={(event) => setName(event.target.value)}
-          onBlur={() => !name.trim() && setAdding(false)}
-          autoFocus
-        />
-      </form>
+      <span className="sp-speaker">
+        <CreateField kind="character" label="Speaker name" onPick={(id) => onChange(id)} onClose={() => setAdding(false)} />
+      </span>
     );
   }
 

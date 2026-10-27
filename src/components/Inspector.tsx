@@ -6,13 +6,14 @@ import { describeEffect } from "../domain/effects";
 import { entityName } from "../domain/format";
 import { involvedIndex, involvement } from "../domain/involved";
 import { beatLabel, shortBeatLabel } from "../domain/labels";
-import type { GraphDocument, ProjectDocument, StoryEdge, StoryEntity } from "../domain/types";
+import type { EntityKind, GraphDocument, ProjectDocument, StoryEdge, StoryEntity } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { ConditionBuilder } from "./ConditionBuilder";
 import { DialogueEditor, focusLine } from "./DialogueEditor";
 import { EffectsEditor } from "./EffectsEditor";
 import { focusRename, menuHandler, type MenuItem } from "./ContextMenu";
 import { conditionAddItems } from "./menuItems";
+import { CreateField } from "./CreateField";
 import { AutoTextarea, IconButton, Row, Section } from "./Panel";
 
 export function Inspector() {
@@ -118,24 +119,17 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
       </div>
 
       <Section id="insp:location" title="Location">
-        <select
-          className="sp-cell"
-          aria-label="Location"
-          value={node.locationId ?? ""}
-          onChange={(event) => updateNode(node.id, { locationId: event.target.value || null })}
-        >
-          <option value="">None</option>
-          {project.locations.map((location) => (
-            <option key={location.id} value={location.id}>
-              {entityLabel(project, location)}
-            </option>
-          ))}
-        </select>
+        <LocationPicker
+          project={project}
+          value={node.locationId}
+          onChange={(locationId) => updateNode(node.id, { locationId })}
+        />
         <Inherited ids={info.inherited.locationIds} project={project} from={fromSub} />
       </Section>
 
       <Section id="insp:characters" title="Characters">
         <EntityChips
+          kind="character"
           project={project}
           names={project.characters}
           selected={node.characterIds}
@@ -146,6 +140,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
 
       <Section id="insp:items" title="Items">
         <EntityChips
+          kind="item"
           project={project}
           names={project.items}
           selected={node.itemIds}
@@ -336,20 +331,56 @@ function Inherited({ ids, project, from }: { ids: string[]; project: ProjectDocu
   );
 }
 
+function LocationPicker({
+  project,
+  value,
+  onChange,
+}: {
+  project: ProjectDocument;
+  value: string | null;
+  onChange: (id: string | null) => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  if (adding) {
+    return <CreateField kind="location" label="Location name" onPick={(id) => onChange(id)} onClose={() => setAdding(false)} />;
+  }
+  return (
+    <select
+      className="sp-cell"
+      aria-label="Location"
+      value={value ?? ""}
+      onChange={(event) => {
+        if (event.target.value === "__new__") setAdding(true);
+        else onChange(event.target.value || null);
+      }}
+    >
+      <option value="">None</option>
+      {project.locations.map((location) => (
+        <option key={location.id} value={location.id}>
+          {entityLabel(project, location)}
+        </option>
+      ))}
+      <option value="__new__">+ location</option>
+    </select>
+  );
+}
+
 function EntityChips({
+  kind,
   project,
   names,
   selected,
   onChange,
 }: {
+  kind: EntityKind;
   project: ProjectDocument;
   names: StoryEntity[];
   selected: string[];
   onChange: (ids: string[]) => void;
 }) {
+  const [adding, setAdding] = useState(false);
   const known = new Set(names.map((entity) => entity.id));
   const missing = selected.filter((id) => !known.has(id));
-  if (names.length === 0 && missing.length === 0) return null;
   return (
     <div className="sp-loc-picks">
       {missing.map((id) => (
@@ -377,6 +408,19 @@ function EntityChips({
           </button>
         );
       })}
+      {adding ? (
+        <CreateField
+          kind={kind}
+          label={`${kind === "character" ? "Character" : "Item"} name`}
+          exclude={selected}
+          onPick={(id) => onChange(selected.includes(id) ? selected : [...selected, id])}
+          onClose={() => setAdding(false)}
+        />
+      ) : (
+        <button type="button" className="sp-chip-btn" aria-label={`Add ${kind}`} onClick={() => setAdding(true)}>
+          +
+        </button>
+      )}
     </div>
   );
 }

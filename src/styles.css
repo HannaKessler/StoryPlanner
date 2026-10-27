@@ -279,6 +279,12 @@ input.sp-cell[type="number"]::-webkit-inner-spin-button, input.sp-cell[type="num
 .sp-inspector .sp-insp-head { padding-right: 34px; }
 .sp-head-area { resize: none; line-height: 1.3; display: block; overflow: hidden; }
 .sp-canvas { position: relative; min-width: 0; min-height: 0; }
+.sp-create { position: relative; display: inline-flex; min-width: 140px; }
+.sp-create > input { width: 100%; }
+.sp-create-list { position: absolute; top: calc(100% + 2px); left: 0; z-index: 30; min-width: 100%; display: flex; flex-direction: column; padding: 3px; background: var(--bg-elev); border: 1px solid var(--line-strong); border-radius: 6px; box-shadow: var(--shadow); }
+.sp-create-list button { background: transparent; border: 0; border-radius: 3px; padding: 3px 8px; text-align: left; font-size: var(--fs-sm); color: var(--text-dim); white-space: nowrap; }
+.sp-create-list button.is-active, .sp-create-list button:hover { background: var(--bg-elev-2); color: var(--text); }
+.sp-used .sp-beat { gap: 8px; }
 .sp-context {
   position: fixed;
   z-index: 40;

@@ -442,3 +442,19 @@ describe("save as", () => {
     expect(store().banner?.tone).toBe("error");
   });
 });
+
+describe("quick create", () => {
+  it("creates an entity and assigns it as one undo step", async () => {
+    await openFresh();
+    const node = rootGraph().nodes[0];
+    store().select({ kind: "node", id: node.id });
+    const id = store().createEntityAnd("location", "Harbor", (created) => store().updateNode(node.id, { locationId: created }));
+    expect(store().project!.locations.some((item) => item.id === id && item.name === "Harbor")).toBe(true);
+    expect(rootGraph().nodes[0].locationId).toBe(id);
+    store().undo();
+    expect(store().project!.locations.some((item) => item.id === id)).toBe(false);
+    expect(rootGraph().nodes[0].locationId).toBeNull();
+    store().redo();
+    expect(rootGraph().nodes[0].locationId).toBe(id);
+  });
+});

@@ -205,6 +205,8 @@ interface ProjectStore {
   updateVariable: (variableId: string, patch: Partial<VariableDef>) => void;
   deleteVariable: (variableId: string) => void;
   addEntity: (kind: EntityKind, name?: string) => string | null;
+  /** Creates an entity and hands its id to `assign`, as one undo step. */
+  createEntityAnd: (kind: EntityKind, name: string, assign: (id: string) => void) => string | null;
   updateEntity: (kind: EntityKind, entityId: string, patch: Partial<Pick<StoryEntity, "name" | "notes" | "images" | "fields">>) => void;
   deleteEntity: (kind: EntityKind, entityId: string) => void;
   addEntityImages: (kind: EntityKind, entityId: string) => Promise<void>;
@@ -1237,6 +1239,19 @@ export const useProjectStore = create<ProjectStore>()((_set, get, api) => {
       if (!state.project) return {};
       return deleteVariableEverywhere(state.project, state.graphs, variableId);
     });
+  },
+
+  createEntityAnd(kind, name, assign) {
+    const before = get().project;
+    const id = get().addEntity(kind, name);
+    if (!id) return null;
+    assign(id);
+    const past = get().past;
+    // The entity and its use undo together.
+    if (past.length >= 2 && past[past.length - 2].project === before && past[past.length - 1].project !== before) {
+      set({ past: past.slice(0, -1) });
+    }
+    return id;
   },
 
   addEntity(kind, name = "") {

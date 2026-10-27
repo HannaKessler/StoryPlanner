@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { readFileBytes } from "../desktop/tauri";
 import { entitiesOf } from "../domain/format";
 import { entityLabel, isDuplicateName, uniqueName } from "../domain/names";
+import { graphName } from "../domain/graphOps";
+import { beatLabel } from "../domain/labels";
 import { joinPath } from "../domain/paths";
+import { usedIn, type UseKind } from "../domain/usedIn";
 import type { EntityKind, StoryEntity } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { focusRename, menuHandler } from "./ContextMenu";
@@ -111,6 +114,7 @@ function EntityDetail({ kind, entity }: { kind: EntityKind; entity: StoryEntity 
           onChange={(event) => updateEntity(kind, entity.id, { notes: event.target.value })}
         />
       </Section>
+      <UsedIn kind={kind} entityId={entity.id} />
       <Section
         id={`entity:${entity.id}:images`}
         title="Images"
@@ -190,6 +194,41 @@ function EntityDetail({ kind, entity }: { kind: EntityKind; entity: StoryEntity 
         </ul>
       </Section>
     </div>
+  );
+}
+
+const WAY_LABEL: Record<UseKind, string> = {
+  location: "",
+  listed: "",
+  speaks: "speaks",
+  effect: "effect",
+  condition: "condition",
+};
+
+function UsedIn({ kind, entityId }: { kind: EntityKind; entityId: string }) {
+  const project = useProjectStore((state) => state.project);
+  const graphs = useProjectStore((state) => state.graphs);
+  const entries = useMemo(() => (project ? usedIn(project, graphs, kind, entityId) : []), [project, graphs, kind, entityId]);
+  if (!project) return null;
+  return (
+    <Section id={`entity:${entityId}:used`} title="Used in" count={entries.length}>
+      <ul className="sp-beats sp-used">
+        {entries.map((entry) => {
+          const graph = graphs[entry.graphId];
+          const where = graph && graph.id !== project.rootGraphId ? graphName(graph, graphs, project) : "";
+          const ways = entry.ways.map((way) => WAY_LABEL[way]).filter(Boolean).join(", ");
+          return (
+            <li key={`${entry.graphId}:${entry.node.id}`}>
+              <button type="button" className="sp-beat" onClick={() => useProjectStore.getState().selectBeat(entry.graphId, entry.node.id)}>
+                <span className="sp-beat-title">{beatLabel(entry.node, project)}</span>
+                {where && <span className="sp-faint">{where}</span>}
+                {ways && <span className="sp-faint">{ways}</span>}
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </Section>
   );
 }
 

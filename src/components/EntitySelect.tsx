@@ -3,6 +3,7 @@ import { entityLabel } from "../domain/names";
 import { entitiesOf } from "../domain/format";
 import type { EntityKind } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
+import { CreateField } from "./CreateField";
 
 export function EntitySelect({
   kind,
@@ -16,33 +17,11 @@ export function EntitySelect({
   allowEmpty?: boolean;
 }) {
   const project = useProjectStore((state) => state.project);
-  const addEntity = useProjectStore((state) => state.addEntity);
   const [adding, setAdding] = useState(false);
-  const [name, setName] = useState("");
   const entities = project ? entitiesOf(project, kind) : [];
 
   if (adding) {
-    return (
-      <form
-        className="sp-tag-select"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const id = addEntity(kind, name);
-          if (id) onChange(id);
-          setName("");
-          setAdding(false);
-        }}
-      >
-        <input
-          className="sp-cell"
-          value={name}
-          aria-label={`New ${kind}`}
-          onChange={(event) => setName(event.target.value)}
-          onBlur={() => !name.trim() && setAdding(false)}
-          autoFocus
-        />
-      </form>
-    );
+    return <CreateField kind={kind} label={`New ${kind}`} onPick={(id) => onChange(id)} onClose={() => setAdding(false)} />;
   }
 
   return (
