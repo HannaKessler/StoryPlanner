@@ -60,40 +60,31 @@ export function AppShell() {
           />
           {dirty && <span className="sp-dirty">Unsaved</span>}
         </div>
-        <nav className="sp-libraries" aria-label="Libraries">
-          {(
-            [
-              ["characters", "Characters"],
-              ["items", "Items"],
-              ["locations", "Locations"],
-            ] as const
-          ).map(([id, label]) => (
-            <button
-              key={id}
-              type="button"
-              className={screen === id ? "is-active" : ""}
-              aria-current={screen === id ? "page" : undefined}
-              onClick={() => useProjectStore.getState().setScreen(id)}
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
-        <div className="sp-editmode" role="group" aria-label="Mode">
+        <nav className="sp-editmode" aria-label="Views">
           {(
             [
               ["structure", "Structure"],
               ["write", "Write"],
+              ["characters", "Characters"],
+              ["items", "Items"],
+              ["locations", "Locations"],
             ] as const
           ).map(([id, label]) => {
-            const on = screen === "graph" && editMode === id;
+            const mode = id === "structure" || id === "write";
+            const on = mode ? screen === "graph" && editMode === id : screen === id;
             return (
-              <button key={id} type="button" className={on ? "is-active" : ""} aria-pressed={on} onClick={() => setEditMode(id)}>
+              <button
+                key={id}
+                type="button"
+                className={on ? "is-active" : ""}
+                aria-current={on ? "page" : undefined}
+                onClick={() => (mode ? setEditMode(id) : useProjectStore.getState().setScreen(id))}
+              >
                 {label}
               </button>
             );
           })}
-        </div>
+        </nav>
       </header>
       <div className="sp-main">
         {banner && (
@@ -106,7 +97,9 @@ export function AppShell() {
         )}
         {screen === "graph" && graph && (
           <>
-            <div className="sp-crumbs">
+            {(crumbs.length > 1 || !writing) && (
+              <div className="sp-crumbs">
+                {crumbs.length > 1 ? (
               <nav aria-label="Graph path">
                 {crumbs.map((crumb, index) => (
                   <span key={crumb.id}>
@@ -122,6 +115,9 @@ export function AppShell() {
                   </span>
                 ))}
               </nav>
+                ) : (
+                  <span />
+                )}
               <div className="sp-toolbar">
                 {!writing && (
                   <>
@@ -135,6 +131,7 @@ export function AppShell() {
                 )}
               </div>
             </div>
+            )}
             {writing ? (
               <div className="sp-workspace is-write">
                 <LeftPanel outlineOnly />

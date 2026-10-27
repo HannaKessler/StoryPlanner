@@ -248,10 +248,6 @@ input.sp-cell[type="number"]::-webkit-inner-spin-button, input.sp-cell[type="num
 .sp-editmode { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; gap: 2px; padding: 2px; border-radius: 7px; background: var(--bg-sunken); }
 .sp-editmode button { background: transparent; border: 0; border-radius: 5px; padding: 3px 12px; color: var(--text-dim); font-size: var(--fs-sm); }
 .sp-editmode button:hover { color: var(--text); }
-.sp-libraries { display: flex; gap: 2px; }
-.sp-libraries button { background: transparent; border: 0; border-radius: 5px; padding: 3px 10px; color: var(--text-dim); font-size: var(--fs-sm); }
-.sp-libraries button:hover { color: var(--text); background: var(--bg-elev-2); }
-.sp-libraries button.is-active { color: var(--text); background: var(--bg-elev-2); font-weight: 650; }
 .sp-editmode button.is-active { background: var(--bg-elev-2); color: var(--text); font-weight: 650; }
 
 .sp-write { min-height: 0; overflow: auto; padding: 18px 40px 48px; }
