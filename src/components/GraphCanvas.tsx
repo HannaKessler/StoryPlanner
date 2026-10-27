@@ -19,7 +19,7 @@ import {
 } from "@xyflow/react";
 import { describeCondition } from "../domain/conditions";
 import { parallelOffset } from "../domain/edgeGeometry";
-import { describeEffect } from "../domain/effects";
+import { indexInvolved, involvement } from "../domain/involved";
 import { locationFrames } from "../domain/locations";
 import type { GraphDocument, ProjectDocument } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
@@ -35,13 +35,14 @@ const nodeTypes = { story: StoryNodeCard, box: LocationBoxNode };
 const edgeTypes = { transition: TransitionEdge };
 
 export function GraphCanvas() {
+  const graphs = useProjectStore((state) => state.graphs);
   const graph = useProjectStore((state) => (state.currentGraphId ? state.graphs[state.currentGraphId] : null));
   const project = useProjectStore((state) => state.project);
   const mode = useProjectStore((state) => state.canvasMode);
   if (!graph || !project) return null;
   return (
     <ReactFlowProvider>
-      <CanvasBody key={`${graph.id}:${mode}`} graph={graph} project={project} mode={mode} />
+      <CanvasBody key={`${graph.id}:${mode}`} graph={graph} graphs={graphs} project={project} mode={mode} />
     </ReactFlowProvider>
   );
 }
@@ -79,10 +80,12 @@ function LocationBoxNode({ data, selected }: NodeProps<BoxNode>) {
 
 function CanvasBody({
   graph,
+  graphs,
   project,
   mode,
 }: {
   graph: GraphDocument;
+  graphs: Record<string, GraphDocument>;
   project: ProjectDocument;
   mode: "graph" | "locations";
 }) {
@@ -106,7 +109,7 @@ function CanvasBody({
     openMenu(event.clientX, event.clientY, addBeatItems(position));
   };
 
-  const [nodes, setNodes] = useNodesState<CanvasNode>(toNodes(graph, project, mode));
+  const [nodes, setNodes] = useNodesState<CanvasNode>(toNodes(graph, graphs, project, mode));
   const [edges, setEdges] = useEdgesState(toEdges(graph, project));
 
   const signature = useMemo(
@@ -116,10 +119,15 @@ function CanvasBody({
         edges: graph.edges,
         boxes: graph.locationBoxes,
         variables: project.variables,
-        tags: project.tagCategories,
+        characters: project.characters,
+        items: project.items,
+        locations: project.locations,
+        refs: Object.values(graphs).map((item) =>
+          item.nodes.map((node) => [node.locationId, node.characterIds, node.itemIds, node.subgraphId, node.lines.map((line) => line.speakerId)]),
+        ),
         mode,
       }),
-    [graph, project, mode],
+    [graph, graphs, project, mode],
   );
 
   useEffect(() => {
@@ -142,7 +150,7 @@ function CanvasBody({
 
   useEffect(() => {
     setNodes((current) => {
-      const next = toNodes(graph, project, mode);
+      const next = toNodes(graph, graphs, project, mode);
       if (mode === "locations") return next;
       return next.map((node) => {
         const previous = current.find((item) => item.id === node.id);
@@ -278,18 +286,28 @@ function droppedOnNode(event: MouseEvent | TouchEvent): boolean {
   return document.elementsFromPoint(point.clientX, point.clientY).some((element) => element.closest(".react-flow__node"));
 }
 
-function toNodes(graph: GraphDocument, project: ProjectDocument, mode: "graph" | "locations"): CanvasNode[] {
+function toNodes(
+  graph: GraphDocument,
+  graphs: Record<string, GraphDocument>,
+  project: ProjectDocument,
+  mode: "graph" | "locations",
+): CanvasNode[] {
+  const involved = indexInvolved(graphs);
+  const dataFor = (story: GraphDocument["nodes"][number]) => ({
+    story,
+    involvement: involvement(involved, graph.id, story.id),
+  });
   if (mode === "graph") {
     return graph.nodes.map((story) => ({
       id: story.id,
       type: "story",
       position: story.position,
-      data: { story },
+      data: dataFor(story),
     }));
   }
   const boxes: BoxNode[] = [];
   const stories: StoryFlowNode[] = [];
-  for (const frame of locationFrames(graph, project)) {
+  for (const frame of locationFrames(graph, project, graphs)) {
     const boxId = `box:${frame.id}`;
     boxes.push({
       id: boxId,
@@ -313,7 +331,7 @@ function toNodes(graph: GraphDocument, project: ProjectDocument, mode: "graph" |
         parentId: boxId,
         extent: "parent",
         position: item.position,
-        data: { story },
+        data: dataFor(story),
         zIndex: 1,
       });
     }
@@ -334,7 +352,6 @@ function toEdges(graph: GraphDocument, project: ProjectDocument): TransitionFlow
       data: {
         label: edge.label,
         condition: edge.condition ? describeCondition(edge.condition, project) : "",
-        effects: edge.effects.map((effect) => describeEffect(effect, project)).join(", "),
         offset: parallelOffset(graph.edges, edge.id),
       },
       markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color },

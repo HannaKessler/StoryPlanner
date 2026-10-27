@@ -6,12 +6,13 @@ A project is a folder on disk:
 
 ```
 MyStory/
-  project.json          variables and tag categories
+  project.json          variables, characters, items, and locations
   graphs/
     <graphId>.json      one file per graph, including nested graphs
+  assets/               images copied in for those entities
 ```
 
-`project.json` and every graph file include `"schemaVersion": 3`. Version 1 and 2 projects are migrated when opened.
+`project.json` and every graph file include `"schemaVersion": 4`. Version 1, 2, and 3 projects are migrated when opened.
 
 ## Run it
 
@@ -47,16 +48,16 @@ npm run build
 
 ## What you can do
 
-The story model works like a state machine, similar to Unity’s Animator. Beats (events, scenes, dialogue) are states that hold content. Branching happens only on the transitions between them. Each transition has its own conditions and variable changes.
+The story model works like a state machine. There is one beat type. A beat can hold a title, notes, one location, characters, items, dialogue, effects, and a sub-graph. Transitions are gates: they have conditions and change nothing. Effects live on the beat and run when it is entered.
 
 - **New / Open / Save** a project folder, from the start screen or the File menu. Recent projects are remembered in this window.
-- **Graph.** The top level is a graph of events. Any event, scene, or dialogue beat can own a sub-graph, which works like a sub-state machine. Right-click the beat and choose **Create sub-graph** to make one. When it already exists, that menu says **Open**, and double-click opens it too. Breadcrumbs show the path and jump back up. There is no fixed depth. A new beat has no title until one is added. Dialogue cards show every line. **Locations** puts each location tag, plus Unassigned, in a box on its own canvas. Dragging a box moves the beats inside it. Transitions stay drawn, including ones that cross boxes. Those positions are saved apart from the normal graph.
-- **Start** is an ordinary beat. A graph can have several, and each can be deleted. Play asks which one to begin from when there is more than one, and warns when there are none.
-- **Transitions.** Drag from a beat’s right handle to another beat, or use **+ to…** in the inspector. Each transition has a label, a condition built from All / Any / Not groups, and effects (set, add, toggle, clear). The canvas labels show the condition and effects in words.
-- **Left panel.** Beats in this graph, plus a compact list of project-wide variables (boolean, number, tag: name, kind, default value) and tag categories. Everything is edited inline. Click a variable’s kind badge for its description and tag category. Mark a category as **speakers** to use its tags as dialogue speakers.
-- **Inspector.** Collapsible sections for the selected beat (notes, dialogue lines with a speaker and direction, transitions out and in) or the selected transition (from, to, order, conditions, effects).
-- **Play.** Step through the story from a chosen start. The current beat’s outgoing transitions are the ways forward. Closed ones stay visible, marked blocked, with their condition. The live variables panel shows changed values and can be edited to open another branch.
-- **Export.** Bundled JSON for add-ons, a Markdown screenplay (scene notes included, transitions written out), and per-character voice sheets. On a voice sheet, the line a cue answers is in italics, and a line that answers different lines on different paths lists each of them.
+- **Graph.** Right-click a beat and choose **Create sub-graph** to make one. When it already exists, that menu says **Open**, and double-click opens it too. Breadcrumbs show the path and jump back up. There is no fixed depth. A new beat has no title until one is added. A card shows its title, the locations, characters, and items it involves, its summary, every dialogue line, and its effects — each only when there is something to show. A parent lists what its sub-graph involves. Those inherited names are muted, and only the beat’s own references are editable. **Locations** puts each location in a box. A beat with no place of its own uses its single inherited location; otherwise it sits in Unplaced, or in Multiple when it inherits more than one. Dragging a box moves the beats inside it. Transitions stay drawn, including ones that cross boxes. Those positions are saved apart from the normal graph.
+- **Characters, items, and locations** are not nodes. The left panel opens an editor for each: a list, notes, an image gallery, and a few extra fields. Images are copied into the project’s `assets/` folder. Right-click to add or delete. Dialogue speakers are characters. Variables can hold a character, an item, a location, or a set of items.
+- **Transitions.** Drag from a beat’s right handle to another beat. Each transition has a label and a condition (All / Any / Not, comparisons, and a contains check). The canvas label shows the condition. Effects are edited on the beat.
+- **Left panel.** Beats in this graph, variables, and links to the three libraries.
+- **Inspector.** The selected beat’s own location, characters, items, notes, effects, and lines. Inherited entities are listed and cannot be edited there. The selected transition has from, to, order, and conditions.
+- **Play.** Pick any beat to begin. Beats with no incoming transition are offered first. Entering a beat applies its effects. Outgoing transitions are the ways forward. Closed ones stay visible, marked blocked. A run ends when no transition can be taken. The live variables panel can be edited to open another branch.
+- **Export.** Bundled JSON for add-ons (entities, and a computed `involved` set on each beat), a Markdown screenplay, and per-character voice sheets. The stored file does not keep `involved`; each beat’s own references are the source of truth.
 
 The included sample is [sample-project](sample-project): *The Lantern Gate*. **Open sample** on the start screen loads that folder. Saving it writes back into `sample-project/`.
 

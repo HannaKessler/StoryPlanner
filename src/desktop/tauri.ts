@@ -43,6 +43,25 @@ export async function pickSaveFile(title: string, defaultPath: string, extension
   });
 }
 
+export async function pickImages(): Promise<string[] | null> {
+  const { open } = await import("@tauri-apps/plugin-dialog");
+  const result = await open({
+    multiple: true,
+    title: "Add images",
+    filters: [{ name: "Image", extensions: ["png", "jpg", "jpeg", "gif", "webp"] }],
+  });
+  if (!result) return null;
+  return Array.isArray(result) ? result : [result];
+}
+
+export async function copyFile(from: string, to: string): Promise<void> {
+  await invoke<void>("copy_file", { from, to });
+}
+
+export async function readFileBytes(path: string): Promise<number[]> {
+  return invoke<number[]>("read_file_bytes", { path });
+}
+
 export async function sampleProjectDir(): Promise<string> {
   return invoke<string>("sample_project_dir");
 }

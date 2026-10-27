@@ -1,12 +1,20 @@
 import { useState } from "react";
+import { entitiesOf } from "../domain/format";
 import { kindLabel } from "../domain/labels";
-import type { ProjectDocument, VariableDef } from "../domain/types";
+import type { EntityKind, ProjectDocument, VariableDef, VariableValue } from "../domain/types";
 import { KNOWN_VARIABLE_KINDS } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { focusRename, menuHandler, type MenuItem } from "./ContextMenu";
 import { IconButton, Section } from "./Panel";
 
-const KIND_SHORT: Record<string, string> = { boolean: "bool", value: "value", tag: "tag" };
+const KIND_SHORT: Record<string, string> = {
+  boolean: "bool",
+  value: "value",
+  character: "char",
+  item: "item",
+  location: "loc",
+  inventory: "items",
+};
 
 function addVariableItems(): MenuItem[] {
   return KNOWN_VARIABLE_KINDS.map((kind) => ({
@@ -44,8 +52,13 @@ function VariableRow({ variable, project }: { variable: VariableDef; project: Pr
   const updateVariable = useProjectStore((state) => state.updateVariable);
   const deleteVariable = useProjectStore((state) => state.deleteVariable);
   const [expanded, setExpanded] = useState(false);
-  const known = variable.kind === "boolean" || variable.kind === "value" || variable.kind === "tag";
-  const category = project.tagCategories.find((item) => item.id === variable.tagCategoryId);
+  const known = (["boolean", "value", "character", "item", "location", "inventory"] as string[]).includes(variable.kind);
+  const entityKind: EntityKind | null =
+    variable.kind === "character" || variable.kind === "item" || variable.kind === "location"
+      ? variable.kind
+      : variable.kind === "inventory"
+        ? "item"
+        : null;
 
   return (
     <li
@@ -61,7 +74,7 @@ function VariableRow({ variable, project }: { variable: VariableDef; project: Pr
         <button
           type="button"
           className={`sp-kind sp-kind-${known ? variable.kind : "other"}`}
-          title={known ? `${kindLabel(variable.kind)}: description${variable.kind === "tag" ? ", category" : ""}` : `${variable.kind}: from a newer editor, kept as-is`}
+          title={known ? kindLabel(variable.kind) : variable.kind}
           onClick={() => setExpanded((open) => !open)}
         >
           {KIND_SHORT[variable.kind] ?? variable.kind}
@@ -93,19 +106,41 @@ function VariableRow({ variable, project }: { variable: VariableDef; project: Pr
             onChange={(event) => updateVariable(variable.id, { defaultValue: Number(event.target.value) })}
           />
         )}
-        {variable.kind === "tag" && (
+        {entityKind && variable.kind !== "inventory" && (
           <select
             className="sp-cell sp-cell-value"
-            aria-label="Default tag"
+            aria-label="Default value"
             value={typeof variable.defaultValue === "string" ? variable.defaultValue : ""}
             onChange={(event) => updateVariable(variable.id, { defaultValue: event.target.value || null })}
           >
             <option value="">unset</option>
-            {category?.tags.map((tag) => (
-              <option key={tag.id} value={tag.id}>
-                {tag.name}
+            {entitiesOf(project, entityKind).map((entity) => (
+              <option key={entity.id} value={entity.id}>
+                {entity.name || "Untitled"}
               </option>
             ))}
+          </select>
+        )}
+        {variable.kind === "inventory" && (
+          <select
+            className="sp-cell sp-cell-value"
+            aria-label="Default items"
+            value=""
+            onChange={(event) => {
+              const current = Array.isArray(variable.defaultValue) ? variable.defaultValue : [];
+              if (event.target.value && !current.includes(event.target.value)) {
+                updateVariable(variable.id, { defaultValue: [...current, event.target.value] });
+              }
+            }}
+          >
+            <option value="">{Array.isArray(variable.defaultValue) && variable.defaultValue.length ? `${variable.defaultValue.length}` : "empty"}</option>
+            {project.items
+              .filter((item) => !(Array.isArray(variable.defaultValue) && variable.defaultValue.includes(item.id)))
+              .map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name || "Untitled"}
+                </option>
+              ))}
           </select>
         )}
         {!known && <span className="sp-cell sp-cell-value sp-faint">{String(variable.defaultValue ?? "unset")}</span>}
@@ -121,20 +156,23 @@ function VariableRow({ variable, project }: { variable: VariableDef; project: Pr
             value={variable.description}
             onChange={(event) => updateVariable(variable.id, { description: event.target.value })}
           />
-          {variable.kind === "tag" && (
-            <select
-              className="sp-cell"
-              aria-label="Tag category"
-              value={variable.tagCategoryId ?? ""}
-              onChange={(event) => updateVariable(variable.id, { tagCategoryId: event.target.value || null, defaultValue: null })}
-            >
-              <option value="">No category</option>
-              {project.tagCategories.map((item) => (
-                <option key={item.id} value={item.id}>
-                  from {item.name}
-                </option>
+          {variable.kind === "inventory" && Array.isArray(variable.defaultValue) && variable.defaultValue.length > 0 && (
+            <div className="sp-loc-picks">
+              {variable.defaultValue.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  className="sp-chip-btn is-on"
+                  onClick={() =>
+                    updateVariable(variable.id, {
+                      defaultValue: (variable.defaultValue as VariableValue[]).filter((item) => item !== id) as VariableValue,
+                    })
+                  }
+                >
+                  {project.items.find((item) => item.id === id)?.name || "Untitled"} ×
+                </button>
               ))}
-            </select>
+            </div>
           )}
         </div>
       )}

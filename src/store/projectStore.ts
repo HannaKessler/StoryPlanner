@@ -8,18 +8,19 @@ import {
   sampleProjectDir,
 } from "../desktop/tauri";
 import { opsForVariable } from "../domain/effects";
+import { copyImagesIntoProject } from "../domain/assets";
 import {
-  createCategory,
   createEdge,
   createEffect,
+  createEntity,
   createGraph,
   createLine,
   createNode,
-  createTag,
   createVariable,
   moveItem,
 } from "../domain/factories";
-import { canOwnInnerGraph, descendantGraphIds, splitTransition } from "../domain/graphOps";
+import { entitiesOf, withEntities } from "../domain/format";
+import { descendantGraphIds, splitTransition } from "../domain/graphOps";
 import {
   bundleProject,
   createNewProject,
@@ -37,14 +38,14 @@ import type {
   Effect,
   GraphDocument,
   LocationBox,
+  EntityKind,
   ProjectDocument,
   Scalar,
   StoryEdge,
+  StoryEntity,
   StoryNode,
-  StoryNodeType,
-  Tag,
-  TagCategory,
   VariableDef,
+  VariableValue,
 } from "../domain/types";
 import { PROJECT_FILE } from "../domain/types";
 import { joinPath } from "../domain/paths";
@@ -58,7 +59,7 @@ export interface RecentProject {
 }
 
 export type Selection = { kind: "node" | "edge"; id: string } | null;
-export type Screen = "graph" | "play";
+export type Screen = "graph" | "play" | "characters" | "items" | "locations";
 export type ResumeIntent = "new" | "open" | null;
 export type ExportKind = "bundle" | "screenplay" | "voices";
 
@@ -108,13 +109,13 @@ interface ProjectStore {
   updateNode: (nodeId: string, patch: Partial<StoryNode>) => void;
   updateNodePosition: (nodeId: string, position: { x: number; y: number }) => void;
   saveLocationLayout: (patch: { box?: LocationBox; nodePositions?: Record<string, { x: number; y: number }> }) => void;
-  addNode: (type: StoryNodeType, position?: { x: number; y: number }) => void;
+  addNode: (position?: { x: number; y: number }) => void;
   deleteNodes: (nodeIds: string[]) => void;
   deleteEdges: (edgeIds: string[]) => void;
   connectNodes: (source: string, target: string) => void;
-  addConnectedNode: (sourceId: string, type: StoryNodeType, position: { x: number; y: number }) => void;
+  addConnectedNode: (sourceId: string, position: { x: number; y: number }) => void;
   addParallelTransition: (edgeId: string) => void;
-  insertBeatOnEdge: (edgeId: string, type: StoryNodeType) => void;
+  insertBeatOnEdge: (edgeId: string) => void;
   updateEdge: (edgeId: string, patch: Partial<StoryEdge>) => void;
   moveEdge: (edgeId: string, direction: -1 | 1) => void;
   openSubgraph: (nodeId: string) => void;
@@ -126,26 +127,24 @@ interface ProjectStore {
   deleteLine: (nodeId: string, lineId: string) => void;
   moveLine: (nodeId: string, lineId: string, direction: -1 | 1) => void;
 
-  addEdgeEffect: (edgeId: string) => void;
-  updateEdgeEffect: (edgeId: string, effectId: string, patch: Partial<Effect>) => void;
-  deleteEdgeEffect: (edgeId: string, effectId: string) => void;
+  addNodeEffect: (nodeId: string) => void;
+  updateNodeEffect: (nodeId: string, effectId: string, patch: Partial<Effect>) => void;
+  deleteNodeEffect: (nodeId: string, effectId: string) => void;
 
   addVariable: (kind: string) => void;
   updateVariable: (variableId: string, patch: Partial<VariableDef>) => void;
   deleteVariable: (variableId: string) => void;
-  addCategory: () => void;
-  updateCategory: (categoryId: string, patch: Partial<TagCategory>) => void;
-  deleteCategory: (categoryId: string) => void;
-  addTag: (categoryId: string, name: string) => string | null;
-  updateTag: (categoryId: string, tagId: string, patch: Partial<Tag>) => void;
-  deleteTag: (categoryId: string, tagId: string) => void;
-  ensureCharacterCategory: () => string | null;
+  addEntity: (kind: EntityKind, name?: string) => string | null;
+  updateEntity: (kind: EntityKind, entityId: string, patch: Partial<Pick<StoryEntity, "name" | "notes" | "images" | "fields">>) => void;
+  deleteEntity: (kind: EntityKind, entityId: string) => void;
+  addEntityImages: (kind: EntityKind, entityId: string) => Promise<void>;
+  removeEntityImage: (kind: EntityKind, entityId: string, path: string) => Promise<void>;
 
   restartPlay: () => void;
   beginPlay: (nodeId: string) => void;
   cancelStartChoice: () => void;
   performPlay: (action: PlayAction) => void;
-  updatePlayValue: (variableId: string, value: Scalar) => void;
+  updatePlayValue: (variableId: string, value: VariableValue) => void;
   exportText: (kind: ExportKind) => string;
   exportToFile: (kind: ExportKind) => Promise<void>;
 }
@@ -217,9 +216,10 @@ function blankEffect(variables: VariableDef[]): Effect {
   let value: Scalar = null;
   if (variable?.kind === "boolean") value = true;
   else if (variable?.kind === "value") value = op === "add" ? 1 : 0;
-  else if (variable?.kind === "tag") {
-    const category = useProjectStore.getState().project?.tagCategories.find((item) => item.id === variable.tagCategoryId);
-    value = category?.tags[0]?.id ?? null;
+  else if (variable && (variable.kind === "character" || variable.kind === "item" || variable.kind === "location" || variable.kind === "inventory")) {
+    const project = useProjectStore.getState().project;
+    const kind = variable.kind === "inventory" ? "item" : variable.kind;
+    value = project ? entitiesOf(project, kind)[0]?.id ?? null : null;
   }
   return createEffect({ variableId: variable?.id ?? "", op, value });
 }
@@ -463,12 +463,12 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     });
   },
 
-  addNode(type, position) {
+  addNode(position) {
     const state = get();
     const graph = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
     if (!graph) return;
     const maxX = graph.nodes.reduce((max, node) => Math.max(max, node.position.x), 0);
-    const node = createNode(type, { position: position ?? { x: maxX + 280, y: 140 + (graph.nodes.length % 4) * 48 } });
+    const node = createNode({ position: position ?? { x: maxX + 280, y: 140 + (graph.nodes.length % 4) * 48 } });
     withGraph((current) => ({ ...current, nodes: [...current.nodes, node] }));
     set({ selection: { kind: "node", id: node.id } });
   },
@@ -515,11 +515,11 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ selection: { kind: "edge", id: edge.id } });
   },
 
-  addConnectedNode(sourceId, type, position) {
+  addConnectedNode(sourceId, position) {
     const state = get();
     const graph = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
     if (!graph || !graph.nodes.some((node) => node.id === sourceId)) return;
-    const node = createNode(type, { position });
+    const node = createNode({ position });
     const edge = createEdge(sourceId, node.id);
     withGraph((current) => ({ ...current, nodes: [...current.nodes, node], edges: [...current.edges, edge] }));
     set({ selection: { kind: "node", id: node.id } });
@@ -541,14 +541,14 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     set({ selection: { kind: "edge", id: created.id } });
   },
 
-  insertBeatOnEdge(edgeId, type) {
+  insertBeatOnEdge(edgeId) {
     const state = get();
     if (!state.currentGraphId) return;
     const graph = state.graphs[state.currentGraphId];
     if (!graph) return;
     const edge = graph.edges.find((item) => item.id === edgeId);
     if (!edge) return;
-    const node = createNode(type);
+    const node = createNode();
     const next = splitTransition(graph, edgeId, node, createEdge(node.id, edge.target));
     if (!next) return;
     set({
@@ -593,7 +593,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     if (!state.currentGraphId || !state.project) return;
     const graph = state.graphs[state.currentGraphId];
     const node = graph?.nodes.find((item) => item.id === nodeId);
-    if (!graph || !node || !canOwnInnerGraph(node.type)) return;
+    if (!graph || !node) return;
     if (node.subgraphId && state.graphs[node.subgraphId]) {
       set({ currentGraphId: node.subgraphId, selection: null, screen: "graph" });
       return;
@@ -603,10 +603,7 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
       parentGraphId: graph.id,
       parentNodeId: node.id,
     });
-    const start = createNode("start", { position: { x: 80, y: 200 } });
-    const inner = createNode(node.type, { position: { x: 380, y: 170 } });
-    child.nodes = [start, inner];
-    child.edges = [createEdge(start.id, inner.id)];
+    child.nodes = [createNode({ position: { x: 160, y: 180 } })];
     withNode(nodeId, (current) => ({ ...current, subgraphId: child.id }));
     set((current) => ({
       graphs: { ...current.graphs, [child.id]: child },
@@ -634,8 +631,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   },
 
   addLine(nodeId) {
-    const speaker = get().project?.tagCategories.find((category) => category.isCharacters)?.tags[0]?.id ?? null;
-    withNode(nodeId, (node) => ({ ...node, lines: [...node.lines, createLine({ speakerTagId: speaker })] }));
+    const speaker = get().project?.characters[0]?.id ?? null;
+    withNode(nodeId, (node) => ({ ...node, lines: [...node.lines, createLine({ speakerId: speaker })] }));
   },
 
   updateLine(nodeId, lineId, patch) {
@@ -656,31 +653,29 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     });
   },
 
-  addEdgeEffect(edgeId) {
+  addNodeEffect(nodeId) {
     const effect = blankEffect(get().project?.variables ?? []);
-    withEdge(edgeId, (edge) => ({ ...edge, effects: [...edge.effects, effect] }));
+    withNode(nodeId, (node) => ({ ...node, effects: [...node.effects, effect] }));
   },
 
-  updateEdgeEffect(edgeId, effectId, patch) {
-    withEdge(edgeId, (edge) => ({
-      ...edge,
-      effects: edge.effects.map((effect) => (effect.id === effectId ? { ...effect, ...patch, id: effect.id } : effect)),
+  updateNodeEffect(nodeId, effectId, patch) {
+    withNode(nodeId, (node) => ({
+      ...node,
+      effects: node.effects.map((effect) => (effect.id === effectId ? { ...effect, ...patch, id: effect.id } : effect)),
     }));
   },
 
-  deleteEdgeEffect(edgeId, effectId) {
-    withEdge(edgeId, (edge) => ({ ...edge, effects: edge.effects.filter((effect) => effect.id !== effectId) }));
+  deleteNodeEffect(nodeId, effectId) {
+    withNode(nodeId, (node) => ({ ...node, effects: node.effects.filter((effect) => effect.id !== effectId) }));
   },
 
   addVariable(kind) {
     set((state) => {
       if (!state.project) return {};
       const count = state.project.variables.filter((variable) => variable.kind === kind).length + 1;
-      const base = kind === "boolean" ? "flag" : kind === "value" ? "amount" : kind === "tag" ? "label" : "variable";
-      const variable = createVariable(kind, {
-        name: `${base}${count}`,
-        tagCategoryId: kind === "tag" ? state.project.tagCategories[0]?.id ?? null : null,
-      });
+      const base =
+        kind === "boolean" ? "flag" : kind === "value" ? "amount" : kind === "inventory" ? "inventory" : kind === "character" || kind === "item" || kind === "location" ? kind : "variable";
+      const variable = createVariable(kind, { name: count === 1 && kind === "inventory" ? "inventory" : `${base}${count}` });
       return { project: { ...state.project, variables: [...state.project.variables, variable] }, dirty: true };
     });
   },
@@ -713,114 +708,63 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
     });
   },
 
-  addCategory() {
+  addEntity(kind, name = "") {
+    const entity = createEntity({ name: name.trim() });
     set((state) => {
       if (!state.project) return {};
-      return {
-        project: { ...state.project, tagCategories: [...state.project.tagCategories, createCategory()] },
-        dirty: true,
-      };
+      const entities = entitiesOf(state.project, kind);
+      return { project: withEntities(state.project, kind, [...entities, entity]), dirty: true };
+    });
+    return get().project ? entity.id : null;
+  },
+
+  updateEntity(kind, entityId, patch) {
+    set((state) => {
+      if (!state.project) return {};
+      const entities = entitiesOf(state.project, kind).map((entity) =>
+        entity.id === entityId ? { ...entity, ...patch, id: entity.id } : entity,
+      );
+      return { project: withEntities(state.project, kind, entities), dirty: true };
     });
   },
 
-  updateCategory(categoryId, patch) {
+  deleteEntity(kind, entityId) {
     set((state) => {
       if (!state.project) return {};
-      return {
-        project: {
-          ...state.project,
-          tagCategories: state.project.tagCategories.map((category) =>
-            category.id === categoryId ? { ...category, ...patch, id: category.id, tags: patch.tags ?? category.tags } : category,
-          ),
-        },
-        dirty: true,
-      };
+      const entities = entitiesOf(state.project, kind).filter((entity) => entity.id !== entityId);
+      return { project: withEntities(state.project, kind, entities), dirty: true };
     });
   },
 
-  deleteCategory(categoryId) {
-    set((state) => {
-      if (!state.project) return {};
-      return {
-        project: {
-          ...state.project,
-          tagCategories: state.project.tagCategories.filter((category) => category.id !== categoryId),
-          variables: state.project.variables.map((variable) =>
-            variable.tagCategoryId === categoryId ? { ...variable, tagCategoryId: null } : variable,
-          ),
-        },
-        dirty: true,
-      };
-    });
+  async addEntityImages(kind, entityId) {
+    const state = get();
+    if (!state.project || !state.projectPath) {
+      set({ banner: { tone: "error", text: "Save the project before adding images." } });
+      return;
+    }
+    const entity = entitiesOf(state.project, kind).find((item) => item.id === entityId);
+    if (!entity) return;
+    try {
+      const added = await copyImagesIntoProject(state.projectPath, entityId, entity.images);
+      if (added.length === 0) return;
+      get().updateEntity(kind, entityId, { images: [...entity.images, ...added] });
+    } catch (error) {
+      set({ banner: { tone: "error", text: errorMessage(error) } });
+    }
   },
 
-  addTag(categoryId, name) {
-    const trimmed = name.trim();
-    if (!trimmed) return null;
-    let created: string | null = null;
-    set((state) => {
-      if (!state.project) return {};
-      const categories = state.project.tagCategories.map((category) => {
-        if (category.id !== categoryId) return category;
-        const tag = createTag(trimmed, category.tags.length);
-        created = tag.id;
-        return { ...category, tags: [...category.tags, tag] };
-      });
-      if (!created) return {};
-      return { project: { ...state.project, tagCategories: categories }, dirty: true };
-    });
-    return created;
-  },
-
-  updateTag(categoryId, tagId, patch) {
-    set((state) => {
-      if (!state.project) return {};
-      return {
-        project: {
-          ...state.project,
-          tagCategories: state.project.tagCategories.map((category) =>
-            category.id === categoryId
-              ? {
-                  ...category,
-                  tags: category.tags.map((tag) => (tag.id === tagId ? { ...tag, ...patch, id: tag.id } : tag)),
-                }
-              : category,
-          ),
-        },
-        dirty: true,
-      };
-    });
-  },
-
-  deleteTag(categoryId, tagId) {
-    set((state) => {
-      if (!state.project) return {};
-      return {
-        project: {
-          ...state.project,
-          tagCategories: state.project.tagCategories.map((category) =>
-            category.id === categoryId
-              ? { ...category, tags: category.tags.filter((tag) => tag.id !== tagId) }
-              : category,
-          ),
-        },
-        dirty: true,
-      };
-    });
-  },
-
-  ensureCharacterCategory() {
-    const project = get().project;
-    if (!project) return null;
-    const existing = project.tagCategories.find((category) => category.isCharacters);
-    if (existing) return existing.id;
-    const category = createCategory({
-      name: "Characters",
-      isCharacters: true,
-      description: "People who can speak dialogue.",
-    });
-    set({ project: { ...project, tagCategories: [...project.tagCategories, category] }, dirty: true });
-    return category.id;
+  async removeEntityImage(kind, entityId, path) {
+    const state = get();
+    const entity = state.project ? entitiesOf(state.project, kind).find((item) => item.id === entityId) : undefined;
+    if (!entity) return;
+    get().updateEntity(kind, entityId, { images: entity.images.filter((item) => item !== path) });
+    if (state.projectPath && !path.includes("..")) {
+      try {
+        await fs().remove(joinPath(state.projectPath, path));
+      } catch {
+        // The picture is already gone from the entity.
+      }
+    }
   },
 
   restartPlay() {
@@ -832,7 +776,8 @@ export const useProjectStore = create<ProjectStore>((set, get) => ({
   beginPlay(nodeId) {
     const state = get();
     if (!state.play) return;
-    set({ play: chooseStart(state.play, state.graphs, nodeId) });
+    if (!state.project) return;
+    set({ play: chooseStart(state.play, state.graphs, nodeId, state.project.variables) });
   },
 
   cancelStartChoice() {

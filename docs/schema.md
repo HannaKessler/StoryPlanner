@@ -1,8 +1,10 @@
 # StoryPlanner project schema
 
-Version **3**. Every project file, graph file, and bundled export carries `schemaVersion`. This app writes version 3 and still reads versions 1 and 2 (see [Older files](#older-files)). A higher number means the file was written by a newer StoryPlanner; do not guess at fields you do not know.
+Version **4**. Every project file, graph file, and bundled export carries `schemaVersion`. This app writes version 4 and still reads versions 1, 2, and 3 (see [Older files](#older-files)). A higher number means the file was written by a newer StoryPlanner; do not guess at fields you do not know.
 
-The story model works like a state machine (think of Unity’s Animator). **Nodes are states**: events, scenes, and dialogue that hold content. **Edges are transitions**: all branching lives on them. Each transition has its own condition on global variables and its own variable effects. Any node can own a sub-graph, which works like a sub-state machine. Nodes never contain choices.
+The story model works like a state machine. **Every node is the same kind of beat.** A beat can hold a title, notes, one location, characters, items, dialogue, effects, and a sub-graph. **Edges are gates.** A transition is available when its condition passes, and it changes nothing by itself. Effects live on the beat and run when play enters it.
+
+Locations, characters, and items are project data, not graph nodes. Each has notes and image paths. A beat stores only its own references. What a beat *involves* — its own references plus everything in its sub-graph — is computed, not stored on the beat.
 
 Engine add-ons should treat this document as the contract. Files are UTF-8 JSON. Unknown object keys are dropped when StoryPlanner saves, so do not store private data beside the documented fields. Unknown **variable kinds** are the exception: the `kind` string is open-ended and is preserved.
 
@@ -15,10 +17,14 @@ MyStory/
   project.json
   graphs/
     <graphId>.json
-    <graphId>.json
+  assets/
+    <entityId>/
+      image.png
 ```
 
 `project.json` is the project document. Each graph, including the root and every nested graph, is one file under `graphs/`. The file name is `<id>.json`, matching `GraphDocument.id`.
+
+Images copied into the project live under `assets/`. Entity `images` stores paths relative to the project folder.
 
 There is no depth limit. A node points at a sub-graph with `subgraphId`. That graph points back with `parentGraphId` and `parentNodeId`.
 
@@ -26,26 +32,50 @@ There is no depth limit. A node points at a sub-graph with `subgraphId`. That gr
 
 ```json
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "id": "proj_lantern_gate",
   "name": "The Lantern Gate",
   "createdAt": "2026-01-15T18:00:00.000Z",
   "updatedAt": "2026-01-15T18:00:00.000Z",
   "rootGraphId": "graph_root",
   "variables": [],
-  "tagCategories": []
+  "characters": [],
+  "items": [],
+  "locations": []
 }
 ```
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| schemaVersion | number | `3` |
+| schemaVersion | number | `4` |
 | id | string | Stable project id |
 | name | string | Display name |
 | createdAt, updatedAt | string | ISO-8601 timestamps |
 | rootGraphId | string | Id of the top-level graph |
 | variables | Variable[] | Project-wide. No scoping |
-| tagCategories | TagCategory[] | User-defined categories |
+| characters, items, locations | Entity[] | People, things, and places. Not nodes |
+
+### Entity
+
+```json
+{
+  "id": "tag_traveler",
+  "name": "Traveler",
+  "notes": "The player character.",
+  "images": ["assets/tag_traveler/portrait.png"],
+  "fields": [{ "key": "color", "value": "#e3a15a" }]
+}
+```
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| id | string | Stable id. Dialogue speakers and beat references store this |
+| name | string | Display name. May be empty |
+| notes | string | Free-form notes |
+| images | string[] | Paths relative to the project folder |
+| fields | { key, value }[] | Optional extra text. Both strings. Empty until some are added |
+
+`fields` is open-ended. This version does not assign meaning to particular keys. A migrated tag color is kept as `{ "key": "color", "value": "#rrggbb" }`.
 
 ### Variable
 
@@ -55,8 +85,7 @@ There is no depth limit. A node points at a sub-graph with `subgraphId`. That gr
   "name": "gold",
   "kind": "value",
   "description": "Coins in the traveler's purse.",
-  "defaultValue": 5,
-  "tagCategoryId": null
+  "defaultValue": 5
 }
 ```
 
@@ -65,43 +94,19 @@ There is no depth limit. A node points at a sub-graph with `subgraphId`. That gr
 | Kind | defaultValue | Meaning |
 | --- | --- | --- |
 | `boolean` | `true` or `false` | A flag |
-| `value` | finite number | A number. Not an integer type and not a programming-language type |
-| `tag` | tag id or `null` | A single tag from `tagCategoryId` |
+| `value` | finite number | A number |
+| `character` | character id or `null` | One character |
+| `item` | item id or `null` | One item |
+| `location` | location id or `null` | One location |
+| `inventory` | string[] of item ids | A set of items. Empty is `[]` |
 
-`tagCategoryId` is the category a tag variable draws from, or `null`.
-
-Add-ons should keep unknown kinds and their scalar `defaultValue` (`boolean`, `number`, `string`, or `null`). This editor will not rewrite them into a known kind. Equality (`eq` / `neq`) still works on them. Other comparisons and arithmetic do not.
-
-There are no enums and no nested types.
-
-### Tag category and tag
-
-```json
-{
-  "id": "cat_characters",
-  "name": "Characters",
-  "isCharacters": true,
-  "isLocations": false,
-  "description": "People who speak.",
-  "tags": [
-    { "id": "tag_traveler", "name": "Traveler", "description": "", "color": "#e3a15a" }
-  ]
-}
-```
-
-`isCharacters` marks a category whose tags may be chosen as dialogue speakers. `isLocations` marks a category whose tags are places. A project may mark more than one category for either role. Tags are not global ids across categories; a speaker or a beat stores the tag id.
-
-```json
-{ "id": "cat_locations", "name": "Locations", "isCharacters": false, "isLocations": true, "description": "", "tags": [] }
-```
-
-`color` is a display hint (`#rrggbb`).
+Add-ons should keep unknown kinds and their `defaultValue` (`boolean`, `number`, `string`, `null`, or an array of strings). This editor will not rewrite them into a known kind. Equality (`eq` / `neq`) still works on scalars. Other comparisons and arithmetic do not.
 
 ## Graph document
 
 ```json
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "id": "graph_approach",
   "name": "At the gate",
   "parentGraphId": "graph_root",
@@ -115,61 +120,66 @@ There are no enums and no nested types.
 
 The root graph uses `null` for both parent fields. `sceneNotes` on a graph cover that whole graph. Notes on a node cover that beat.
 
-`locationBoxes` is the location view for this graph. Each entry is one box: `id` is a location tag id, or `"unassigned"` for beats with no location tag. `position` is the box’s point on that canvas. `size` is its width and height. Moving a box moves the beats inside it. An empty array, or a missing field, means no box has been moved or resized yet; the editor then lays the boxes out itself. Boxes the user has not touched are left out of the array.
+`locationBoxes` is the location view for this graph. Each entry is one box:
+
+| id | Box |
+| --- | --- |
+| a location id | Beats placed in that location |
+| `"unplaced"` | Beats with no location of their own and no single inherited location |
+| `"multiple"` | Beats with no location of their own and more than one inherited location |
+
+`position` is the box’s point on that canvas. `size` is `{ "width", "height" }`. An empty array, or a missing field, means no box has been moved or resized yet. Boxes the user has not touched are left out of the array. The editor still draws an Unplaced box, and a Multiple box only when some beat needs it.
 
 ### Node
 
 ```json
 {
   "id": "node_ap_gate",
-  "type": "dialogue",
+  "type": "beat",
   "position": { "x": 300, "y": 220 },
   "title": "At the gate",
   "summary": "",
   "sceneNotes": "The gatekeeper does not open the shutter at first.",
   "subgraphId": null,
-  "tagIds": ["tag_loc_gate"],
+  "locationId": "tag_loc_gate",
+  "characterIds": ["tag_gatekeeper"],
+  "itemIds": [],
   "locationPosition": null,
-  "lines": []
+  "lines": [],
+  "effects": []
 }
 ```
 
-`type` is one of `start`, `event`, `scene`, `dialogue`, `end`.
+`type` is always `"beat"`. Older files used `start`, `event`, `scene`, `dialogue`, and `end`. Those become beats on load. Connections are kept.
 
-| Type | Role |
-| --- | --- |
-| start | An entry of this graph. A graph may have several, and may have none. Play begins at one of them |
-| event | A high-level beat. Often owns a sub-graph |
-| scene | A place and time, with scene notes. May own a sub-graph |
-| dialogue | Ordered spoken lines |
-| end | Stops this branch |
+| Field | Type | Notes |
+| --- | --- | --- |
+| title, summary, sceneNotes | string | Optional. Empty until set. A generated label is not stored |
+| position | point | Graph-view point in pixels. The location view does not write it |
+| subgraphId | string or null | Another graph, or null |
+| locationId | string or null | This beat’s own place. One location |
+| characterIds | string[] | Characters on this beat. Speakers are not copied into this list |
+| itemIds | string[] | Items on this beat |
+| locationPosition | point or null | Point inside the location box. Null until the location view places it |
+| lines | DialogueLine[] | Spoken lines, in order |
+| effects | Effect[] | Applied when play enters this beat |
 
-Start is an ordinary beat. It can be added, deleted, and connected like any other type. A file with no start node, or with several, is valid. The editor warns when the graph currently open has none.
+A beat does not store what it inherits from a sub-graph. See [Involved](#involved).
 
-`title` may be empty. The editor does not store a generated name. A consumer that needs a label should treat an empty title as unnamed.
-
-`position` is the editor’s graph-view point in pixels. The location view must not write it. Add-ons can ignore it.
-
-`locationPosition` is that beat’s point inside its location box, in pixels from the box’s top left. `null` means the location view has not placed it yet and will use a default. A missing field is read as `null`.
-
-`tagIds` lists tags on the beat. Location tags are the ones whose category has `isLocations: true`. A beat may carry more than one. The location view draws the beat once, inside the box of the earliest of those tags in project order (category order, then tag order). Tags that are not places stay on the beat and do not make a box.
-
-`subgraphId` is another graph id, or `null`. Opening that graph is how a writer drills in. Any node may own one. Nesting is unlimited.
-
-A node has no logic of its own. What happens next, and which variables change, is decided by the transitions that leave it.
+The location view groups a beat by `locationId`. If that is null and the beat inherits exactly one location, it uses that location. Otherwise it goes in Multiple or Unplaced.
 
 ### Dialogue line
 
 ```json
 {
   "id": "line_gate_1",
-  "speakerTagId": "tag_gatekeeper",
+  "speakerId": "tag_gatekeeper",
   "text": "The gate is shut. What business have you past nightfall?",
   "direction": "He does not lift the lantern."
 }
 ```
 
-`speakerTagId` is a tag id, or `null` for narration. The tag should belong to a category with `isCharacters: true`. `direction` is a short parenthetical for that line. Longer setting and action live in `sceneNotes`.
+`speakerId` is a character id, or `null` for narration. `direction` is a short parenthetical. Longer setting lives in `sceneNotes`.
 
 ### Edge (transition)
 
@@ -186,31 +196,48 @@ A node has no logic of its own. What happens next, and which variables change, i
       { "type": "compare", "variableId": "var_gold", "op": "gte", "value": 1 },
       { "type": "not", "child": { "type": "compare", "variableId": "var_convinced", "op": "eq", "value": true } }
     ]
-  },
-  "effects": [
-    { "id": "fx_coin_gold", "variableId": "var_gold", "op": "add", "value": -1 }
-  ]
+  }
 }
 ```
 
 | Field | Type | Notes |
 | --- | --- | --- |
-| id | string | Stable edge id |
-| source, target | string | Node ids in the same graph. Edges are directed |
-| label | string | What the transition is called. A player-facing option, an exit name, or empty |
-| condition | Condition or null | The transition is available when this passes. `null` means always |
-| effects | Effect[] | Run in order when the transition is followed, before the target is entered |
+| source, target | string | Node ids in the same graph |
+| label | string | What the transition is called. May be empty |
+| condition | Condition or null | Available when this passes. `null` means always |
 
-The outgoing transitions of a node keep their order in `edges`. The editor and the exports list them in that order. An engine can use it as priority, or offer every open transition to the player. Several transitions may connect the same two nodes.
-
-A player choice is a labelled transition. The label is the text of the option, the condition decides whether it is open, and the effects record what taking it changes.
+A transition has no effects. Taking it enters the target, and the target’s effects run then. The outgoing transitions of a node keep their order in `edges`.
 
 ### Moving through a graph
 
-- Play starts at a `start` node of the root graph. One start is entered immediately. Several starts wait until one is chosen. No start means play does not begin; that is a warning, not an invalid file.
-- From the current node, every outgoing edge whose condition passes can be followed. Following it runs its `effects`, then enters `target`.
-- If the current node has a `subgraphId`, play can enter that graph at one of its `start` nodes, choosing when there is more than one. From inside, play can return to the parent node and continue with the parent’s outgoing transitions. Returning runs no effects.
-- An `end` node, or a node with no open transition, ends that branch.
+- Play waits for a beat to be chosen. Any beat in the graph can be chosen. Beats with no incoming edge are the sensible defaults, not a restriction.
+- Entering a beat runs that beat’s `effects`, in order.
+- From the current beat, every outgoing edge whose condition passes can be followed. Following it enters `target` and runs the target’s effects. The edge itself changes nothing.
+- If the current beat has a `subgraphId`, play can step into that graph and again choose any beat there. Returning to the parent runs no effects.
+- A run ends when the current beat has no outgoing transition and there is no way back up. A transition that is blocked stays available so a variable change can open it.
+
+## Involved
+
+Involvement is derived. It is not a field of the stored node.
+
+A beat’s **own** references are:
+
+- `locationId`, when set
+- `characterIds`
+- `itemIds`
+- every dialogue `speakerId`
+
+A beat’s **involved** set is that union, plus the involved set of every beat in `subgraphId`, at every depth. Inheritance only flows upward. A child does not gain its parent’s references. Cycles stop once a pass adds nothing.
+
+The location view uses the inherited locations only when the beat has no `locationId` of its own.
+
+A bundled JSON export may add `involved` onto each node as a convenience:
+
+```json
+{ "locationIds": ["tag_loc_gate"], "characterIds": [], "itemIds": [] }
+```
+
+That object is the full involved set (own plus inherited). Loading a bundle drops it. The source of truth remains each beat’s own fields.
 
 ## Conditions
 
@@ -221,9 +248,10 @@ A condition is `null` (always passes) or one of:
 { "type": "group", "op": "or", "children": [] }
 { "type": "not", "child": { "type": "compare", "variableId": "var_convinced", "op": "eq", "value": true } }
 { "type": "compare", "variableId": "var_gold", "op": "gte", "value": 5 }
+{ "type": "has", "variableId": "var_bag", "entityId": "tag_item_token" }
 ```
 
-Groups nest. `not` wraps one child. Compare ops are `eq`, `neq`, `gt`, `gte`, `lt`, `lte`.
+Groups nest. `not` wraps one child. Compare ops are `eq`, `neq`, `gt`, `gte`, `lt`, `lte`. `has` checks membership: an inventory contains `entityId`, or a character, item, or location variable equals it.
 
 Evaluation, against the current variable values:
 
@@ -233,24 +261,26 @@ Evaluation, against the current variable values:
 - `not` inverts its child.
 - Numeric ops apply when both sides are numbers.
 - Otherwise only `eq` and `neq` apply, using same-value equality. `gt` on a boolean fails.
-- A compare whose variable is missing fails.
-
-Writers build this in the condition editor. Nothing in the file is an expression language.
+- A compare or `has` whose variable is missing fails.
+- `has` on an array passes when the array contains `entityId`. On a scalar it passes when the current value equals `entityId`.
 
 ## Effects
 
 ```json
-{ "id": "fx_token_location", "variableId": "var_location", "op": "set", "value": "tag_loc_inside" }
+{ "id": "fx_coin_gold", "variableId": "var_gold", "op": "add", "value": -1 }
 ```
+
+Effects are stored on beats. `value` is a scalar: boolean, number, string, or null. An inventory effect’s `value` is one item id.
 
 | op | Behavior |
 | --- | --- |
-| set | Assign `value` when it matches the kind (`boolean`, finite `number`, or a string / `null` for tags) |
-| add | Add a number to a numeric current value. Negative numbers subtract |
+| set | Assign `value` when it matches the kind. For inventory, a string becomes a one-item list and `null` clears it |
+| add | Add a number to a numeric value, or add an item id to an inventory |
+| remove | Remove an entity. A single-entity variable becomes `null`. An inventory drops that id |
 | toggle | Flip a boolean |
-| clear | Boolean becomes false, value becomes 0, tag becomes `null` |
+| clear | Boolean becomes false, value becomes 0, an entity reference becomes `null`, an inventory becomes `[]` |
 
-Effects run in array order. An effect whose variable or value does not fit the kind is skipped.
+Effects run in array order when the beat is entered. An effect whose variable or value does not fit the kind is skipped.
 
 ## Bundle
 
@@ -258,7 +288,7 @@ Export → Bundled JSON writes one document:
 
 ```json
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "kind": "storyplanner.bundle",
   "exportedAt": "2026-04-01T00:00:00.000Z",
   "project": {},
@@ -266,42 +296,39 @@ Export → Bundled JSON writes one document:
 }
 ```
 
-`project` is the project document. `graphs` is every graph document, including nested ones. `kind` is the literal `storyplanner.bundle`.
+`project` is the project document, including entities, notes, and image paths. `graphs` is every graph. Node copies in the bundle may include the computed `involved` object described above. `kind` is the literal `storyplanner.bundle`.
 
 ## What is not stored
 
-Play-through state (current beat, live variable values, the path taken) is runtime only. Screenplay and voice-actor sheets are derived from the graph when exported; they are not a second source of truth.
+Play-through state (current beat, live variable values, the path taken) is runtime only. Which entities a parent involves is computed from sub-graphs. Screenplay and voice-actor sheets are derived when exported.
 
 Derived exports in this version are Markdown:
 
-- **Screenplay** walks from each of a graph’s start nodes, writes scene notes as block quotes, and spells each transition’s condition and effects in words. The first visit to a beat is written in full. Later visits say `→ Continues at **Title**.` A beat that no start reaches is marked not reachable.
-- **Voice sheets** list, per character category (`isCharacters`), only that character’s lines. Each line is preceded by the italic line or lines it directly answers. The previous line in the same node is the single answer. The first line of a node answers the last spoken line of each way in, and a line inside a nested graph can answer the last line before that graph was entered. When the transition into the node has a label, the sheet names it after the cue. Scene notes are included above the line.
-
-## Adding a variable kind later
-
-1. Keep storing `kind` as a string and `defaultValue` as a scalar.
-2. Teach the editor and the evaluator the new kind.
-3. Leave `schemaVersion` as it is if no existing field changes meaning. Bump it when a consumer would misread old files.
+- **Screenplay** walks from each entry beat (a beat nothing points at). If a graph has none, it walks every beat. Scene notes are block quotes. A beat’s effects are written as `*On enter: …*`. Each transition’s condition is spelled out; transitions have no effects. The first visit to a beat is written in full. Later visits say `→ Continues at **Title**.`
+- **Voice sheets** list one section per character. Only that character’s lines are included. Each line is preceded by the italic line or lines it directly answers.
 
 ## Older files
 
+StoryPlanner reads versions 1, 2, and 3 and writes version 4.
+
+### Version 3
+
+Version 3 used tag categories instead of entities, and effects lived on transitions.
+
+- Categories marked `isCharacters` become characters. Categories marked `isLocations` become locations. A category whose name looks like items, inventory, objects, props, gear, weapons, or keys becomes items. Any other category also becomes items, and the category name is kept in the entity notes and in a `category` field, so nothing is dropped.
+- Tag ids are kept, so references stay stable. A tag’s description becomes notes. A color becomes a `color` field.
+- A beat’s location tags: the earliest in project order becomes `locationId`. Further location names are appended to `sceneNotes`. Character tags become `characterIds`. Item tags become `itemIds`.
+- `speakerTagId` becomes `speakerId`.
+- A variable of kind `tag` becomes a character, item, or location variable matching its category. If the variable or the category is named like an inventory, it becomes an inventory and the default is wrapped in a list.
+- Each transition’s effects are appended to the target beat’s effects. The same variable, op, and value is not copied twice. Edges are stored without effects.
+- A location box id `"unassigned"` is read as `"unplaced"`.
+
 ### Version 2
 
-Version 2 is the state-machine file described above, without `tagIds` on nodes and without `isLocations` on categories. StoryPlanner fills those in on load and writes version 3 on the next save:
-
-- A node with no `tagIds` gets `[]`.
-- A node with no `locationPosition` gets `null`.
-- A graph with no `locationBoxes` gets `[]`.
-- A category with no `isLocations` gets `false`.
-
-Start nodes already in the file stay as they are. Several starts are allowed; nothing in the file is rewritten to enforce a single start.
+Version 2 is the version 3 shape without `tagIds` on nodes and without `isLocations` on categories. Those beats get no entity references. The rest of the version 3 migration applies, including moving edge effects onto the target beat.
 
 ### Version 1
 
-Version 1 kept player choices (`choices`) and on-enter `effects` on nodes, and edges had a `choiceId`. Version 2 moved all of that onto edges. StoryPlanner migrates a version 1 graph when it loads it, applies the version 2 defaults above, and writes version 3 on the next save:
+Version 1 kept player choices (`choices`) and on-enter `effects` on nodes, and edges had a `choiceId`. On load, choices and on-enter effects are folded onto edges first (on-enter effect ids are prefixed with the edge id). The version 4 step then moves those edge effects onto the target beat and drops duplicates. A choice with no edge is dropped. The node types become beats.
 
-- An edge whose `choiceId` names a choice on its source node takes the choice’s label (unless the edge had its own), the choice’s condition joined with the edge’s condition by `and`, and the choice’s effects.
-- A node’s on-enter effects are appended to every incoming edge in the same graph. Their ids are prefixed with the edge id so they stay unique.
-- A choice with no edge, and on-enter effects of a node with no incoming edge, have nowhere to go and are dropped.
-
-Add-ons only need to read version 3. Re-save older projects in StoryPlanner first.
+Add-ons only need to read version 4. Re-save older projects in StoryPlanner first.

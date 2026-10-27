@@ -1,8 +1,8 @@
 import { describeCondition, evaluateCondition } from "./conditions";
-import { applyEffects, defaultValues, describeEffect } from "./effects";
-import { startNodes } from "./graphOps";
+import { applyEffects, defaultValues } from "./effects";
+import { entryNodes } from "./graphOps";
 import { beatLabel } from "./labels";
-import type { GraphDocument, ProjectDocument, Scalar, StoryNode } from "./types";
+import type { GraphDocument, ProjectDocument, StoryNode, VariableDef, VariableValue } from "./types";
 
 export interface PlayFrame {
   graphId: string;
@@ -11,14 +11,10 @@ export interface PlayFrame {
 
 export interface PlayState {
   frames: PlayFrame[];
-  values: Record<string, Scalar>;
+  values: Record<string, VariableValue>;
   /** Titles of beats entered, in order. */
   log: string[];
-  /**
-   * When set, play is waiting for a start beat in this graph. One start is
-   * entered immediately. Several starts wait here. None waits here too, so the
-   * player can see that the graph has no start.
-   */
+  /** When set, play is waiting for a beat to enter in this graph. */
   choosingGraphId: string | null;
 }
 
@@ -29,7 +25,6 @@ export interface PlayAction {
   /** Target beat title for transitions. */
   target: string;
   condition: string;
-  effects: string;
   enabled: boolean;
   edgeId?: string;
 }
@@ -44,34 +39,33 @@ export function createPlayState(
   return enterGraph({ frames: [], values, log: [], choosingGraphId: null }, root);
 }
 
-/** Enters the only start, or waits so the player can choose among several. */
+/** Waits so any beat in the graph can be entered. Beats with no incoming edge are the suggested ones. */
 function enterGraph(state: PlayState, graph: GraphDocument): PlayState {
-  const starts = startNodes(graph);
-  if (starts.length !== 1) return { ...state, choosingGraphId: graph.id };
-  const entry = starts[0];
-  return {
-    ...state,
-    frames: [...state.frames, { graphId: graph.id, nodeId: entry.id }],
-    log: [...state.log, beatLabel(entry)],
-    choosingGraphId: null,
-  };
+  return { ...state, choosingGraphId: graph.id };
 }
 
 export function chooseStart(
   state: PlayState,
   graphs: Record<string, GraphDocument>,
   nodeId: string,
+  variables: VariableDef[],
 ): PlayState {
   if (!state.choosingGraphId) return state;
   const graph = graphs[state.choosingGraphId];
-  const node = graph?.nodes.find((item) => item.id === nodeId && item.type === "start");
+  const node = graph?.nodes.find((item) => item.id === nodeId);
   if (!graph || !node) return state;
   return {
     ...state,
     frames: [...state.frames, { graphId: graph.id, nodeId: node.id }],
+    values: applyEffects(state.values, node.effects, variables),
     log: [...state.log, beatLabel(node)],
     choosingGraphId: null,
   };
+}
+
+export function suggestedNodes(graph: GraphDocument): StoryNode[] {
+  const entries = new Set(entryNodes(graph).map((node) => node.id));
+  return [...graph.nodes].sort((a, b) => Number(entries.has(b.id)) - Number(entries.has(a.id)) || 0);
 }
 
 export function playLocation(
@@ -92,6 +86,7 @@ export function availableActions(
   project: ProjectDocument,
   graphs: Record<string, GraphDocument>,
 ): PlayAction[] {
+  if (state.choosingGraphId) return [];
   const location = playLocation(state, graphs);
   if (!location) return [];
   const { graph, node } = location;
@@ -105,7 +100,6 @@ export function availableActions(
       label: "Step in",
       target: child.name.trim() || beatLabel(node, project),
       condition: "",
-      effects: "",
       enabled: true,
     });
   }
@@ -120,7 +114,6 @@ export function availableActions(
       label: edge.label || targetTitle,
       target: targetTitle,
       condition: edge.condition ? describeCondition(edge.condition, project) : "",
-      effects: edge.effects.map((effect) => describeEffect(effect, project)).join(", "),
       enabled: evaluateCondition(edge.condition, state.values, project.variables),
       edgeId: edge.id,
     });
@@ -135,7 +128,6 @@ export function availableActions(
       label: "Return",
       target: parentNode ? beatLabel(parentNode, project) : "Parent beat",
       condition: "",
-      effects: "",
       enabled: true,
     });
   }
@@ -174,7 +166,7 @@ export function performAction(
     frames.push({ graphId: graph.id, nodeId: target.id });
     return {
       frames,
-      values: applyEffects(state.values, edge.effects, project.variables),
+      values: applyEffects(state.values, target.effects, project.variables),
       log: [...state.log, beatLabel(target, project)],
       choosingGraphId: null,
     };
@@ -183,6 +175,6 @@ export function performAction(
   return state;
 }
 
-export function setPlayValue(state: PlayState, variableId: string, value: Scalar): PlayState {
+export function setPlayValue(state: PlayState, variableId: string, value: VariableValue): PlayState {
   return { ...state, values: { ...state.values, [variableId]: value } };
 }

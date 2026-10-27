@@ -1,5 +1,4 @@
 import { useState } from "react";
-import { characterCategories } from "../domain/format";
 import type { DialogueLine } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { menuHandler } from "./ContextMenu";
@@ -26,7 +25,7 @@ export function DialogueEditor({ nodeId, lines }: { nodeId: string; lines: Dialo
         >
           <div className="sp-line-top">
             <span className="sp-line-no">{index + 1}</span>
-            <SpeakerPicker value={line.speakerTagId} onChange={(speakerTagId) => updateLine(nodeId, line.id, { speakerTagId })} />
+            <SpeakerPicker value={line.speakerId} onChange={(speakerId) => updateLine(nodeId, line.id, { speakerId })} />
             <input
               className="sp-cell sp-line-dir"
               aria-label="Line direction"
@@ -63,15 +62,13 @@ export function SpeakerPicker({
   onChange,
 }: {
   value: string | null;
-  onChange: (speakerTagId: string | null) => void;
+  onChange: (speakerId: string | null) => void;
 }) {
   const project = useProjectStore((state) => state.project);
-  const addTag = useProjectStore((state) => state.addTag);
-  const ensureCharacterCategory = useProjectStore((state) => state.ensureCharacterCategory);
+  const addEntity = useProjectStore((state) => state.addEntity);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
   if (!project) return null;
-  const categories = characterCategories(project);
 
   if (adding) {
     return (
@@ -79,9 +76,7 @@ export function SpeakerPicker({
         className="sp-speaker"
         onSubmit={(event) => {
           event.preventDefault();
-          const category = categories[0]?.id ?? ensureCharacterCategory();
-          if (!category) return;
-          const id = addTag(category, name);
+          const id = addEntity("character", name);
           if (id) onChange(id);
           setName("");
           setAdding(false);
@@ -90,7 +85,6 @@ export function SpeakerPicker({
         <input
           className="sp-cell"
           value={name}
-          placeholder="New character"
           aria-label="New character name"
           onChange={(event) => setName(event.target.value)}
           onBlur={() => !name.trim() && setAdding(false)}
@@ -114,16 +108,12 @@ export function SpeakerPicker({
       }}
     >
       <option value="">Narration</option>
-      {categories.map((category) => (
-        <optgroup key={category.id} label={category.name}>
-          {category.tags.map((tag) => (
-            <option key={tag.id} value={tag.id}>
-              {tag.name}
-            </option>
-          ))}
-        </optgroup>
+      {project.characters.map((character) => (
+        <option key={character.id} value={character.id}>
+          {character.name || "Untitled"}
+        </option>
       ))}
-      <option value="__new__">+ new character</option>
+      <option value="__new__">+ character</option>
     </select>
   );
 }

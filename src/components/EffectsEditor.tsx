@@ -3,9 +3,10 @@ import type { Effect, EffectOp, Scalar } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { menuHandler } from "./ContextMenu";
 import { IconButton } from "./Panel";
-import { TagSelect } from "./TagSelect";
+import { EntitySelect } from "./EntitySelect";
+import type { EntityKind } from "../domain/types";
 
-const OP_LABEL: Record<EffectOp, string> = { set: "set", add: "add", toggle: "toggle", clear: "clear" };
+const OP_LABEL: Record<EffectOp, string> = { set: "set", add: "add", remove: "remove", toggle: "toggle", clear: "clear" };
 
 export function EffectsEditor({
   effects,
@@ -73,7 +74,6 @@ export function EffectsEditor({
             {effect.op !== "toggle" && effect.op !== "clear" ? (
               <EffectValue
                 kind={variable?.kind}
-                categoryId={variable?.tagCategoryId ?? null}
                 op={effect.op}
                 value={effect.value}
                 onChange={(value) => onUpdate(effect.id, { value })}
@@ -93,13 +93,11 @@ export function EffectsEditor({
 
 function EffectValue({
   kind,
-  categoryId,
   op,
   value,
   onChange,
 }: {
   kind: string | undefined;
-  categoryId: string | null;
   op: EffectOp;
   value: Scalar;
   onChange: (value: Scalar) => void;
@@ -112,7 +110,7 @@ function EffectValue({
       </select>
     );
   }
-  if (kind === "value" || op === "add") {
+  if (kind === "value" || (op === "add" && kind !== "inventory" && kind !== "character" && kind !== "item" && kind !== "location")) {
     return (
       <input
         className="sp-cell"
@@ -123,8 +121,10 @@ function EffectValue({
       />
     );
   }
-  if (kind === "tag") {
-    return <TagSelect categoryId={categoryId} value={typeof value === "string" ? value : null} onChange={onChange} allowEmpty />;
+  const entityKind: EntityKind | null =
+    kind === "character" || kind === "location" ? kind : kind === "item" || kind === "inventory" ? "item" : null;
+  if (entityKind) {
+    return <EntitySelect kind={entityKind} value={typeof value === "string" ? value : null} onChange={onChange} allowEmpty />;
   }
   return <input className="sp-cell" aria-label="Value" value={value == null ? "" : String(value)} onChange={(event) => onChange(event.target.value)} />;
 }

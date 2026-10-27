@@ -1,30 +1,15 @@
 import { beatLabel } from "./labels";
-import type { GraphDocument, ProjectDocument, StoryEdge, StoryNode, StoryNodeType } from "./types";
+import type { GraphDocument, ProjectDocument, StoryEdge, StoryNode } from "./types";
 
-/** Every beat type, including Start. A graph may contain any number of each. */
-export const BEAT_TYPES: StoryNodeType[] = ["start", "event", "scene", "dialogue", "end"];
-
-export function addableNodeTypes(): StoryNodeType[] {
-  return [...BEAT_TYPES];
-}
-
-/** Event, scene, and dialogue can own a sub-graph. Start and end do not. */
-export function canOwnInnerGraph(type: StoryNodeType): boolean {
-  return type === "event" || type === "scene" || type === "dialogue";
-}
-
-export function startNodes(graph: GraphDocument): StoryNode[] {
-  return graph.nodes.filter((node) => node.type === "start");
-}
-
-/** A missing Start is a warning. It does not make the file invalid. */
-export function graphWarning(graph: GraphDocument): string | null {
-  return startNodes(graph).length === 0 ? "This graph has no start." : null;
+/** Beats nothing points at. Play offers these first, and any beat can still be chosen. */
+export function entryNodes(graph: GraphDocument): StoryNode[] {
+  const incoming = new Set(graph.edges.map((edge) => edge.target));
+  return graph.nodes.filter((node) => !incoming.has(node.id));
 }
 
 /**
- * Splits A→B into A→new→B. The original edge keeps its label, conditions and
- * effects and becomes the first leg. The new edge is the plain second leg.
+ * Splits A→B into A→new→B. The original edge keeps its label and condition
+ * and becomes the first leg. The new edge is a plain second leg.
  */
 export function splitTransition(graph: GraphDocument, edgeId: string, node: StoryNode, nextEdge: StoryEdge): GraphDocument | null {
   const edge = graph.edges.find((item) => item.id === edgeId);
@@ -45,7 +30,6 @@ export function splitTransition(graph: GraphDocument, edgeId: string, node: Stor
     target: edge.target,
     label: "",
     condition: null,
-    effects: [],
   };
   return {
     ...graph,

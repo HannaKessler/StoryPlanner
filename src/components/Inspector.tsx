@@ -1,6 +1,9 @@
+import { useMemo } from "react";
 import { describeCondition } from "../domain/conditions";
 import { describeEffect } from "../domain/effects";
-import { beatLabel, NODE_LABEL } from "../domain/labels";
+import { entityName } from "../domain/format";
+import { indexInvolved, involvement } from "../domain/involved";
+import { beatLabel } from "../domain/labels";
 import type { GraphDocument, ProjectDocument, StoryEdge } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { ConditionBuilder } from "./ConditionBuilder";
@@ -52,13 +55,17 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
   const deleteNodes = useProjectStore((state) => state.deleteNodes);
   const connectNodes = useProjectStore((state) => state.connectNodes);
   const addLine = useProjectStore((state) => state.addLine);
+  const addNodeEffect = useProjectStore((state) => state.addNodeEffect);
+  const updateNodeEffect = useProjectStore((state) => state.updateNodeEffect);
+  const deleteNodeEffect = useProjectStore((state) => state.deleteNodeEffect);
+  const currentGraphId = useProjectStore((state) => state.currentGraphId);
   const node = graph.nodes.find((item) => item.id === nodeId);
-  if (!node || !project) return null;
+  const involved = useMemo(() => indexInvolved(graphs), [graphs]);
+  if (!node || !project || !currentGraphId) return null;
   const child = node.subgraphId ? graphs[node.subgraphId] : undefined;
-  const content = node.type === "event" || node.type === "scene" || node.type === "dialogue";
+  const info = involvement(involved, currentGraphId, node.id);
   const outgoing = graph.edges.filter((edge) => edge.source === node.id);
   const targets = graph.nodes.filter((item) => item.id !== node.id);
-  const locationTags = project.tagCategories.filter((category) => category.isLocations).flatMap((category) => category.tags);
   const addTransitionItems = (): MenuItem[] =>
     targets.length === 0
       ? [{ label: "Add transition", disabled: true, onSelect: () => undefined }]
@@ -67,39 +74,49 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
   return (
     <>
       <div className="sp-insp-head">
-        <span className="sp-kicker">{NODE_LABEL[node.type]}</span>
+        <span className="sp-kicker">Beat</span>
         <input className="sp-head-input" aria-label="Title" placeholder="Title" data-rename={node.id} value={node.title} onChange={(event) => updateNode(node.id, { title: event.target.value })} />
         <IconButton label="Delete beat" danger onClick={() => deleteNodes([node.id])}>
           ×
         </IconButton>
       </div>
 
-      {locationTags.length > 0 && (
-        <Section id="insp:location" title="Location">
-          <div className="sp-loc-picks">
-            {locationTags.map((tag) => {
-              const on = node.tagIds.includes(tag.id);
-              return (
-                <button
-                  key={tag.id}
-                  type="button"
-                  className={on ? "sp-chip-btn is-on" : "sp-chip-btn"}
-                  aria-pressed={on}
-                  onClick={() =>
-                    updateNode(node.id, {
-                      tagIds: on ? node.tagIds.filter((id) => id !== tag.id) : [...node.tagIds, tag.id],
-                    })
-                  }
-                >
-                  {tag.name}
-                </button>
-              );
-            })}
-          </div>
-        </Section>
-      )}
+      <Section id="insp:location" title="Location">
+        <select
+          className="sp-cell"
+          aria-label="Location"
+          value={node.locationId ?? ""}
+          onChange={(event) => updateNode(node.id, { locationId: event.target.value || null })}
+        >
+          <option value="">None</option>
+          {project.locations.map((location) => (
+            <option key={location.id} value={location.id}>
+              {location.name || "Untitled"}
+            </option>
+          ))}
+        </select>
+        <Inherited ids={info.inherited.locationIds} project={project} />
+      </Section>
 
-      {content && child && (
+      <Section id="insp:characters" title="Characters">
+        <EntityChips
+          names={project.characters}
+          selected={node.characterIds}
+          onChange={(characterIds) => updateNode(node.id, { characterIds })}
+        />
+        <Inherited ids={info.inherited.characterIds} project={project} />
+      </Section>
+
+      <Section id="insp:items" title="Items">
+        <EntityChips
+          names={project.items}
+          selected={node.itemIds}
+          onChange={(itemIds) => updateNode(node.id, { itemIds })}
+        />
+        <Inherited ids={info.inherited.itemIds} project={project} />
+      </Section>
+
+      {child && (
         <div className="sp-inner-row" title="Sub-graph">
           <span className="sp-inner-name">↳ {child.name.trim() || beatLabel(node, project)}</span>
           <button type="button" className="sp-chip-btn" onClick={() => openSubgraph(node.id)}>
@@ -120,19 +137,39 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
             value={node.summary}
             onChange={(event) => updateNode(node.id, { summary: event.target.value })}
           />
-          {content && (
-            <textarea
-              className="sp-cell sp-area"
-              rows={2}
-              aria-label="Scene notes"
-              placeholder="Scene notes"
-              value={node.sceneNotes}
-              onChange={(event) => updateNode(node.id, { sceneNotes: event.target.value })}
-            />
-          )}
+          <textarea
+            className="sp-cell sp-area"
+            rows={2}
+            aria-label="Scene notes"
+            placeholder="Scene notes"
+            value={node.sceneNotes}
+            onChange={(event) => updateNode(node.id, { sceneNotes: event.target.value })}
+          />
         </Section>
 
-      {node.type === "dialogue" && (
+      <Section
+        id="insp:effects"
+        title="Effects"
+        count={node.effects.length}
+        summary={node.effects.map((effect) => describeEffect(effect, project)).join(", ")}
+        onContextMenu={menuHandler(() => [
+          { label: "Add effect", disabled: project.variables.length === 0, onSelect: () => addNodeEffect(node.id) },
+        ])}
+        actions={
+          <button type="button" className="sp-chip-btn" disabled={project.variables.length === 0} onClick={() => addNodeEffect(node.id)}>
+            + effect
+          </button>
+        }
+      >
+        <EffectsEditor
+          effects={node.effects}
+          onAdd={() => addNodeEffect(node.id)}
+          onUpdate={(effectId, patch) => updateNodeEffect(node.id, effectId, patch)}
+          onDelete={(effectId) => deleteNodeEffect(node.id, effectId)}
+        />
+      </Section>
+
+      {(
         <Section
           id="insp:lines"
           title="Lines"
@@ -148,7 +185,7 @@ function NodeInspector({ graph, nodeId }: { graph: GraphDocument; nodeId: string
         </Section>
       )}
 
-      {node.type !== "end" && (
+      {(
         <Section
           id="insp:out"
           title="Transitions out"
@@ -242,20 +279,57 @@ function TransitionList({
   );
 }
 
+function Inherited({ ids, project }: { ids: string[]; project: ProjectDocument }) {
+  if (ids.length === 0) return null;
+  return (
+    <p className="sp-node-refs">
+      {ids.map((id) => (
+        <span key={id} className="sp-ref is-inherited" title="Sub-graph">
+          {entityName(project, id)}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+function EntityChips({
+  names,
+  selected,
+  onChange,
+}: {
+  names: Array<{ id: string; name: string }>;
+  selected: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  if (names.length === 0) return null;
+  return (
+    <div className="sp-loc-picks">
+      {names.map((entity) => {
+        const on = selected.includes(entity.id);
+        return (
+          <button
+            key={entity.id}
+            type="button"
+            className={on ? "sp-chip-btn is-on" : "sp-chip-btn"}
+            aria-pressed={on}
+            onClick={() => onChange(on ? selected.filter((id) => id !== entity.id) : [...selected, entity.id])}
+          >
+            {entity.name || "Untitled"}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function transitionLogic(edge: StoryEdge, project: ProjectDocument): string {
-  const parts: string[] = [];
-  if (edge.condition) parts.push(`if ${describeCondition(edge.condition, project)}`);
-  if (edge.effects.length) parts.push(edge.effects.map((effect) => describeEffect(effect, project)).join(", "));
-  return parts.join(" · ");
+  return edge.condition ? `if ${describeCondition(edge.condition, project)}` : "";
 }
 
 function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string }) {
   const project = useProjectStore((state) => state.project);
   const updateEdge = useProjectStore((state) => state.updateEdge);
   const deleteEdges = useProjectStore((state) => state.deleteEdges);
-  const addEdgeEffect = useProjectStore((state) => state.addEdgeEffect);
-  const updateEdgeEffect = useProjectStore((state) => state.updateEdgeEffect);
-  const deleteEdgeEffect = useProjectStore((state) => state.deleteEdgeEffect);
   const edge = graph.edges.find((item) => item.id === edgeId);
   if (!edge || !project) return null;
 
@@ -284,7 +358,6 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
             onChange={(event) => event.target.value !== edge.target && updateEdge(edge.id, { source: event.target.value })}
           >
             {graph.nodes
-              .filter((item) => item.type !== "end")
               .map((item) => (
                 <option key={item.id} value={item.id}>
                   {beatLabel(item, project)}
@@ -318,33 +391,6 @@ function EdgeInspector({ graph, edgeId }: { graph: GraphDocument; edgeId: string
         )}
       >
         <ConditionBuilder value={edge.condition} onChange={(condition) => updateEdge(edge.id, { condition })} />
-      </Section>
-      <Section
-        id="insp:effects"
-        title="Effects"
-        onContextMenu={menuHandler(() => [
-          { label: "Add effect", disabled: project.variables.length === 0, onSelect: () => addEdgeEffect(edge.id) },
-        ])}
-        count={edge.effects.length}
-        summary={edge.effects.map((effect) => describeEffect(effect, project)).join(", ")}
-        actions={
-          <button
-            type="button"
-            className="sp-chip-btn"
-            disabled={project.variables.length === 0}
-            title={project.variables.length === 0 ? "Add a variable first" : undefined}
-            onClick={() => addEdgeEffect(edge.id)}
-          >
-            + effect
-          </button>
-        }
-      >
-        <EffectsEditor
-          effects={edge.effects}
-          onAdd={() => addEdgeEffect(edge.id)}
-          onUpdate={(effectId, patch) => updateEdgeEffect(edge.id, effectId, patch)}
-          onDelete={(effectId) => deleteEdgeEffect(edge.id, effectId)}
-        />
       </Section>
     </>
   );

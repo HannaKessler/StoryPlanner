@@ -1,7 +1,8 @@
-import { createCategory, createEdge, createGraph, createNode } from "./factories";
+import { createGraph, createNode } from "./factories";
 import { createId } from "./ids";
 import { graphFileName, joinPath } from "./paths";
-import { parseGraph, parseJson, parseProject, stringifyDoc } from "./schema";
+import { indexInvolved, involvement } from "./involved";
+import { migrationContext, parseGraph, parseJson, parseProject, stringifyDoc } from "./schema";
 import {
   BUNDLE_KIND,
   GRAPHS_DIR,
@@ -119,13 +120,12 @@ export function createNewProject(
   now = new Date().toISOString(),
 ): LoadedProject {
   const rootId = createId();
-  const start = createNode("start", { position: { x: 80, y: 220 } });
-  const beat = createNode("event", { position: { x: 380, y: 180 } });
+  const beat = createNode({ position: { x: 160, y: 180 } });
   const graph = createGraph({
     id: rootId,
     name,
-    nodes: [start, beat],
-    edges: [createEdge(start.id, beat.id)],
+    nodes: [beat],
+    edges: [],
   });
   const project: ProjectDocument = {
     schemaVersion: SCHEMA_VERSION,
@@ -135,13 +135,9 @@ export function createNewProject(
     updatedAt: now,
     rootGraphId: rootId,
     variables: [],
-    tagCategories: [
-      createCategory({
-        name: "Characters",
-        isCharacters: true,
-        description: "People who can speak dialogue.",
-      }),
-    ],
+    characters: [],
+    items: [],
+    locations: [],
   };
   return { project, graphs: { [rootId]: graph } };
 }
@@ -173,12 +169,14 @@ export async function saveProject(
 }
 
 export async function loadProject(fs: ProjectFs, root: string): Promise<LoadedProject> {
-  const project = parseProject(parseJson(await fs.readText(joinPath(root, PROJECT_FILE)), PROJECT_FILE));
+  const rawProject = parseJson(await fs.readText(joinPath(root, PROJECT_FILE)), PROJECT_FILE);
+  const context = migrationContext(rawProject);
+  const project = parseProject(rawProject);
   const graphs: Record<string, GraphDocument> = {};
   const names = await fs.list(joinPath(root, GRAPHS_DIR));
   for (const name of names) {
     if (!name.endsWith(".json")) continue;
-    const graph = parseGraph(parseJson(await fs.readText(joinPath(root, GRAPHS_DIR, name)), name));
+    const graph = parseGraph(parseJson(await fs.readText(joinPath(root, GRAPHS_DIR, name)), name), context);
     if (graphs[graph.id]) {
       throw new Error(`Two graph files use the id ${graph.id}`);
     }
@@ -195,12 +193,21 @@ export function bundleProject(
   graphs: Record<string, GraphDocument>,
   exportedAt: string,
 ): ProjectBundle {
+  const involved = indexInvolved(graphs);
   return {
     schemaVersion: SCHEMA_VERSION,
     kind: BUNDLE_KIND,
     exportedAt,
     project,
-    graphs: Object.values(graphs).sort((a, b) => a.id.localeCompare(b.id)),
+    graphs: Object.values(graphs)
+      .sort((a, b) => a.id.localeCompare(b.id))
+      .map((graph) => ({
+        ...graph,
+        nodes: graph.nodes.map((node) => ({
+          ...node,
+          involved: involvement(involved, graph.id, node.id).all,
+        })) as GraphDocument["nodes"],
+      })),
   };
 }
 

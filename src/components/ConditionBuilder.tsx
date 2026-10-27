@@ -3,7 +3,8 @@ import type { CompareOp, Condition, Scalar } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 import { menuHandler } from "./ContextMenu";
 import { IconButton } from "./Panel";
-import { TagSelect } from "./TagSelect";
+import { EntitySelect } from "./EntitySelect";
+import type { EntityKind } from "../domain/types";
 
 export function ConditionBuilder({
   value,
@@ -147,6 +148,38 @@ function ConditionNode({
     );
   }
 
+  if (value.type === "has") {
+    return (
+      <div
+        className="sp-cond-rule"
+        onContextMenu={menuHandler(() => [
+          { label: "Wrap in NOT", onSelect: () => onChange({ type: "not", child: value }) },
+          "separator",
+          { label: "Delete rule", danger: true, onSelect: () => onChange(null) },
+        ])}
+      >
+        <select
+          className="sp-cell"
+          aria-label="Variable"
+          value={value.variableId}
+          onChange={(event) => onChange({ ...value, variableId: event.target.value })}
+        >
+          <option value="">variable…</option>
+          {project.variables.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
+        </select>
+        <span className="sp-cond-op">has</span>
+        <EntitySelect kind="item" value={value.entityId || null} onChange={(entityId) => onChange({ ...value, entityId: entityId ?? "" })} allowEmpty />
+        <IconButton label="Remove rule" danger onClick={() => onChange(null)}>
+          ×
+        </IconButton>
+      </div>
+    );
+  }
+
   const variable = project.variables.find((item) => item.id === value.variableId);
   const ops = opsForKind(variable?.kind);
   return (
@@ -164,6 +197,10 @@ function ConditionNode({
         value={value.variableId}
         onChange={(event) => {
           const nextVariable = project.variables.find((item) => item.id === event.target.value);
+          if (nextVariable?.kind === "inventory") {
+            onChange({ type: "has", variableId: nextVariable.id, entityId: "" });
+            return;
+          }
           const allowed = opsForKind(nextVariable?.kind);
           onChange({
             ...value,
@@ -189,7 +226,6 @@ function ConditionNode({
       </select>
       <ValueInput
         kind={variable?.kind}
-        categoryId={variable?.tagCategoryId ?? null}
         value={value.value}
         onChange={(next) => onChange({ ...value, value: next })}
       />
@@ -205,12 +241,10 @@ function ConditionNode({
 
 function ValueInput({
   kind,
-  categoryId,
   value,
   onChange,
 }: {
   kind: string | undefined;
-  categoryId: string | null;
   value: Scalar;
   onChange: (value: Scalar) => void;
 }) {
@@ -233,8 +267,9 @@ function ValueInput({
       />
     );
   }
-  if (kind === "tag") {
-    return <TagSelect categoryId={categoryId} value={typeof value === "string" ? value : null} onChange={onChange} allowEmpty />;
+  const entityKind: EntityKind | null = kind === "character" || kind === "item" || kind === "location" ? kind : null;
+  if (entityKind) {
+    return <EntitySelect kind={entityKind} value={typeof value === "string" ? value : null} onChange={onChange} allowEmpty />;
   }
   return (
     <input className="sp-cell" aria-label="Value" value={value === null || value === undefined ? "" : String(value)} onChange={(event) => onChange(event.target.value)} />

@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { addableNodeTypes, graphBreadcrumbs, graphWarning } from "../domain/graphOps";
-import { NODE_LABEL } from "../domain/labels";
+import { graphBreadcrumbs } from "../domain/graphOps";
 import { SCHEMA_VERSION } from "../domain/types";
+import { libraryKind } from "../domain/format";
 import { useProjectStore } from "../store/projectStore";
+import { EntityEditor } from "./EntityEditor";
 import { ExportDialog } from "./ExportDialog";
 import { GraphCanvas } from "./GraphCanvas";
 import { Inspector } from "./Inspector";
@@ -128,11 +129,9 @@ export function AppShell() {
                 >
                   Locations
                 </button>
-                {addableNodeTypes().map((type) => (
-                  <button key={type} type="button" className="sp-chip-btn" onClick={() => addNode(type)}>
-                    + {NODE_LABEL[type]}
-                  </button>
-                ))}
+                <button type="button" className="sp-chip-btn" onClick={() => addNode()}>
+                  + Beat
+                </button>
               </div>
             </div>
             <div className="sp-workspace">
@@ -143,6 +142,12 @@ export function AppShell() {
           </>
         )}
         {screen === "play" && <PlayMode />}
+        {(screen === "characters" || screen === "items" || screen === "locations") && (
+          <div className="sp-workspace">
+            <LeftPanel />
+            <EntityEditor kind={libraryKind(screen)} />
+          </div>
+        )}
       </div>
       <footer className="sp-status">
         <span className="sp-status-path">{path}</span>
@@ -150,7 +155,6 @@ export function AppShell() {
           {graph && (
             <>
               {`${graph.nodes.length} beats · ${graph.edges.length} transitions (${graph.edges.filter((edge) => edge.condition).length} conditional)`}
-              {graphWarning(graph) && <span className="sp-warn"> · {graphWarning(graph)}</span>}
               {" · "}
             </>
           )}

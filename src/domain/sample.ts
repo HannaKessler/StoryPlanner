@@ -1,5 +1,5 @@
-import type { Condition, Effect, GraphDocument, ProjectDocument, StoryNode } from "./types";
-import { SCHEMA_VERSION } from "./types";
+import type { Condition, Effect, GraphDocument, ProjectDocument } from "./types";
+import { migrationContext, parseGraph, parseProject } from "./schema";
 
 const NOW = "2026-01-15T18:00:00.000Z";
 
@@ -24,7 +24,7 @@ function effect(
   return { id, variableId, op, value };
 }
 
-function node(partial: Omit<StoryNode, "tagIds" | "locationPosition"> & { tagIds?: string[] }): StoryNode {
+function node(partial: Record<string, unknown> & { id: string }) {
   return { tagIds: [], locationPosition: null, ...partial };
 }
 
@@ -56,8 +56,8 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
     ],
   };
 
-  const project: ProjectDocument = {
-    schemaVersion: SCHEMA_VERSION,
+  const project = {
+    schemaVersion: 3,
     id: "proj_lantern_gate",
     name: "The Lantern Gate",
     createdAt: NOW,
@@ -140,8 +140,8 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
     ],
   };
 
-  const root: GraphDocument = {
-    schemaVersion: SCHEMA_VERSION,
+  const root = {
+    schemaVersion: 3,
     id: "graph_root",
     name: "The Lantern Gate",
     parentGraphId: null,
@@ -272,8 +272,8 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
     ],
   };
 
-  const approach: GraphDocument = {
-    schemaVersion: SCHEMA_VERSION,
+  const approach = {
+    schemaVersion: 3,
     id: "graph_approach",
     name: "At the gate",
     parentGraphId: "graph_root",
@@ -522,8 +522,8 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
     ],
   };
 
-  const inside: GraphDocument = {
-    schemaVersion: SCHEMA_VERSION,
+  const inside = {
+    schemaVersion: 3,
     id: "graph_inside",
     name: "Within the walls",
     parentGraphId: "graph_root",
@@ -610,17 +610,18 @@ export function buildSample(): { project: ProjectDocument; graphs: Record<string
     node_in_court: ["tag_loc_inside"],
     node_in_end: ["tag_loc_inside"],
   };
-  const place = (graph: GraphDocument): GraphDocument => ({
+  const place = <T extends { nodes: Array<{ id: string }> }>(graph: T) => ({
     ...graph,
     nodes: graph.nodes.map((item) => ({ ...item, tagIds: locations[item.id] ?? [] })),
   });
 
+  const context = migrationContext(project);
   return {
-    project,
+    project: parseProject(project),
     graphs: {
-      [root.id]: place(root),
-      [approach.id]: place(approach),
-      [inside.id]: place(inside),
+      [root.id]: parseGraph(place(root), context),
+      [approach.id]: parseGraph(place(approach), context),
+      [inside.id]: parseGraph(place(inside), context),
     },
   };
 }

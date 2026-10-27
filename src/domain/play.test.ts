@@ -8,7 +8,12 @@ const { project, graphs } = buildSample();
 function openPlay(): PlayState {
   const state = createPlayState(project, graphs);
   expect(state.choosingGraphId).toBe(project.rootGraphId);
-  return chooseStart(state, graphs, "node_root_start");
+  return chooseStart(state, graphs, "node_root_start", project.variables);
+}
+
+function enterChild(state: PlayState, graphId: string, nodeId: string): PlayState {
+  expect(state.choosingGraphId).toBe(graphId);
+  return chooseStart(state, graphs, nodeId, project.variables);
 }
 
 function take(state: PlayState, label: string): PlayState {
@@ -24,7 +29,7 @@ function labels(state: PlayState, enabledOnly = false): string[] {
 }
 
 describe("play-through", () => {
-  it("disables the token transition until hasToken is set, and spends gold on a bribe", () => {
+  it("disables the token transition until hasToken is set, and spends gold on entering the bribe", () => {
     let state = openPlay();
     state = take(state, "Approach the gate");
     expect(labels(state)).toContain("Step in");
@@ -32,6 +37,7 @@ describe("play-through", () => {
     expect(labels(state, true)).not.toContain("Enter the walls");
 
     state = take(state, "Step in");
+    state = enterChild(state, "graph_approach", "node_ap_start");
     state = take(state, "At the gate");
     const atGate = labels(state);
     expect(atGate).toContain("off:Show the lantern token");
@@ -61,6 +67,7 @@ describe("play-through", () => {
     let state = openPlay();
     state = take(state, "Approach the gate");
     state = take(state, "Step in");
+    state = enterChild(state, "graph_approach", "node_ap_start");
     state = take(state, "At the gate");
     const blocked = availableActions(state, project, graphs).find((action) => action.label === "Show the lantern token");
     expect(blocked?.enabled).toBe(false);
@@ -71,25 +78,28 @@ describe("play-through", () => {
 });
 
 describe("transition actions", () => {
-  it("describes the target, the condition, and the effects of each outgoing transition", () => {
+  it("describes the target and the condition, and leaves effects on the beat that is entered", () => {
     let state = openPlay();
     state = take(state, "Approach the gate");
     state = take(state, "Step in");
+    state = enterChild(state, "graph_approach", "node_ap_start");
     state = take(state, "At the gate");
     const coin = availableActions(state, project, graphs).find((action) => action.label === "Offer a coin");
     expect(coin?.kind).toBe("transition");
     expect(coin?.target).toBe("The bribe");
     expect(coin?.condition).toContain("gold ≥ 1");
-    expect(coin?.effects).toContain("subtract 1 from gold");
+    expect(coin).not.toHaveProperty("effects");
+    const bribe = graphs.graph_approach.nodes.find((node) => node.id === "node_ap_bribe");
+    expect(bribe?.effects.map((effect) => effect.id)).toEqual(["fx_coin_gold", "fx_coin_location"]);
   });
 });
 
 describe("choosing a start", () => {
-  it("waits when the root has several starts, then enters the one that was picked", () => {
+  it("waits, then enters whichever beat was picked", () => {
     const waiting = createPlayState(project, graphs);
     expect(waiting.frames).toEqual([]);
     expect(waiting.choosingGraphId).toBe("graph_root");
-    const hill = chooseStart(waiting, graphs, "node_root_hill");
+    const hill = chooseStart(waiting, graphs, "node_root_hill", project.variables);
     expect(hill.choosingGraphId).toBeNull();
     expect(hill.log).toEqual(["From the hill"]);
     const next = take(hill, "Word of the gate");
@@ -97,26 +107,19 @@ describe("choosing a start", () => {
     expect(labels(next, true)).toContain("Come up to the gate");
   });
 
-  it("enters the only start without asking", () => {
+  it("still waits when a graph has one beat with no incoming edge", () => {
     const approach = graphs.graph_approach;
-    const state = createPlayState(
-      { ...project, rootGraphId: approach.id },
-      graphs,
-    );
-    expect(state.choosingGraphId).toBeNull();
-    expect(state.frames).toEqual([{ graphId: approach.id, nodeId: "node_ap_start" }]);
+    const state = createPlayState({ ...project, rootGraphId: approach.id }, graphs);
+    expect(state.choosingGraphId).toBe(approach.id);
+    expect(state.frames).toEqual([]);
+    const entered = chooseStart(state, graphs, "node_ap_start", project.variables);
+    expect(entered.frames).toEqual([{ graphId: approach.id, nodeId: "node_ap_start" }]);
   });
 
-  it("stops to warn when a graph has no start", () => {
-    const bare = {
-      ...graphs.graph_root,
-      id: "graph_bare",
-      nodes: graphs.graph_root.nodes.filter((node) => node.type !== "start"),
-      edges: [],
-    };
-    const state = createPlayState({ ...project, rootGraphId: bare.id }, { ...graphs, [bare.id]: bare });
-    expect(state.frames).toEqual([]);
-    expect(state.choosingGraphId).toBe(bare.id);
-    expect(chooseStart(state, { ...graphs, [bare.id]: bare }, "node_root_approach").frames).toEqual([]);
+  it("can enter a beat that already has an incoming transition", () => {
+    const state = createPlayState(project, graphs);
+    const entered = chooseStart(state, graphs, "node_root_approach", project.variables);
+    expect(entered.frames).toEqual([{ graphId: "graph_root", nodeId: "node_root_approach" }]);
+    expect(entered.choosingGraphId).toBeNull();
   });
 });

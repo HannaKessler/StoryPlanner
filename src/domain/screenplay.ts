@@ -1,17 +1,9 @@
 import { describeCondition } from "./conditions";
 import { describeEffect } from "./effects";
 import { speakerName } from "./format";
-import { startNodes } from "./graphOps";
+import { entryNodes } from "./graphOps";
 import { beatLabel } from "./labels";
 import type { GraphDocument, ProjectDocument, StoryEdge, StoryNode } from "./types";
-
-const TYPE_LABEL: Record<StoryNode["type"], string> = {
-  start: "Start",
-  event: "Event",
-  scene: "Scene",
-  dialogue: "Dialogue",
-  end: "End",
-};
 
 /**
  * Markdown screenplay. Branching is written in full the first time a beat
@@ -48,11 +40,15 @@ function writeGraph(
   if (graph.sceneNotes.trim()) {
     lines.push(...quote(graph.sceneNotes), "");
   }
-  for (const entry of startNodes(graph)) writeNode(graph, entry, level, lines, seen, project, graphs);
-  for (const node of graph.nodes) {
-    if (!seen.has(key(graph, node))) {
-      lines.push("_Not reachable from a start of this graph._", "");
-      writeNode(graph, node, level, lines, seen, project, graphs);
+  const entries = entryNodes(graph);
+  const roots = entries.length > 0 ? entries : graph.nodes;
+  for (const entry of roots) writeNode(graph, entry, level, lines, seen, project, graphs);
+  if (entries.length > 0) {
+    for (const node of graph.nodes) {
+      if (!seen.has(key(graph, node))) {
+        lines.push("_Not reached by a transition._", "");
+        writeNode(graph, node, level, lines, seen, project, graphs);
+      }
     }
   }
 }
@@ -72,21 +68,18 @@ function writeNode(
     return;
   }
   seen.add(id);
-  if (node.type === "start") {
-    lines.push(heading(level, beatLabel(node, project)), "");
-    writeExits(graph, node, level, lines, seen, project, graphs);
-    return;
-  }
   lines.push(heading(level, beatLabel(node, project)), "");
-  lines.push(`*${TYPE_LABEL[node.type]}*`, "");
   if (node.summary.trim()) {
     lines.push(node.summary.trim(), "");
   }
   if (node.sceneNotes.trim()) {
     lines.push(...quote(node.sceneNotes), "");
   }
+  if (node.effects.length > 0) {
+    lines.push(`*On enter: ${node.effects.map((effect) => describeEffect(effect, project)).join("; ")}.*`, "");
+  }
   for (const line of node.lines) {
-    const speaker = speakerName(project, line.speakerTagId).toUpperCase();
+    const speaker = speakerName(project, line.speakerId).toUpperCase();
     lines.push(`**${speaker}**`);
     if (line.direction.trim()) lines.push(`*(${line.direction.trim()})*`);
     lines.push("", line.text.trim() || "…", "");
@@ -120,7 +113,7 @@ function writeExits(
 }
 
 function hasLogic(edge: StoryEdge): boolean {
-  return Boolean(edge.label || edge.condition || edge.effects.length);
+  return Boolean(edge.label || edge.condition);
 }
 
 function writeTransition(
@@ -132,11 +125,7 @@ function writeTransition(
   const title = target ? beatLabel(target, project) : "Missing beat";
   const heading = edge.label ? `${edge.label} → ${title}` : `→ ${title}`;
   lines.push(`**${heading}**`);
-  lines.push(`*When ${describeCondition(edge.condition, project)}.*`);
-  if (edge.effects.length) {
-    lines.push(`*Then ${edge.effects.map((effect) => describeEffect(effect, project)).join(", ")}.*`);
-  }
-  lines.push("");
+  lines.push(`*When ${describeCondition(edge.condition, project)}.*`, "");
 }
 
 function key(graph: GraphDocument, node: StoryNode): string {

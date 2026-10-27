@@ -12,11 +12,11 @@ describe("project folder round trip", () => {
       id: childId,
       name: "Inner",
       parentGraphId: root.id,
-      parentNodeId: root.nodes[1].id,
-      nodes: [createNode("start", { id: "inner_start", title: "Start", position: { x: 0, y: 0 } })],
+      parentNodeId: root.nodes[0].id,
+      nodes: [createNode({ id: "inner_start", title: "Start", position: { x: 0, y: 0 } })],
       edges: [],
     });
-    root.nodes[1].subgraphId = childId;
+    root.nodes[0].subgraphId = childId;
     const graphs = { ...created.graphs, [childId]: child };
     const fs = createMemoryFs();
     const saved = await saveProject(fs, "/stories/harbor", created.project, graphs, "2026-03-01T00:00:00.000Z");
@@ -44,7 +44,7 @@ describe("project folder round trip", () => {
     const extra = createGraph({
       id: "graph_extra",
       name: "Extra",
-      nodes: [createNode("end", { id: "end", title: "End" })],
+      nodes: [createNode({ id: "end", title: "End" })],
       edges: [createEdge("missing", "end")],
     });
     const graphs = { ...created.graphs, [extra.id]: extra };

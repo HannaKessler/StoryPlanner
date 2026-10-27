@@ -8,7 +8,6 @@ import { useContextMenu } from "./ContextMenu";
 export type TransitionEdgeData = Record<string, unknown> & {
   label: string;
   condition: string;
-  effects: string;
   offset: number;
 };
 export type TransitionFlowEdge = Edge<TransitionEdgeData, "transition">;
@@ -59,7 +58,7 @@ export function TransitionEdge({
             type="button"
             className={`sp-edge-label nodrag nopan${selected ? " is-selected" : ""}`}
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
-            title={[data.condition && `If ${data.condition}`, data.effects && `Then ${data.effects}`].filter(Boolean).join("\n")}
+            title={data.condition ? `If ${data.condition}` : undefined}
             onClick={(event) => {
               event.stopPropagation();
               select({ kind: "edge", id });

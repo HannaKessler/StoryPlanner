@@ -1,7 +1,10 @@
-import type { GraphDocument, ProjectDocument, StoryNode, Tag } from "./types";
+import { indexInvolved, involvement } from "./involved";
+import type { GraphDocument, ProjectDocument, StoryNode } from "./types";
 
-/** Beats with no location tag share this box. */
-export const UNASSIGNED_LOCATION = "unassigned";
+/** Beats with no place of their own, and no single inherited place, share this box. */
+export const UNPLACED_LOCATION = "unplaced";
+/** Beats with no place of their own and more than one inherited place. */
+export const MULTI_LOCATION = "multiple";
 
 const PAD = 16;
 const TITLE = 36;
@@ -11,19 +14,19 @@ const BOX_GAP = 72;
 const MIN_W = PAD + CARD_W + PAD;
 const MIN_H = TITLE + 96;
 
-/** Height the location layout reserves for a card. Dialogue grows with every line. */
-function cardHeight(node: StoryNode | undefined): number {
+/** Height the location layout reserves for a card. Lines, notes, and refs add rows. */
+function cardHeight(node: StoryNode | undefined, extraRows = 0): number {
   if (!node) return 72;
   let body = node.title.trim() ? 18 : 0;
-  if (node.type === "dialogue" && node.lines.length > 0) {
-    for (const line of node.lines) {
-      const chars = 14 + line.text.length;
-      body += Math.max(1, Math.ceil(chars / 30)) * 16;
-    }
-  } else if (node.summary.trim()) {
-    body += Math.max(1, Math.ceil(node.summary.trim().length / 30)) * 16;
+  body += extraRows * 16;
+  if (node.summary.trim()) body += Math.max(1, Math.ceil(node.summary.trim().length / 30)) * 16;
+  if (node.sceneNotes.trim()) body += Math.max(1, Math.ceil(node.sceneNotes.trim().length / 30)) * 16;
+  for (const line of node.lines) {
+    const chars = 14 + line.text.length;
+    body += Math.max(1, Math.ceil(chars / 30)) * 16;
   }
-  return Math.max(40, 16 + 16 + body);
+  if (node.effects.length > 0) body += node.effects.length * 14;
+  return Math.max(40, 16 + body);
 }
 
 export interface LocationFrameNode {
@@ -43,51 +46,45 @@ export interface LocationFrame {
   nodes: LocationFrameNode[];
 }
 
-/** Location tags in project order: category order, then tag order inside each category. */
-export function locationTags(project: ProjectDocument): Tag[] {
-  const tags: Tag[] = [];
-  for (const category of project.tagCategories) {
-    if (!category.isLocations) continue;
-    tags.push(...category.tags);
-  }
-  return tags;
+/** The box a beat is drawn in. Own location wins. One inherited location is used. Several inherited locations share a box. */
+export function placementLocationId(
+  node: StoryNode,
+  inheritedLocationIds: string[],
+): string {
+  if (node.locationId) return node.locationId;
+  if (inheritedLocationIds.length === 1) return inheritedLocationIds[0];
+  if (inheritedLocationIds.length > 1) return MULTI_LOCATION;
+  return UNPLACED_LOCATION;
 }
 
-/**
- * The box a beat is drawn in. A beat with several location tags is drawn once,
- * in the earliest of those tags in project order, so it stays one node and
- * each transition is drawn once.
- */
-export function primaryLocationId(node: StoryNode, project: ProjectDocument): string | null {
-  const have = new Set(node.tagIds);
-  return locationTags(project).find((tag) => have.has(tag.id))?.id ?? null;
-}
-
-/** Boxes for the current graph, including an empty Unassigned box. Does not read graph-view positions except to order beats that have no saved location point. */
+/** Boxes for the current graph, including an empty Unplaced box. Does not read graph-view positions except to order beats that have no saved location point. */
 export function locationGroups(
   graph: GraphDocument,
   project: ProjectDocument,
+  graphs: Record<string, GraphDocument> = { [graph.id]: graph },
 ): Array<{ id: string; name: string; nodeIds: string[] }> {
-  const groups = locationTags(project).map((tag) => ({
-    id: tag.id,
-    name: tag.name || "Untitled",
+  const index = indexInvolved(graphs);
+  const groups = project.locations.map((location) => ({
+    id: location.id,
+    name: location.name || "Untitled",
     nodeIds: [] as string[],
   }));
-  const unassigned = { id: UNASSIGNED_LOCATION, name: "Unassigned", nodeIds: [] as string[] };
+  const multiple = { id: MULTI_LOCATION, name: "Multiple", nodeIds: [] as string[] };
+  const unplaced = { id: UNPLACED_LOCATION, name: "Unplaced", nodeIds: [] as string[] };
   const ranked = graph.nodes
-    .map((node, index) => ({ node, index }))
+    .map((node, index) => ({ node, order: index }))
     .sort(
       (a, b) =>
         a.node.position.y - b.node.position.y ||
         a.node.position.x - b.node.position.x ||
-        a.index - b.index,
+        a.order - b.order,
     );
   for (const { node } of ranked) {
-    const place = primaryLocationId(node, project);
-    const group = groups.find((item) => item.id === place) ?? unassigned;
+    const place = placementLocationId(node, involvement(index, graph.id, node.id).inherited.locationIds);
+    const group = groups.find((item) => item.id === place) ?? (place === MULTI_LOCATION ? multiple : unplaced);
     group.nodeIds.push(node.id);
   }
-  return [...groups, unassigned];
+  return [...groups, ...(multiple.nodeIds.length > 0 ? [multiple] : []), unplaced];
 }
 
 /**
@@ -95,11 +92,21 @@ export function locationGroups(
  * are used when present; everything else gets a default that fits the beats.
  * This does not write the graph.
  */
-export function locationFrames(graph: GraphDocument, project: ProjectDocument): LocationFrame[] {
+export function locationFrames(
+  graph: GraphDocument,
+  project: ProjectDocument,
+  graphs: Record<string, GraphDocument> = { [graph.id]: graph },
+): LocationFrame[] {
   const saved = new Map(graph.locationBoxes.map((box) => [box.id, box]));
-  const drafts = locationGroups(graph, project).map((group) => {
+  const involved = indexInvolved(graphs);
+  const drafts = locationGroups(graph, project, graphs).map((group) => {
     const placed = new Map<string, { x: number; y: number }>();
-    const heightOf = (id: string) => cardHeight(graph.nodes.find((node) => node.id === id));
+    const heightOf = (id: string) => {
+      const node = graph.nodes.find((item) => item.id === id);
+      const info = involvement(involved, graph.id, id);
+      const extra = [info.all.locationIds, info.all.characterIds, info.all.itemIds].filter((ids) => ids.length > 0).length;
+      return cardHeight(node, extra);
+    };
     let bottom = TITLE;
     for (const id of group.nodeIds) {
       const stored = graph.nodes.find((node) => node.id === id)?.locationPosition;

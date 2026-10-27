@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "id": "graph_inside",
   "name": "Within the walls",
   "parentGraphId": "graph_root",
@@ -8,12 +8,8 @@
   "locationBoxes": [],
   "nodes": [
     {
-      "tagIds": [
-        "tag_loc_inside"
-      ],
-      "locationPosition": null,
       "id": "node_in_start",
-      "type": "start",
+      "type": "beat",
       "position": {
         "x": 40,
         "y": 180
@@ -22,15 +18,16 @@
       "summary": "",
       "sceneNotes": "",
       "subgraphId": null,
-      "lines": []
+      "locationId": "tag_loc_inside",
+      "characterIds": [],
+      "itemIds": [],
+      "locationPosition": null,
+      "lines": [],
+      "effects": []
     },
     {
-      "tagIds": [
-        "tag_loc_inside"
-      ],
-      "locationPosition": null,
       "id": "node_in_court",
-      "type": "dialogue",
+      "type": "beat",
       "position": {
         "x": 320,
         "y": 150
@@ -39,22 +36,23 @@
       "summary": "",
       "sceneNotes": "Rain sounds farther off. The gate closes.",
       "subgraphId": null,
+      "locationId": "tag_loc_inside",
+      "characterIds": [],
+      "itemIds": [],
+      "locationPosition": null,
       "lines": [
         {
           "id": "line_court_1",
-          "speakerTagId": "tag_traveler",
+          "speakerId": "tag_traveler",
           "text": "The rain sounds different in here.",
           "direction": ""
         }
-      ]
+      ],
+      "effects": []
     },
     {
-      "tagIds": [
-        "tag_loc_inside"
-      ],
-      "locationPosition": null,
       "id": "node_in_end",
-      "type": "end",
+      "type": "beat",
       "position": {
         "x": 680,
         "y": 170
@@ -63,7 +61,12 @@
       "summary": "The night changes its sound.",
       "sceneNotes": "",
       "subgraphId": null,
-      "lines": []
+      "locationId": "tag_loc_inside",
+      "characterIds": [],
+      "itemIds": [],
+      "locationPosition": null,
+      "lines": [],
+      "effects": []
     }
   ],
   "edges": [
@@ -72,16 +75,14 @@
       "source": "node_in_start",
       "target": "node_in_court",
       "label": "",
-      "condition": null,
-      "effects": []
+      "condition": null
     },
     {
       "id": "edge_in_end",
       "source": "node_in_court",
       "target": "node_in_end",
       "label": "",
-      "condition": null,
-      "effects": []
+      "condition": null
     }
   ]
 }

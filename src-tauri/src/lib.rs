@@ -50,6 +50,21 @@ fn remove_file(path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn copy_file(from: String, to: String) -> Result<(), String> {
+    let destination = PathBuf::from(&to);
+    if let Some(parent) = destination.parent() {
+        fs::create_dir_all(parent).map_err(|error| format!("Could not create {}: {error}", parent.display()))?;
+    }
+    fs::copy(&from, &destination).map_err(|error| format!("Could not copy {from} to {to}: {error}"))?;
+    Ok(())
+}
+
+#[tauri::command]
+fn read_file_bytes(path: String) -> Result<Vec<u8>, String> {
+    fs::read(&path).map_err(|error| format!("Could not read {path}: {error}"))
+}
+
+#[tauri::command]
 fn sample_project_dir(app: tauri::AppHandle) -> Result<String, String> {
     let dev = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../sample-project");
     if dev.join("project.json").is_file() {
@@ -74,6 +89,8 @@ pub fn run() {
             create_dir,
             path_exists,
             remove_file,
+            copy_file,
+            read_file_bytes,
             sample_project_dir
         ])
         .run(tauri::generate_context!())

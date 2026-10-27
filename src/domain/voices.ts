@@ -24,7 +24,7 @@ export function exportVoiceSheets(
   project: ProjectDocument,
   graphs: Record<string, GraphDocument>,
 ): string {
-  const categories = project.tagCategories.filter((category) => category.isCharacters);
+  const characters = project.characters;
   const lines: string[] = [
     "# Voice actor sheets",
     "",
@@ -33,20 +33,16 @@ export function exportVoiceSheets(
     "Each section is one character. Only their lines are listed. The italic line above each one is the line it directly answers. When a line answers different lines on different paths, every one of them is listed. Scene notes are included for context.",
     "",
   ];
-  if (categories.length === 0) {
-    lines.push(
-      "_No tag category is marked as characters. Mark one in Tags, then speakers can be chosen for dialogue._",
-      "",
-    );
+  if (characters.length === 0) {
+    lines.push("_No characters yet._", "");
     return `${lines.join("\n").trim()}\n`;
   }
 
   const order = orderedGraphs(project, graphs);
-  for (const category of categories) {
-    for (const tag of category.tags) {
-      lines.push(`## ${tag.name}`, "");
-      if (tag.description.trim()) lines.push(tag.description.trim(), "");
-      const appearances = collectLines(order, tag.id);
+  for (const character of characters) {
+      lines.push(`## ${character.name || "Untitled"}`, "");
+      if (character.notes.trim()) lines.push(character.notes.trim(), "");
+      const appearances = collectLines(order, character.id);
       if (appearances.length === 0) {
         lines.push("_No lines yet._", "");
         continue;
@@ -68,9 +64,8 @@ export function exportVoiceSheets(
             lines.push(`> **${cue.speaker}:** *${cue.line.text.trim() || "…"}*${via}`, "");
           }
         }
-        lines.push(`**${tag.name.toUpperCase()}**`, "", line.text.trim() || "…", "", "---", "");
+        lines.push(`**${(character.name || "Untitled").toUpperCase()}**`, "", line.text.trim() || "…", "", "---", "");
       }
-    }
   }
   return `${lines.join("\n").trim()}\n`;
 }
@@ -80,7 +75,7 @@ function collectLines(graphs: GraphDocument[], speakerTagId: string) {
   for (const graph of graphs) {
     for (const node of graph.nodes) {
       node.lines.forEach((line, index) => {
-        if (line.speakerTagId === speakerTagId) found.push({ graph, node, line, index });
+        if (line.speakerId === speakerTagId) found.push({ graph, node, line, index });
       });
     }
   }
@@ -192,7 +187,7 @@ function transitionLabel(edge: StoryEdge | null): string | null {
 function makeCue(project: ProjectDocument, line: DialogueLine, viaLabel: string | null): Cue {
   return {
     line,
-    speaker: speakerName(project, line.speakerTagId),
+    speaker: speakerName(project, line.speakerId),
     viaLabel,
   };
 }

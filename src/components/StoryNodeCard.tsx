@@ -1,63 +1,93 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { speakerName } from "../domain/format";
-import { NODE_LABEL } from "../domain/labels";
+import { describeEffect } from "../domain/effects";
+import { entityName, speakerName } from "../domain/format";
+import type { NodeInvolvement } from "../domain/involved";
 import type { DialogueLine, ProjectDocument, StoryNode } from "../domain/types";
 import { useProjectStore } from "../store/projectStore";
 
-export type StoryNodeData = Record<string, unknown> & { story: StoryNode };
+export type StoryNodeData = Record<string, unknown> & {
+  story: StoryNode;
+  involvement: NodeInvolvement;
+};
 export type StoryFlowNode = Node<StoryNodeData, "story">;
 
 export function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
   const story = data.story;
   const project = useProjectStore((state) => state.project);
   const openSubgraph = useProjectStore((state) => state.openSubgraph);
-  const hasOutgoing = useProjectStore((state) => {
-    const current = state.currentGraphId ? state.graphs[state.currentGraphId] : undefined;
-    return current?.edges.some((edge) => edge.source === story.id) ?? false;
-  });
   const title = story.title.trim();
-  const lines = story.type === "dialogue" ? story.lines : [];
-  const summary = lines.length === 0 ? story.summary.trim() : "";
+  const summary = story.summary.trim();
+  const own = data.involvement?.own;
+  const all = data.involvement?.all;
 
   return (
     <article
-      className={`sp-node sp-type-${story.type}${selected ? " is-selected" : ""}`}
+      className={`sp-node${selected ? " is-selected" : ""}`}
       onDoubleClickCapture={(event) => {
-        // Capture runs before the pane's dblclick zoom listener. A node
-        // double-click never zooms. It opens a sub-graph only when one exists.
         event.preventDefault();
         event.stopPropagation();
         if (story.subgraphId) openSubgraph(story.id);
       }}
     >
       <Handle type="target" position={Position.Left} id="in" />
-      <header>
-        <span>{NODE_LABEL[story.type]}</span>
-        {story.subgraphId && (
-          <span className="sp-node-nest" title="Sub-graph">
-            ↳
-          </span>
-        )}
-      </header>
-      {title && <h3>{title}</h3>}
-      {lines.length > 0 && (
+      {(story.subgraphId || title) && (
+        <header>
+          {title ? <h3>{title}</h3> : <span />}
+          {story.subgraphId && (
+            <span className="sp-node-nest" title="Sub-graph">
+              ↳
+            </span>
+          )}
+        </header>
+      )}
+      {project && <RefLine ids={all?.locationIds ?? []} own={own?.locationIds ?? []} project={project} />}
+      {project && <RefLine ids={all?.characterIds ?? []} own={own?.characterIds ?? []} project={project} kind="who" />}
+      {project && <RefLine ids={all?.itemIds ?? []} own={own?.itemIds ?? []} project={project} kind="item" />}
+      {summary && <p>{summary}</p>}
+      {story.lines.length > 0 && (
         <ul className="sp-node-lines">
-          {lines.map((line) => (
+          {story.lines.map((line) => (
             <li key={line.id}>{lineText(line, project)}</li>
           ))}
         </ul>
       )}
-      {summary && <p>{summary}</p>}
-      {story.type !== "end" ? (
-        <Handle type="source" position={Position.Right} id="out" className="sp-handle-out" />
-      ) : (
-        hasOutgoing && <Handle type="source" position={Position.Right} id="out" className="sp-handle-out" isConnectable={false} />
+      {project && story.effects.length > 0 && (
+        <ul className="sp-node-fx">
+          {story.effects.map((effect) => (
+            <li key={effect.id}>{describeEffect(effect, project)}</li>
+          ))}
+        </ul>
       )}
+      <Handle type="source" position={Position.Right} id="out" className="sp-handle-out" />
     </article>
   );
 }
 
+function RefLine({
+  ids,
+  own,
+  project,
+  kind,
+}: {
+  ids: string[];
+  own: string[];
+  project: ProjectDocument;
+  kind?: "who" | "item";
+}) {
+  if (ids.length === 0) return null;
+  const ownSet = new Set(own);
+  return (
+    <p className={`sp-node-refs${kind ? ` is-${kind}` : ""}`}>
+      {ids.map((id) => (
+        <span key={id} className={ownSet.has(id) ? "sp-ref" : "sp-ref is-inherited"} title={ownSet.has(id) ? undefined : "Sub-graph"}>
+          {entityName(project, id)}
+        </span>
+      ))}
+    </p>
+  );
+}
+
 function lineText(line: DialogueLine, project: ProjectDocument | null): string {
-  const speaker = project ? speakerName(project, line.speakerTagId) : "Narration";
+  const speaker = project ? speakerName(project, line.speakerId) : "Narration";
   return `${speaker}: ${line.text}`;
 }

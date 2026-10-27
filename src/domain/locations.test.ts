@@ -1,21 +1,21 @@
 import { describe, expect, it } from "vitest";
-import { locationFrames, primaryLocationId } from "./locations";
+import { locationFrames } from "./locations";
 import { buildSample } from "./sample";
 
 describe("location boxes", () => {
   const { project, graphs } = buildSample();
   const root = graphs.graph_root;
 
-  it("draws a beat with several location tags once, in the earliest box", () => {
+  it("draws a beat with its own location, and keeps an extra place in the notes", () => {
     const turned = root.nodes.find((node) => node.id === "node_root_turned");
-    expect(turned?.tagIds).toEqual(["tag_loc_gate", "tag_loc_road"]);
-    expect(primaryLocationId(turned!, project)).toBe("tag_loc_gate");
-    const frames = locationFrames(root, project);
+    expect(turned?.locationId).toBe("tag_loc_gate");
+    expect(turned?.sceneNotes).toContain("The Old Road");
+    const frames = locationFrames(root, project, graphs);
     expect(frames.map((frame) => frame.name)).toEqual([
       "The Lantern Gate",
       "The Old Road",
       "Inside the Walls",
-      "Unassigned",
+      "Unplaced",
     ]);
     const gate = frames.find((frame) => frame.id === "tag_loc_gate");
     const road = frames.find((frame) => frame.id === "tag_loc_road");
@@ -45,7 +45,7 @@ describe("location boxes", () => {
       locationBoxes: [{ id: "tag_loc_road", position: { x: 900, y: 240 }, size: { width: 800, height: 700 } }],
       nodes: root.nodes.map((node) => (node.id === hill.id ? { ...node, locationPosition: { x: 40, y: 300 } } : node)),
     };
-    const frames = locationFrames(moved, project);
+    const frames = locationFrames(moved, project, graphs);
     const road = frames.find((frame) => frame.id === "tag_loc_road");
     expect(road?.position).toEqual({ x: 900, y: 240 });
     expect(road?.size.width).toBe(800);

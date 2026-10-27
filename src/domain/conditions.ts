@@ -1,5 +1,5 @@
-import { formatValue, variableById } from "./format";
-import type { CompareOp, Condition, ProjectDocument, Scalar, VariableDef } from "./types";
+import { entityName, formatValue, variableById } from "./format";
+import type { CompareOp, Condition, ProjectDocument, VariableDef, VariableValue } from "./types";
 
 const OP_LABEL: Record<CompareOp, string> = {
   eq: "is",
@@ -12,7 +12,7 @@ const OP_LABEL: Record<CompareOp, string> = {
 
 export function evaluateCondition(
   condition: Condition | null,
-  values: Record<string, Scalar>,
+  values: Record<string, VariableValue>,
   variables: VariableDef[],
 ): boolean {
   if (!condition) return true;
@@ -21,7 +21,7 @@ export function evaluateCondition(
 
 function evaluateNode(
   condition: Condition,
-  values: Record<string, Scalar>,
+  values: Record<string, VariableValue>,
   variables: VariableDef[],
 ): boolean {
   if (condition.type === "group") {
@@ -31,12 +31,23 @@ function evaluateNode(
     return condition.children.some((child) => evaluateNode(child, values, variables));
   }
   if (condition.type === "not") return !evaluateNode(condition.child, values, variables);
+  if (condition.type === "has") return evaluateHas(condition, values);
   return evaluateCompare(condition, values, variables);
+}
+
+function evaluateHas(
+  condition: Extract<Condition, { type: "has" }>,
+  values: Record<string, VariableValue>,
+): boolean {
+  if (!(condition.variableId in values)) return false;
+  const current = values[condition.variableId];
+  if (Array.isArray(current)) return current.includes(condition.entityId);
+  return current === condition.entityId;
 }
 
 function evaluateCompare(
   condition: Extract<Condition, { type: "compare" }>,
-  values: Record<string, Scalar>,
+  values: Record<string, VariableValue>,
   variables: VariableDef[],
 ): boolean {
   const variable = variables.find((item) => item.id === condition.variableId);
@@ -80,6 +91,11 @@ function describeNode(condition: Condition, project: ProjectDocument): string {
     return `${label} (${condition.children.map((child) => describeNode(child, project)).join("; ")})`;
   }
   if (condition.type === "not") return `not (${describeNode(condition.child, project)})`;
+  if (condition.type === "has") {
+    const variable = variableById(project, condition.variableId);
+    const name = variable?.name || "missing variable";
+    return `${name} has ${entityName(project, condition.entityId)}`;
+  }
   const variable = variableById(project, condition.variableId);
   const name = variable?.name || "missing variable";
   const value = formatValue(project, variable, condition.value);
